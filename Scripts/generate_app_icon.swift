@@ -1,22 +1,16 @@
 import AppKit
-import CoreImage
 
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-let sourceURL = root.appendingPathComponent("Kara/Supporting/IconSources/KaraIcon-1024.png")
-let outputRoot = root.appendingPathComponent("Kara/Assets.xcassets")
+let outputRoot = root.appendingPathComponent("MyClip/Assets.xcassets")
 let appIconSet = outputRoot.appendingPathComponent("AppIcon.appiconset")
-let iconset = root.appendingPathComponent("build/Kara.iconset")
-let sources = root.appendingPathComponent("Kara/Supporting/IconSources")
-let iconComposerDocument = root.appendingPathComponent("Kara/Supporting/AppIcon.icon")
+let iconset = root.appendingPathComponent("build/MyClip.iconset")
+let sources = root.appendingPathComponent("MyClip/Supporting/IconSources")
+let iconComposerDocument = root.appendingPathComponent("MyClip/Supporting/AppIcon.icon")
 
 try FileManager.default.createDirectory(at: appIconSet, withIntermediateDirectories: true)
 try FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
 try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
 try FileManager.default.createDirectory(at: iconComposerDocument, withIntermediateDirectories: true)
-
-guard let source = NSImage(contentsOf: sourceURL) else {
-    fatalError("Could not load source image at \(sourceURL.path)")
-}
 
 func image(pixels: Int, actions: (NSRect) -> Void) -> NSImage {
     guard let rep = NSBitmapImageRep(
@@ -59,17 +53,46 @@ let master = image(pixels: 1024) { rect in
     NSColor.clear.setFill()
     rect.fill()
 
-    source.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1.0, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
+    let tile = NSBezierPath(roundedRect: rect.insetBy(dx: 54, dy: 54), xRadius: 204, yRadius: 204)
+    NSGraphicsContext.saveGraphicsState()
+    let shadow = NSShadow()
+    shadow.shadowColor = NSColor.black.withAlphaComponent(0.12)
+    shadow.shadowBlurRadius = 20
+    shadow.shadowOffset = NSSize(width: 0, height: -8)
+    shadow.set()
+    NSColor.white.setFill()
+    tile.fill()
+    NSGraphicsContext.restoreGraphicsState()
+    NSColor(calibratedWhite: 0.86, alpha: 1).setStroke()
+    tile.lineWidth = 2
+    tile.stroke()
+
+    let clip = NSBezierPath()
+    clip.move(to: NSPoint(x: 356, y: 655))
+    clip.line(to: NSPoint(x: 356, y: 378))
+    clip.curve(to: NSPoint(x: 512, y: 222), controlPoint1: NSPoint(x: 356, y: 292), controlPoint2: NSPoint(x: 426, y: 222))
+    clip.curve(to: NSPoint(x: 668, y: 378), controlPoint1: NSPoint(x: 598, y: 222), controlPoint2: NSPoint(x: 668, y: 292))
+    clip.line(to: NSPoint(x: 668, y: 666))
+    clip.curve(to: NSPoint(x: 550, y: 784), controlPoint1: NSPoint(x: 668, y: 731), controlPoint2: NSPoint(x: 615, y: 784))
+    clip.curve(to: NSPoint(x: 432, y: 666), controlPoint1: NSPoint(x: 485, y: 784), controlPoint2: NSPoint(x: 432, y: 731))
+    clip.line(to: NSPoint(x: 432, y: 386))
+    clip.curve(to: NSPoint(x: 512, y: 306), controlPoint1: NSPoint(x: 432, y: 342), controlPoint2: NSPoint(x: 468, y: 306))
+    clip.curve(to: NSPoint(x: 592, y: 386), controlPoint1: NSPoint(x: 556, y: 306), controlPoint2: NSPoint(x: 592, y: 342))
+    clip.line(to: NSPoint(x: 592, y: 614))
+    var orientation = AffineTransform(translationByX: 512, byY: 512)
+    orientation.rotate(byDegrees: -35)
+    orientation.translate(x: -512, y: -503)
+    clip.transform(using: orientation)
+    clip.lineWidth = 52
+    clip.lineCapStyle = .round
+    clip.lineJoinStyle = .round
+    NSColor(calibratedRed: 0.12, green: 0.14, blue: 0.18, alpha: 1).setStroke()
+    clip.stroke()
 }
 
-let overlayed = image(pixels: 1024) { rect in
-    master.draw(in: rect)
-}
-
-let masterPNG = sources.appendingPathComponent("KaraIcon-1024.png")
-try savePNG(overlayed, to: masterPNG)
-try? FileManager.default.removeItem(at: iconComposerDocument.appendingPathComponent("KaraIcon-1024.png"))
-try FileManager.default.copyItem(at: masterPNG, to: iconComposerDocument.appendingPathComponent("KaraIcon-1024.png"))
+let masterPNG = sources.appendingPathComponent("MyClipIcon-1024.png")
+try savePNG(master, to: masterPNG)
+try savePNG(master, to: iconComposerDocument.appendingPathComponent("MyClipIcon-1024.png"))
 
 let slots: [(String, Int)] = [
     ("icon_16x16.png", 16),
@@ -86,11 +109,15 @@ let slots: [(String, Int)] = [
 
 for (name, pixels) in slots {
     let resized = image(pixels: pixels) { rect in
-        overlayed.draw(in: rect, from: NSRect(x: 0, y: 0, width: 1024, height: 1024), operation: .sourceOver, fraction: 1.0)
+        master.draw(in: rect, from: NSRect(x: 0, y: 0, width: 1024, height: 1024), operation: .sourceOver, fraction: 1.0)
     }
     try savePNG(resized, to: appIconSet.appendingPathComponent(name))
     try savePNG(resized, to: iconset.appendingPathComponent(name))
 }
+
+let documentationImages = root.appendingPathComponent("docs/images")
+try FileManager.default.createDirectory(at: documentationImages, withIntermediateDirectories: true)
+try savePNG(image(pixels: 256) { master.draw(in: $0) }, to: documentationImages.appendingPathComponent("myclip-icon.png"))
 
 let contents = """
 {
@@ -116,14 +143,14 @@ let contents = """
 try contents.write(to: appIconSet.appendingPathComponent("Contents.json"), atomically: true, encoding: .utf8)
 try """
 {
-  "fill" : "system-dark",
+  "fill" : "system-light",
   "groups" : [
     {
       "layers" : [
         {
           "hidden" : false,
-          "image-name" : "KaraIcon-1024.png",
-          "name" : "KaraIcon",
+          "image-name" : "MyClipIcon-1024.png",
+          "name" : "MyClipIcon",
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
@@ -134,8 +161,8 @@ try """
         }
       ],
       "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
+        "enabled" : false,
+        "value" : 0
       }
     }
   ],

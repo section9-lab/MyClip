@@ -6,9 +6,9 @@ cd "$ROOT_DIR"
 
 CONFIGURATION="${CONFIGURATION:-Release}"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-build/DerivedData}"
-APP_PATH="$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/Kara.app"
-VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Kara/Supporting/Info.plist)"
-DMG_PATH="dist/Kara-$VERSION.dmg"
+APP_PATH="$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/MyClip.app"
+VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' MyClip/Supporting/Info.plist)"
+DMG_PATH="dist/MyClip-$VERSION.dmg"
 DMG_ROOT="build/dmg-root"
 CODE_SIGN_ARGS=()
 
@@ -19,8 +19,8 @@ elif [[ "${CI:-}" == "true" ]]; then
 fi
 
 xcodebuild \
-  -project Kara.xcodeproj \
-  -scheme Kara \
+  -project MyClip.xcodeproj \
+  -scheme MyClip \
   -configuration "$CONFIGURATION" \
   -destination 'platform=macOS' \
   -derivedDataPath "$DERIVED_DATA_PATH" \
@@ -29,11 +29,11 @@ xcodebuild \
 
 rm -rf "$DMG_ROOT" "$DMG_PATH"
 mkdir -p "$DMG_ROOT" dist
-cp -R "$APP_PATH" "$DMG_ROOT/Kara.app"
+cp -R "$APP_PATH" "$DMG_ROOT/MyClip.app"
 ln -s /Applications "$DMG_ROOT/Applications"
 
 hdiutil create \
-  -volname Kara \
+  -volname MyClip \
   -srcfolder "$DMG_ROOT" \
   -ov \
   -format UDZO \

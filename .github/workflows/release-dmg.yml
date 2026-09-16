@@ -31,6 +31,9 @@ jobs:
         run: |
           git config --global url."https://x-access-token:${GIT_AUTH_TOKEN}@github.com/".insteadOf "https://github.com/"
 
+      - name: Test MyClip core
+        run: swift test
+
       - name: Build DMG
         id: package
         run: |
@@ -38,7 +41,7 @@ jobs:
           dmg_output="$(mktemp)"
           DMG_PATH_OUTPUT="$dmg_output" Scripts/package_dmg.sh
           dmg_path="$(cat "$dmg_output")"
-          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Kara/Supporting/Info.plist)"
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' MyClip/Supporting/Info.plist)"
           short_sha="${GITHUB_SHA::7}"
 
           test -f "$dmg_path"
@@ -56,7 +59,7 @@ jobs:
           SHORT_SHA: ${{ steps.package.outputs.short_sha }}
           DMG_PATH: ${{ steps.package.outputs.dmg_path }}
         run: |
-          title="Kara $VERSION ($SHORT_SHA)"
+          title="MyClip $VERSION ($SHORT_SHA)"
           notes="Automated DMG release for commit $GITHUB_SHA on main."
 
           if gh release view "$TAG" >/dev/null 2>&1; then

@@ -1,106 +1,58 @@
-# Kara
+<div align="center">
+  <img src="MyClip/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" alt="MyClip icon" width="120" height="120">
+  <h1 align="center">MyClip</h1>
 
-Kara is a native macOS menu bar assistant for sending voice commands, with screen context, to local AI coding agents.
+  <p align="center">
+    MyClip helps you remember what you were working on. It captures the focused window or its display on your Mac and uses Codex or Claude to turn screenshots into searchable notes, connected knowledge, and suggested tasks.
+  </p>
+</div>
 
-Hold the global hotkey, speak what you want, and Kara transcribes your speech, captures the current screen, then routes both through its Agent Bridge to a local agent such as Codex CLI, Claude CLI, or Hermes CLI.
+<p align="center">
+  <img src="docs/images/myclip-demo.gif" alt="MyClip walkthrough: screenshot timeline, Memory file browser, task board, project progress, and AI memory access" width="1000">
+</p>
+<p align="center"><sub>MyClip 0.6.0 · Demo with sample data.</sub></p>
 
-## Screenshots
+## What you can do
 
-Kara stays visible as a compact menu bar status item:
+- **Revisit your work.** Browse a screenshot timeline and check the sources behind your notes.
+- **Build a personal knowledge library.** Search, edit, and link notes across projects, topics, and daily work. Your notes are Markdown files you can open in other editors.
+- **Keep track of next steps.** Review suggested tasks, confirm what matters, and follow progress on a task board.
+- **Give your AI tools context.** Let Codex, Claude Code, Cursor, or OpenCode search your saved memories.
 
-![Kara menu bar status showing the Ready state](docs/images/kara-menubar.png)
+## Get started
 
-The request panel keeps the retained transcript, screenshot context, bridge state, and recent bridge events in one place:
+Requires **macOS 26 or later** and a **Codex or Claude account**. Installing the agent connector also requires **Node.js 22 or later**. Local build instructions are below.
 
-| Request context | Agent Bridge |
-| --- | --- |
-| <img src="docs/images/kara-request-context.png" alt="Kara request panel with retained transcript and screenshot preview" width="380"> | <img src="docs/images/kara-bridge-timeline.png" alt="Kara Agent Bridge panel with bridge status and event timeline" width="380"> |
+1. Open MyClip and choose Codex or Claude using the icons at the bottom of the sidebar. Install its connector and sign in when prompted.
+2. Grant **Screen Recording** and **Accessibility** permissions, then start capture.
+3. Work as usual. By default, MyClip captures the focused window after a click following one second of pointer stillness, after two seconds without vertical scrolling, or after a letter key followed by Return. Automatic organization turns new screenshots into Memory.
+4. Explore **Timeline** for screenshots, **Memory** for notes, and **Task Board** for suggested work.
 
-## What Kara Does
+To use your memory in an AI tool, enable **MyClip MCP** in Settings, select your clients, and apply the configuration. Restart the client or start a new session afterward.
 
-- Runs quietly in the macOS menu bar
-- Records push-to-talk speech from the microphone
-- Transcribes speech locally with Apple Speech APIs
-- Captures the current screen at the start of each voice request
-- Routes the transcript and screenshot through a long-running Agent Bridge
-- Reuses the last successful agent/session unless the user switches target
-- Persists bridge events to support replay and diagnostics
-- Supports Codex, Claude, and Hermes command-line targets
-- Lets you pick recent agent sessions when available
-- Provides WeChat channel integration for forwarding messages
-- Supports scheduled tasks that can run agent prompts on a cadence
+## Screenshot organization
 
-## Agent Bridge
+Screenshots enter a persistent waiting pool as soon as they are saved. Automatic organization waits three minutes from the oldest pending capture, then takes up to eight screenshots for the same agent in chronological order. New captures do not reset the timer. Only one batch runs at a time, with at least three minutes between batch starts.
 
-Kara uses an in-app Agent Bridge runtime between voice capture and CLI execution. The bridge owns:
+The sidebar and agent panel show the waiting count, countdown, and current batch. **Organize Now** starts one batch early. A failure or interrupted run pauses automatic processing until you retry or resume; screenshots and existing Memory files are retained. Each agent continues its own saved ACP conversation. Switching the default agent affects future captures only.
 
-- request turn lifecycle
-- frontmost app and screenshot context capture
-- agent/session routing
-- monotonic event sequencing
-- JSONL event log persistence under `~/Library/Application Support/Kara/Bridge`
-- replay support for diagnostics and recovery
-- last-successful target reuse
+## Privacy and control
 
-This keeps the normal workflow simple: speak first, switch Agent only when needed.
+- **Choose what to capture.** Settings groups capture into three controls: scope (focused window by default, or the display containing it), independent mouse triggers (idle-then-click and scroll-then-pause), and keyboard trigger (letters then Return by default, or every Return). Pause capture anytime and exclude specific apps; full-display capture also filters excluded apps.
+- **Keep your library locally.** Screenshots and notes are stored on your Mac. Original screenshots expire after 30 days by default; saved notes remain. You can change the retention period in Settings.
+- **Decide when to use AI.** Organization uses your selected agent's model service, which may process screenshots and notes in the cloud. Turn off automatic organization to keep new captures local until you choose to process them.
 
-## Current Workflow
+<details>
+<summary>Build from source</summary>
 
-1. Choose an AI tool once, or let Kara pick the first available supported agent.
-2. Grant microphone access and screen recording access when prompted.
-3. Hold the voice hotkey and speak your request.
-4. Release the hotkey to send the transcript plus screenshot through Agent Bridge.
-5. Kara routes to the last successful agent/session by default.
-6. If delivery fails, Kara keeps the transcript and screenshot so you can retry, edit, or switch Agent.
-7. Kara shows delivery status in the menu bar and stores diagnostic logs under `~/Library/Logs/Kara`.
-
-## Permissions
-
-Kara needs these macOS permissions:
-
-- Microphone: used for push-to-talk voice transcription.
-- Speech Recognition: used by Apple's speech transcription APIs.
-- Screen & System Audio Recording: used to capture the current screen as request context.
-
-If screenshot requests fail, open System Settings and enable Kara under:
-
-`Privacy & Security` -> `Screen & System Audio Recording`
-
-After changing this permission, quit and reopen Kara so macOS applies the new authorization.
-
-## Download
-
-Download the latest DMG from:
-
-https://github.com/section9-lab/Kara/releases/latest
-
-## Build Locally
-
-Kara is built with Swift, SwiftUI, AppKit, and ScreenCaptureKit.
+Requires Xcode 26, Swift 6.2, and XcodeGen.
 
 ```sh
+swift test
 xcodegen generate
-xcodebuild -project Kara.xcodeproj -scheme Kara -configuration Debug build
+xcodebuild -project MyClip.xcodeproj -scheme MyClip -configuration Debug build
 ```
 
-To create a release DMG:
+To package a DMG, run `Scripts/package_dmg.sh`. The output is `dist/MyClip-<version>.dmg`.
 
-```sh
-Scripts/package_dmg.sh
-```
-
-The DMG is written to `dist/Kara-<version>.dmg`.
-
-## Signing Notes
-
-Local builds use the signing settings in `project.yml`. The DMG packaging script also supports CI builds where a local Apple Development certificate is unavailable.
-
-To override the signing identity for packaging:
-
-```sh
-CODE_SIGN_IDENTITY_OVERRIDE="Apple Development: Example (TEAMID)" Scripts/package_dmg.sh
-```
-
-## Release Process
-
-Releases are published from GitHub Releases. The repository includes a GitHub Actions workflow that builds and uploads a DMG whenever changes land on `main`.
+</details>

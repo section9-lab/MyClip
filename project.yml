@@ -1,6 +1,6 @@
-name: Kara
+name: MyClip
 options:
-  bundleIdPrefix: com.kara
+  bundleIdPrefix: cc.vibevibe
   deploymentTarget:
     macOS: "26.0"
   xcodeVersion: "26.0"
@@ -10,37 +10,47 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "26.0"
     GENERATE_INFOPLIST_FILE: NO
 schemes:
-  Kara:
+  MyClip:
     build:
       targets:
-        Kara: all
+        MyClip: all
 packages:
+  MyClipCore:
+    path: .
   WChatClawSwift:
     url: https://github.com/section9-lab/wchat-claw-swfit.git
     branch: main
+  Textual:
+    url: https://github.com/gonzalezreal/textual.git
+    exactVersion: 0.5.0
 targets:
-  Kara:
+  MyClip:
     type: application
     platform: macOS
     deploymentTarget: "26.0"
     sources:
-      - path: Kara
+      - path: MyClip
         excludes:
+          - Core/**
           - Supporting/AppIcon.icon/**
           - Supporting/IconSources/**
           - Supporting/Kara.icns
     dependencies:
+      - package: MyClipCore
+        product: MyClipCore
       - package: WChatClawSwift
         product: WChatClawSwift
+      - package: Textual
+        product: Textual
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.kara.Kara
-        PRODUCT_NAME: Kara
+        PRODUCT_BUNDLE_IDENTIFIER: cc.vibevibe.myclip
+        PRODUCT_NAME: MyClip
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: E04719740CD0DF70E4D0CA1B42ABBD273B4E0F9A
         DEVELOPMENT_TEAM: YP86S77K2X
-        INFOPLIST_FILE: Kara/Supporting/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Kara/Supporting/Kara.entitlements
+        INFOPLIST_FILE: MyClip/Supporting/Info.plist
+        CODE_SIGN_ENTITLEMENTS: MyClip/Supporting/MyClip.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: YES
         LSUIElement: YES
