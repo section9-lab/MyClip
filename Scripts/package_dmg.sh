@@ -23,7 +23,7 @@ if [[ -n "${CODE_SIGN_IDENTITY_OVERRIDE:-}" ]]; then
     echo "Ad-hoc signing cannot preserve macOS permissions across updates. Use a persistent signing certificate." >&2
     exit 1
   fi
-  CODE_SIGN_ARGS+=(CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY_OVERRIDE" DEVELOPMENT_TEAM=)
+  CODE_SIGN_ARGS+=(CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY_OVERRIDE" DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual)
 elif [[ "${CI:-}" == "true" ]]; then
   echo "CI packaging requires CODE_SIGN_IDENTITY_OVERRIDE and its signing certificate. See docs/release-signing.md." >&2
   exit 1

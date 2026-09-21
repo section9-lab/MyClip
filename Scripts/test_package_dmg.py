@@ -80,6 +80,7 @@ else:
                 self.assertIn("ONLY_ACTIVE_ARCH=NO", arguments)
                 self.assertIn("CODE_SIGN_IDENTITY=Developer ID Application: MyClip Test", arguments)
                 self.assertIn("DEVELOPMENT_TEAM=", arguments)
+                self.assertIn("CODE_SIGN_STYLE=Manual", arguments)
 
     def test_community_certificate_is_pinned_instead_of_requiring_an_apple_certificate(self):
         self.environment["CODE_SIGN_IDENTITY_OVERRIDE"] = "MyClip Community Signing"
