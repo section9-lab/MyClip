@@ -8,8 +8,8 @@
   <a href="../README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <strong>Deutsch</strong> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a>
 </p>
 
-<p align="center"><img src="images/myclip-demo.gif" alt="MyClip lokal: Memory-Dateinavigation, Screenshots in Timeline durchsuchen und filtern sowie OCR-Texte anzeigen, unabhängig scrollende Kanban-Spalten sowie Tages-, Wochen- und Monatsberichte" width="1000"></p>
-<p align="center"><sub>Aufgenommen in der installierten MyClip-App für macOS · Lokale Bibliothek · Chinesische Oberfläche.</sub></p>
+<p align="center"><img src="images/myclip-demo.gif" alt="MyClip lokal: Ersteinrichtung mit Auswahl des Standard-Agenten und Berechtigungen, Memory-Dateinavigation, Screenshots in Timeline durchsuchen und filtern sowie OCR-Texte anzeigen, unabhängig scrollende Kanban-Spalten sowie Tages-, Wochen- und Monatsberichte" width="1000"></p>
+<p align="center"><sub>Aufgenommen in der nativen MyClip-App für macOS · Lokale Bibliothek · Chinesische Oberfläche.</sub></p>
 
 ## Was du damit machen kannst
 

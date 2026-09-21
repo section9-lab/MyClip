@@ -8,8 +8,8 @@
   <a href="../README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.de.md">Deutsch</a> · <strong>日本語</strong> · <a href="README.ko.md">한국어</a>
 </p>
 
-<p align="center"><img src="images/myclip-demo.gif" alt="MyClip ローカルアプリの録画：Memory のファイル操作、Timeline のスクリーンショット閲覧・絞り込み・OCR 文書、Kanban 各列の独立スクロール、日報・週報・月報の切り替え" width="1000"></p>
-<p align="center"><sub>インストール済みの MyClip macOS アプリを録画 · ローカルライブラリ · 中国語 UI。</sub></p>
+<p align="center"><img src="images/myclip-demo.gif" alt="MyClip ローカルアプリの録画：初期設定でのデフォルト Agent の選択と権限設定、Memory のファイル操作、Timeline のスクリーンショット閲覧・絞り込み・OCR 文書、Kanban 各列の独立スクロール、日報・週報・月報の切り替え" width="1000"></p>
+<p align="center"><sub>MyClip の macOS ネイティブアプリを録画 · ローカルライブラリ · 中国語 UI。</sub></p>
 
 ## できること
 

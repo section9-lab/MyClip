@@ -12,9 +12,9 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/myclip-demo.gif" alt="MyClip running locally: Memory file navigation, Timeline screenshot browsing, filtering and OCR, independently scrolling Kanban columns, and daily, weekly, and monthly reports" width="1000">
+  <img src="docs/images/myclip-demo.gif" alt="MyClip running locally: onboarding with default Agent selection and permissions, Memory file navigation, Timeline screenshot browsing, filtering and OCR, independently scrolling Kanban columns, and daily, weekly, and monthly reports" width="1000">
 </p>
-<p align="center"><sub>Recorded in the installed MyClip macOS app · Local library · Chinese interface.</sub></p>
+<p align="center"><sub>Recorded in the native MyClip macOS app · Local library · Chinese interface.</sub></p>
 
 ## What you can do
 

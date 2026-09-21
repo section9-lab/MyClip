@@ -1234,7 +1234,7 @@ private struct CaptureOnboardingView: View {
             permission("辅助功能", symbol: "cursorarrow.rays", detail: "识别焦点窗口与截图触发操作", allowed: model.accessibilityPermission, action: model.requestAccessibilityPermission)
             Divider()
             VStack(alignment: .leading, spacing: 5) {
-                Text("授权后开始采集。默认 Agent 可稍后在 Backstage 更改。")
+                Text("权限状态自动更新。默认 Agent 可稍后在 Backstage 更改。")
                 if model.preferences.autoOrganize {
                     Text(model.preferences.enabledAgent.map { "新截图将由 \($0.name) 自动整理，可在设置中关闭。" }
                         ?? "新截图先保存在本机，连接 Agent 后可自动整理。")
@@ -1252,14 +1252,9 @@ private struct CaptureOnboardingView: View {
                 Button("退出 MyClip") { NSApp.terminate(nil) }
                     .buttonStyle(.plain).foregroundStyle(.secondary)
                 Spacer()
-                if model.screenPermission && model.accessibilityPermission {
-                    Button("开始使用", systemImage: "arrow.right", action: onContinue)
-                        .buttonStyle(.borderedProminent).controlSize(.large)
-                        .disabled(model.selectingDefaultAgent != nil)
-                } else {
-                    Button("重新检查权限", systemImage: "arrow.clockwise") { model.refreshPermissions() }
-                        .buttonStyle(.borderedProminent).controlSize(.large)
-                }
+                Button("开始使用", systemImage: "arrow.right", action: onContinue)
+                    .buttonStyle(.borderedProminent).controlSize(.large)
+                    .disabled(!model.screenPermission || !model.accessibilityPermission || model.selectingDefaultAgent != nil)
             }
             .padding(.top, compact ? 18 : 24)
         }
