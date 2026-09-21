@@ -64,7 +64,10 @@ extension LibraryStore {
         if let first = try queueHead(), let queuedAt = first["queued_at"].flatMap(Double.init) {
             result.nextAgent = first["agent"].flatMap(ClipAgent.init(rawValue:))
             let oldestDeadline = Date(timeIntervalSince1970: queuedAt).addingTimeInterval(OrganizationQueue.interval)
-            result.readyAt = max(oldestDeadline, result.lastStartedAt?.addingTimeInterval(OrganizationQueue.interval) ?? .distantPast)
+            var readyAt = max(oldestDeadline, result.lastStartedAt?.addingTimeInterval(OrganizationQueue.interval) ?? .distantPast)
+            // A batch waiting on its automatic retry holds its place but not before the backoff has passed.
+            if let retryAt = first["retry_at"].flatMap(Double.init) { readyAt = max(readyAt, Date(timeIntervalSince1970: retryAt)) }
+            result.readyAt = readyAt
         }
         return result
     }
@@ -123,7 +126,8 @@ extension LibraryStore {
                     for source in sources { try database.run("DELETE FROM pending_captures WHERE capture_id=? AND agent=?", [source.uuidString, agent.rawValue]) }
                 }
             }
-            try database.run("UPDATE jobs SET state='running',error=NULL WHERE id=?", [id])
+            // The previous attempt's reason stays on the row so a retry can put it in the agent's prompt; completion clears it.
+            try database.run("UPDATE jobs SET state='running',retry_at=NULL,attempts=attempts+1 WHERE id=?", [id])
             try database.run("INSERT INTO job_times VALUES(?,?,NULL) ON CONFLICT(id) DO UPDATE SET started_at=excluded.started_at,finished_at=NULL", [id, String(date.timeIntervalSince1970)])
             try database.run("UPDATE organization_queue SET last_started_at=? WHERE id=1", [String(date.timeIntervalSince1970)])
             return try database.run("SELECT * FROM jobs WHERE id=?", [id]).first.map(job)
@@ -149,20 +153,20 @@ extension LibraryStore {
 
     private func queueHead() throws -> [String: String]? {
         try database.run("""
-            SELECT 'capture' kind,capture_id id,agent,queued_at,rowid position FROM pending_captures
-            UNION ALL SELECT 'job',id,agent,created_at,rowid FROM jobs WHERE state='queued'
+            SELECT 'capture' kind,capture_id id,agent,queued_at,rowid position,NULL retry_at FROM pending_captures
+            UNION ALL SELECT 'job',id,agent,created_at,rowid,retry_at FROM jobs WHERE state='queued'
             ORDER BY queued_at,position LIMIT 1
             """).first
     }
 
     func hasOrganizedDuplicate(imageID: String, context: CaptureContext, agent: ClipAgent) throws -> Bool {
         try !database.run("""
-            SELECT c.id FROM captures c WHERE c.image_id=? AND c.bundle_id=? AND c.window_id=? AND c.window_title=?
+            SELECT c.id FROM captures c WHERE c.image_id=? AND c.bundle_id=? AND c.window_id=?
             AND c.captured_at>=? AND c.captured_at<=? AND (
                 EXISTS (SELECT 1 FROM pending_captures p WHERE p.capture_id=c.id AND p.agent=?)
                 OR EXISTS (SELECT 1 FROM job_sources s JOIN jobs j ON j.id=s.job_id WHERE s.capture_id=c.id AND j.agent=? AND j.state!='cancelled')
             ) LIMIT 1
-            """, [imageID, context.bundleID, String(context.windowID), context.windowTitle,
-                    String(context.date.addingTimeInterval(-60).timeIntervalSince1970), String(context.date.timeIntervalSince1970), agent.rawValue, agent.rawValue]).isEmpty
+            """, [imageID, context.bundleID, String(context.windowID),
+                    String(context.date.addingTimeInterval(-LibraryStore.sceneGap).timeIntervalSince1970), String(context.date.timeIntervalSince1970), agent.rawValue, agent.rawValue]).isEmpty
     }
 }

@@ -8,13 +8,16 @@ public enum KnowledgeComposer {
         Inbox 只保存有实际价值且需要确认或整理的事项。后续证据确认后，将结论并入对应项目或专题，从 Inbox 移出已解决的段落；整个页面都解决时可移动到适当目录，维护原有链接并保留有价值的历史。外部文章观点注明作者、出处与未核实状态即可，不自动变成需要用户处理的事项。一次浏览、未发送草稿、按钮或短暂界面状态默认留在截图时间线，只有形成重要上下文时才进入 Memory；相关材料优先合并已有主题。Workflows 仅在有明确、可复用的步骤和适用条件时创建。
         证据：每条新增或修改的重要事实旁标注实际支持它的截图，例如“来源：截图 `sourceID`”；同一结论可引用多张截图。只引用提供的真实截图 ID 或已有记忆中能核对的来源；不要把整批截图都标成每条事实的证据。页面导航只链接目标文档，无需复制它的事实和全部来源。MyClip 会从正文引用更新 source_ids，把整批处理上下文另存 context_source_ids，并计算 observed_at；这些元信息不需要你手写。
         截图中的助手或第三方自述“已完成”“测试通过”时，记录为该主体的汇报并引用来源，不能提升为已独立验证的事实。
+        链接与实体页：正文提到已有页面对应的项目、人物、工具或仓库时必须写成 Wikilink，不能只写名字。同一名词在两个以上文件出现而没有页面时，为它建立 Wiki/Topics 或 Wiki/Projects 页并从各处回链；来源不足以确认含义时先在 Inbox 建条目，不能因为“第三方信息”就不建页。指向页面中某一节时用 [[Wiki/Projects/页面名#标题|显示名称]]，让检索能直接定位到段落。
+        页面结构：项目页固定为一句话概览，然后依次是“## 当前状态”（进行中、阻塞、下一步）、“## 已确认决定”、“## 关键背景”、“## 相关记录”（链接对应 Daily 和专题页）。每条事实写成一个要点，不超过两句，不整段转述对话或界面文字；同一轮对话的来回经过只写进 Daily。来源写在要点末尾同一行“来源：截图 `ID`”，只写 ID，不重复截图时间，同一事实最多引用三张。
+        页面体量：项目页只保留当前结论、已确认决定和重要背景，会话逐条经过写入当天 Daily 并互相链接；Now.md 只列当前重点、阻塞和下一步。单个文件正文不能超过 \(MemoryDocument.maxBodyBytes / 1000) KB（约 \(MemoryDocument.maxBodyBytes / 30_000) 万汉字），超出的文件会被拒绝并恢复上一版；接近上限的页面先按主题拆分再写入。交接记录中的“整理提示”列出断链、未加链接的提及、候选实体和过长文件，处理时只改动相关段落。
         """
 
     public static func filePrompt(captures: [ClipCapture]) -> String {
         filePrompt(inputs: captures.map { OrganizationInput(capture: $0) })
     }
 
-    public static func filePrompt(inputs: [OrganizationInput], handoff: String? = nil) -> String {
+    public static func filePrompt(inputs: [OrganizationInput], handoff: String? = nil, previousAttempt: String? = nil) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.timeZone = .current
         var imageIndex = 0
@@ -29,6 +32,9 @@ public enum KnowledgeComposer {
             imageIndex += 1
             return metadata + " · content=image · 图片附件 \(imageIndex)"
         }.joined(separator: "\n\n")
+        let retry = previousAttempt.map {
+            "\n本批上次尝试未完成：\($0)\n请先处理这个问题：过长页面先整理，把对话经过移入对应日期的 Daily 并互链，页面只留当前状态、已确认决定、关键背景；整理后仍然过长再按主题拆分。然后再写入本批内容；上次已保存到磁盘的改动不必重做。\n"
+        } ?? ""
         return """
         你在帮助 MyClip 将截图整理为持续积累的 Memory。当前工作目录就是 Memory 文件夹。
         这是独立的临时会话，仅处理当前批次。请阅读按时间排列的截图或 OCR 文本，读取当前目录里的最新文件，再使用文件读取、写入、编辑工具或 Bash 实际更新需要修改的 Markdown 文件。不要只在回复中输出记忆正文，也不要返回代写文件的 JSON。没有值得保存的新信息时不改文件。
@@ -39,7 +45,7 @@ public enum KnowledgeComposer {
         \(memoryRules)
         Wikilink 使用相对于 Memory 目录的 [[Wiki/Projects/页面名|显示名称]]，不带 .md。确认目标存在；移动或重命名文件时同时维护相关链接。写入尽量使用临时文件后原子替换，避免出现半写入的文件。
         全屏截图可能包含多个应用，请根据画面辨别信息归属，不要把其他窗口的内容都归给焦点应用。OCR 可能有错字且不保留布局、图形或点击目标，不据此猜测界面关系；证据不足时保留待确认。仅记录有本批资料依据的事实、决定、方法和上下文；不要保存密码或密钥，不猜测用户的长期偏好。只处理本条消息提供的新资料，历史内容用于理解和去重。
-
+        \(retry)
         上一次成功整理的交接记录（仅供定位，重试仍须检查磁盘现状）：
         \(handoff ?? "暂无")
 

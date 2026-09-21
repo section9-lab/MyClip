@@ -258,4 +258,47 @@ final class MemoryLayoutTests: XCTestCase {
             XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: outside.path).isEmpty, path)
         }
     }
+
+    func testInvalidFileKeepsLastIndexAndDoesNotBlockTheVault() async throws {
+        let store = try LibraryStore(root: root)
+        let previous = try await seed(store)
+        let text = try String(contentsOf: previous.fileURL, encoding: .utf8)
+        let boundary = try XCTUnwrap(text.range(of: "\n---\n"))
+        let header = String(text[..<boundary.upperBound])
+        try (header + "\n  \n").write(to: previous.fileURL, atomically: true, encoding: .utf8)
+        try "".write(to: root.appendingPathComponent("Memory/Inbox/空白.md"), atomically: true, encoding: .utf8)
+
+        let snapshot = try await store.snapshot(query: "焦点")
+        XCTAssertEqual(snapshot.invalidMemoryFiles, ["Inbox/空白.md（Memory 正文为空。）", "\(previous.relativePath)（Memory 正文为空。）"])
+        let kept = try await store.readMemory(path: previous.relativePath)
+        XCTAssertEqual(kept.body, previous.body, "The last good revision stays searchable")
+        XCTAssertEqual(snapshot.entries.map(\.id), [previous.id])
+        let lint = try await store.memoryLint()
+        XCTAssertTrue(lint.invalidFiles.contains("Inbox/空白.md（Memory 正文为空。）"), lint.invalidFiles.description)
+
+        try (header + "修好的正文。\n").write(to: previous.fileURL, atomically: true, encoding: .utf8)
+        try FileManager.default.removeItem(at: root.appendingPathComponent("Memory/Inbox/空白.md"))
+        let repaired = try await store.snapshot()
+        XCTAssertEqual(repaired.invalidMemoryFiles, [])
+        let fixed = try await store.readMemory(path: previous.relativePath)
+        XCTAssertEqual(fixed.body, "修好的正文。\n")
+    }
+
+    func testDisplayMarkdownCompactsCitationLinesOnly() {
+        let body = """
+        # 页面
+
+        结论一。来源：截图 `721EBDBB-76BA-424D-BE5B-236AA99FA154`（2026-09-18T11:13:56Z）、`C9ED70FE-8E1B-41E8-9BD5-DF2BC6C10AC8`。
+        正文提到 ID 721EBDBB-76BA-424D-BE5B-236AA99FA154 保持原样。
+        ```
+        来源：截图 `721EBDBB-76BA-424D-BE5B-236AA99FA154` 代码块不动
+        ```
+        - 来源: 58B93C99-1949-483E-9025-63B7B6175776 (2026-09-18)
+        """
+        let shown = MemoryDocument.displayMarkdown(body)
+        XCTAssertTrue(shown.contains("结论一。来源：截图 `721EBDBB`、`C9ED70FE`。"), shown)
+        XCTAssertTrue(shown.contains("正文提到 ID 721EBDBB-76BA-424D-BE5B-236AA99FA154 保持原样。"))
+        XCTAssertTrue(shown.contains("`721EBDBB-76BA-424D-BE5B-236AA99FA154` 代码块不动"))
+        XCTAssertTrue(shown.contains("- 来源: `58B93C99`"), shown)
+    }
 }

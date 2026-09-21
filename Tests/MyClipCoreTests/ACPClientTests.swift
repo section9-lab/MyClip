@@ -372,3 +372,22 @@ final class ACPClientTests: XCTestCase {
         XCTAssertTrue(message.contains(raw))
     }
 }
+
+final class ACPLaunchEnvironmentTests: XCTestCase {
+    func testHostingAgentSessionVariablesAreNotInherited() {
+        let leaked = [
+            "ANTHROPIC_AUTH_TOKEN": "stale-desktop-token", "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
+            "CLAUDE_CODE_ENTRYPOINT": "claude-desktop", "CLAUDECODE": "1", "CLAUDE_CODE_SESSION_ID": "abc",
+            "PATH": "/usr/bin", "HOME": "/Users/me", "LANG": "zh_CN.UTF-8"
+        ]
+        let environment = ACPCommand.launchEnvironment(inheriting: leaked)
+        XCTAssertEqual(environment, ["PATH": "/usr/bin", "HOME": "/Users/me", "LANG": "zh_CN.UTF-8"])
+    }
+
+    func testCommandEnvironmentStillOverridesInheritedValues() {
+        let command = ACPCommand(executable: URL(fileURLWithPath: "/usr/bin/env"), environment: ["PATH": "/custom/bin"])
+        let merged = ACPCommand.launchEnvironment(inheriting: ["PATH": "/usr/bin", "CLAUDE_CODE_ENTRYPOINT": "claude-desktop"])
+            .merging(command.environment) { _, new in new }
+        XCTAssertEqual(merged, ["PATH": "/custom/bin"])
+    }
+}

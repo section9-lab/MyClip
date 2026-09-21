@@ -16,6 +16,7 @@
 		5117721355FE13BB45B4E874 /* MarkdownThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = C5C76804C327A0A0B592C603 /* MarkdownThirdPartyNotices.txt */; };
 		601B31C23F6CAC773173BD12 /* AgentRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F1DEDE5F4B08506C2155E7 /* AgentRuntime.swift */; };
 		64B50CEF8586DF62220C71A8 /* MyClipCore in Frameworks */ = {isa = PBXBuildFile; productRef = 08C930E7912187BDB9B11F7E /* MyClipCore */; };
+		6BDF961DB9CE3CFFB69B7D7B /* BackstageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54CF273A2E3C8B36599AA41C /* BackstageView.swift */; };
 		6EE097D37687B09ECD532957 /* MyClipViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3411BD87E9E8BAA48F2AA31 /* MyClipViews.swift */; };
 		8061428CAE741EC9A223298D /* AgentCharacterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 428FC34F097036C20B32E18E /* AgentCharacterView.swift */; };
 		8F0DA65FE5828D606D28AC31 /* MyClipMenuBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 652C8CAFBFF2AB791C4BBFEB /* MyClipMenuBar.swift */; };
@@ -34,6 +35,7 @@
 		357E53D3B46FD41B1CD21920 /* MyClip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MyClip.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		418F9B75B5DD9D13703EC647 /* WindowImageCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowImageCapture.swift; sourceTree = "<group>"; };
 		428FC34F097036C20B32E18E /* AgentCharacterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCharacterView.swift; sourceTree = "<group>"; };
+		54CF273A2E3C8B36599AA41C /* BackstageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackstageView.swift; sourceTree = "<group>"; };
 		640EBAAF7E6B14C1A195C6A6 /* ExecutionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionDetailView.swift; sourceTree = "<group>"; };
 		64AB631DA26E7316F978FC4E /* MyClipApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyClipApp.swift; sourceTree = "<group>"; };
 		652C8CAFBFF2AB791C4BBFEB /* MyClipMenuBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyClipMenuBar.swift; sourceTree = "<group>"; };
@@ -109,6 +111,7 @@
 				A2F1DEDE5F4B08506C2155E7 /* AgentRuntime.swift */,
 				FBF34964DFBA230E51655E20 /* AgentStatusIcon.swift */,
 				85FD22EF3BF4339FB4D41B95 /* AnalyticsView.swift */,
+				54CF273A2E3C8B36599AA41C /* BackstageView.swift */,
 				640EBAAF7E6B14C1A195C6A6 /* ExecutionDetailView.swift */,
 				C3381289629BF73DF20266A7 /* FocusedCaptureService.swift */,
 				67182996F61325E45927A1DE /* LibraryCompatibility.swift */,
@@ -231,6 +234,7 @@
 				601B31C23F6CAC773173BD12 /* AgentRuntime.swift in Sources */,
 				09493D58F29CA97863642E5A /* AgentStatusIcon.swift in Sources */,
 				49A465A98D2C71E9D0E04172 /* AnalyticsView.swift in Sources */,
+				6BDF961DB9CE3CFFB69B7D7B /* BackstageView.swift in Sources */,
 				D2B59596CD4C1960409C0D9D /* ExecutionDetailView.swift in Sources */,
 				33E814F999C5155F94B896CC /* FocusedCaptureService.swift in Sources */,
 				3C862B368DABCFD030859575 /* LibraryCompatibility.swift in Sources */,

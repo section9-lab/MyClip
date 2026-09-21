@@ -209,7 +209,7 @@ final class DirectMemoryEditingTests: XCTestCase {
         let restored = try LibraryStore(root: copy)
         let server = MemoryMCP(store: restored)
         _ = await server.respond("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}")
-        let response = await server.respond("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"read_memory\",\"arguments\":{\"path\":\"时间.md\"}}}")
+        let response = await server.respond("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"read_memory\",\"arguments\":{\"path\":\"时间.md\",\"includeContext\":true}}}")
         let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(XCTUnwrap(response).utf8)) as? [String: Any])
         let result = try XCTUnwrap(json["result"] as? [String: Any])
         let document = try XCTUnwrap(result["structuredContent"] as? [String: Any])
@@ -352,5 +352,63 @@ final class DirectMemoryEditingTests: XCTestCase {
         XCTAssertEqual(memory.sourceIDs, [capture.id])
         let document = try MemoryDocument(String(contentsOf: file, encoding: .utf8))
         XCTAssertTrue(document.extraMetadata.contains("metadata:\n  type: daily"))
+    }
+
+    func testOversizedAgentEditIsRestoredAndReportedWhileOtherEditsAreKept() async throws {
+        let store = try LibraryStore(root: root)
+        let database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
+        try await store.record(image: fixtureImage(), context: fixtureContext(), agent: .claude, organize: true)
+        let claimed = try await store.claimNextJob(immediately: true)
+        let job = try XCTUnwrap(claimed)
+        let before = try await store.beginMemoryEditing(jobID: job.id)
+        let page = root.appendingPathComponent("Memory/Wiki/Topics/项目页.md")
+        try "# 项目页\n\n第一版结论。".write(to: page, atomically: true, encoding: .utf8)
+        _ = try await store.snapshot()  // an MCP read imports the page mid-run, giving it history
+        let lastGood = try String(contentsOf: page, encoding: .utf8)
+        let boundary = try XCTUnwrap(lastGood.range(of: "\n---\n"))
+        let oversized = String(lastGood[..<boundary.upperBound]) + String(repeating: "长", count: MemoryDocument.maxBodyBytes / 3 + 10)
+        try oversized.write(to: page, atomically: true, encoding: .utf8)
+        try "# 另一页\n\n同一批次的正常改动。".write(to: root.appendingPathComponent("Memory/Wiki/Topics/另一页.md"), atomically: true, encoding: .utf8)
+
+        do {
+            _ = try await store.finishMemoryEditing(jobID: job.id, previousRevisions: before)
+            XCTFail("An oversized file must be reported")
+        } catch LibraryError.rolledBack(let files) {
+            XCTAssertTrue(files.contains("Wiki/Topics/项目页.md"), files)
+            XCTAssertTrue(files.contains("KB 上限"), files)
+            XCTAssertEqual(RetryPolicy.classify(LibraryError.rolledBack(files)), .transient, "The batch runs again on its own")
+        }
+        let onDisk = try MemoryDocument(String(contentsOf: page, encoding: .utf8))
+        XCTAssertEqual(onDisk.body, "# 项目页\n\n第一版结论。", "The last good body is back on disk")
+        let snapshot = try await store.snapshot()
+        XCTAssertEqual(snapshot.invalidMemoryFiles, [])
+        let restoredPage = try await store.readMemory(path: "Wiki/Topics/项目页.md")
+        XCTAssertEqual(restoredPage.body, "# 项目页\n\n第一版结论。")
+        let otherPage = try await store.readMemory(path: "Wiki/Topics/另一页.md")
+        XCTAssertEqual(otherPage.body, "# 另一页\n\n同一批次的正常改动。")
+        XCTAssertEqual(try database.run("SELECT state FROM jobs WHERE id=?", [job.id.uuidString]).first?["state"], "running", "The caller decides the job state")
+        XCTAssertTrue(try database.run("SELECT value FROM vault_meta WHERE key='organization_handoff'").isEmpty, "Only a completed batch writes a handoff")
+
+        // The last allowed attempt writes the same oversized page again: the batch completes and the instruction moves to the handoff.
+        try database.run("UPDATE jobs SET attempts=? WHERE id=?", [String(RetryPolicy.maxAttempts), job.id.uuidString])
+        let again = try await store.beginMemoryEditing(jobID: job.id)
+        try oversized.write(to: page, atomically: true, encoding: .utf8)
+        _ = try await store.finishMemoryEditing(jobID: job.id, previousRevisions: again)
+        XCTAssertEqual(try database.run("SELECT state FROM jobs WHERE id=?", [job.id.uuidString]).first?["state"], "completed", "The user is never asked to act on a cap problem")
+        let handoff = try XCTUnwrap(database.run("SELECT value FROM vault_meta WHERE key='organization_handoff'").first?["value"])
+        XCTAssertTrue(handoff.contains("必须先处理"), handoff)
+        XCTAssertTrue(handoff.contains("上一批写入 Wiki/Topics/项目页.md"), handoff)
+        XCTAssertTrue(handoff.contains("先整理该页"), handoff)
+        let afterwards = try MemoryDocument(String(contentsOf: page, encoding: .utf8))
+        XCTAssertEqual(afterwards.body, "# 项目页\n\n第一版结论。")
+    }
+
+    func testRetryPromptCarriesThePreviousAttempt() {
+        let note = LibraryError.rolledBack("Wiki/Projects/chat-bridge.md（Memory 正文 129 KB，超过 128 KB 上限。）").localizedDescription
+        let prompt = KnowledgeComposer.filePrompt(inputs: [], handoff: nil, previousAttempt: note)
+        XCTAssertTrue(prompt.contains("本批上次尝试未完成：已恢复上一版：Wiki/Projects/chat-bridge.md"), prompt)
+        XCTAssertTrue(prompt.contains("先整理"), prompt)
+        XCTAssertTrue(prompt.contains("仍然过长再按主题拆分"), prompt)
+        XCTAssertFalse(KnowledgeComposer.filePrompt(inputs: []).contains("上次尝试"))
     }
 }

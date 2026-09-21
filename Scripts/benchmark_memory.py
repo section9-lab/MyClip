@@ -147,7 +147,7 @@ class MCP:
         return result
 
     def search(self, query):
-        return self.call("tools/call", {"name": "search_memories", "arguments": {"query": query, "limit": 20}})["structuredContent"]["memories"]
+        return self.call("tools/call", {"name": "search_memories", "arguments": {"query": query, "limit": 20, "expand": False}})["structuredContent"]["memories"]
 
     def close(self):
         self.process.stdin.close()

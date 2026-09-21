@@ -130,7 +130,22 @@ final class AgentCharacterView: NSView {
 
 @MainActor
 enum AgentCharacterDrawing {
-    private static let blossom: CGImage? = NSImage(named: "OpenAIBlossom")?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    private static let blossom = mask(named: "OpenAIBlossom")
+    private static let cursorMark = mask(named: "CursorIcon")
+
+    /// Rasterises a vector asset at a fixed resolution so the mask stays sharp regardless of the SVG's declared size.
+    private static func mask(named name: String, pixels: Int = 256) -> CGImage? {
+        guard let image = NSImage(named: name),
+              let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8,
+                                         samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                         bytesPerRow: 0, bitsPerPixel: 0),
+              let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        image.draw(in: NSRect(x: 0, y: 0, width: pixels, height: pixels), from: .zero, operation: .sourceOver, fraction: 1)
+        NSGraphicsContext.restoreGraphicsState()
+        return rep.cgImage
+    }
 
     static func draw(agent: ClipAgent, expression: ClipAgentState.Expression, in bounds: CGRect, context c: CGContext,
                      time: TimeInterval, moving: Bool, blinking: Bool, greeting: Bool, gaze: CGPoint, hovered: Bool) {
@@ -141,7 +156,13 @@ enum AgentCharacterDrawing {
         let smiling = expression == .happy || greeting
         let orange = NSColor(srgbRed: 0.898, green: 0.537, blue: 0.439, alpha: 1)
         let ink = agent == .claude ? NSColor(srgbRed: 0.145, green: 0.10, blue: 0.08, alpha: 1) : NSColor.labelColor
-        let body = agent == .claude ? orange : NSColor.labelColor
+        let body: NSColor
+        switch agent {
+        case .claude: body = orange
+        case .opencode: body = NSColor.labelColor
+        case .cursor: body = NSColor.labelColor
+        case .codex: body = NSColor.labelColor
+        }
         func fill(_ rect: CGRect, _ color: NSColor, radius: CGFloat = 0) {
             c.setFillColor(color.cgColor)
             c.addPath(CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)); c.fillPath()
@@ -159,9 +180,31 @@ enum AgentCharacterDrawing {
         if smiling && moving { c.translateBy(x: 0, y: -abs(wave) * (compact ? 1 : 3)) }
         c.translateBy(x: -50, y: -50)
 
+        if agent == .cursor {
+            // Cursor keeps its wordless logo (LobeHub icon set) in label colour; no face, only the attention dot.
+            if let cursorMark {
+                c.saveGState()
+                c.translateBy(x: 0, y: 100); c.scaleBy(x: 1, y: -1)
+                c.clip(to: CGRect(x: 6, y: 6, width: 88, height: 88), mask: cursorMark)
+                fill(CGRect(x: 0, y: 0, width: 100, height: 100), body)
+                c.restoreGState()
+            }
+            if expression == .attention { fill(CGRect(x: 91, y: -3, width: 15, height: 15), .systemOrange, radius: 7.5) }
+            c.restoreGState()
+            return
+        }
+
         if agent == .claude {
             for x: CGFloat in [10, 28, 64, 82] { fill(CGRect(x: x, y: 74, width: 8, height: 15), body) }
             fill(CGRect(x: 0, y: 14, width: 100, height: 62), body)
+        } else if agent == .opencode {
+            // OpenCode mark (LobeHub icon set): a tall frame with a rectangular window the face looks out of.
+            c.saveGState()
+            c.addRect(CGRect(x: 10, y: 0, width: 80, height: 100))
+            c.addRect(CGRect(x: 30, y: 20, width: 40, height: 60))
+            c.clip(using: .evenOdd)
+            fill(CGRect(x: 10, y: 0, width: 80, height: 100), body)
+            c.restoreGState()
         } else {
             if let blossom {
                 c.saveGState()
@@ -199,15 +242,16 @@ enum AgentCharacterDrawing {
             } else {
                 let handY: CGFloat = smiling ? 31 : 43
                 let swing = working ? wave * 6 : 0
-                fill(CGRect(x: -14, y: handY + swing, width: 14, height: 14), body, radius: agent == .claude ? 0 : 7)
-                c.saveGState(); c.translateBy(x: 108, y: handY + 7 - swing)
+                let bodyInset: CGFloat = agent == .opencode ? 10 : 0
+                fill(CGRect(x: -14 + bodyInset, y: handY + swing, width: 14, height: 14), body, radius: agent == .claude ? 0 : 7)
+                c.saveGState(); c.translateBy(x: 108 - bodyInset, y: handY + 7 - swing)
                 if greeting { c.rotate(by: -0.35 + wave * 0.55) }
                 fill(CGRect(x: -7, y: -7, width: 14, height: 14), body, radius: agent == .claude ? 0 : 7)
                 c.restoreGState()
             }
         }
 
-        if agent == .codex && compact {
+        if agent != .claude && compact {
             if expression == .attention { fill(CGRect(x: 91, y: -3, width: 15, height: 15), .systemOrange, radius: 7.5) }
             c.restoreGState()
             return

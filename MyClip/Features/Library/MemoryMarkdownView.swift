@@ -8,7 +8,7 @@ struct MemoryMarkdownView: View {
     var openMemoryLink: ((URL) -> Void)?
 
     var body: some View {
-        Markdown(Wikilink.markdown(markdown), baseURL: baseURL, imageBaseURL: baseURL)
+        Markdown(Wikilink.markdown(MemoryDocument.displayMarkdown(markdown)), baseURL: baseURL, imageBaseURL: baseURL)
             .markdownTextStyle { FontSize(15) }
             .markdownImageProvider(MemoryImageProvider())
             .textSelection(.enabled)

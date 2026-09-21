@@ -47,12 +47,21 @@ extension LibraryStore {
         }
     }
 
-    public func synchronizeMemoryFiles() throws {
+    /// Files that fail validation are skipped and returned; their last good index stays until the file is repaired.
+    @discardableResult
+    public func synchronizeMemoryFiles() throws -> [MemoryLayout.InvalidFile] {
         try prepareMemoryLayout()
+        var invalid: [MemoryLayout.InvalidFile] = []
         try database.transaction {
+            if try !database.run("SELECT value FROM vault_meta WHERE key='search_rebuild'").isEmpty {
+                try rebuildMemorySearchTables()
+                try database.run("DELETE FROM vault_meta WHERE key='search_rebuild'")
+            }
             try flushMemoryFiles()
             try importPlainMarkdownFiles()
-            let files = try MemoryLayout.documents(in: root.appendingPathComponent("Memory"))
+            let scan = try MemoryLayout.scan(in: root.appendingPathComponent("Memory"))
+            let files = scan.documents
+            invalid = scan.invalid
             let known = try database.run("SELECT * FROM memory_files")
             let paths = Dictionary(uniqueKeysWithValues: known.compactMap { row -> (String, String)? in
                 guard let id = row["id"], let path = row["path"] else { return nil }; return (id, path)
@@ -87,11 +96,14 @@ extension LibraryStore {
                 try database.run("UPDATE memory_files SET path=?,published_hash=? WHERE id=?", [path, Self.memoryHash(text), document.id.uuidString])
             }
             let found = Set(files.map { $0.3.id.uuidString })
-            for row in known where !found.contains(row["id"] ?? "") {
+            let invalidPaths = Set(invalid.map(\.path))
+            for row in known where !found.contains(row["id"] ?? "") && !invalidPaths.contains(row["path"] ?? "") {
                 try removeMemoryIndex(row["id"]!)
             }
             if !redirects.isEmpty { try rewriteMemoryLinks(redirects) }
             try flushMemoryFiles()
+            // Links written before their target existed resolve once the file appears.
+            try resolvePendingLinks()
             // Rebuild derived passage data for older libraries or edits made by an older app.
             for row in try database.run("SELECT e.* FROM entries e WHERE NOT EXISTS (SELECT 1 FROM memory_passages p WHERE p.entry_id=e.id AND p.revision=e.revision)") {
                 let item = try entry(row)
@@ -99,6 +111,7 @@ extension LibraryStore {
                 try database.run("UPDATE entry_search SET body=?,terms=? WHERE id=?", [searchBody, Self.tokens(item.title + " " + searchBody), item.id.uuidString])
             }
         }
+        return invalid
     }
 
     private func importPlainMarkdownFiles() throws {
@@ -116,7 +129,9 @@ extension LibraryStore {
                 // Existing identities must never be silently replaced or repaired.
                 guard previous == nil else { continue }
                 let encodedTitle = String(decoding: try JSONEncoder().encode(title), as: UTF8.self)
-                let imported = try MemoryDocument("---\nid: \(UUID())\nrevision: 1\nagent: codex\ntitle: \(encodedTitle)\n" + text.dropFirst(4))
+                let imported: MemoryDocument
+                do { imported = try MemoryDocument("---\nid: \(UUID())\nrevision: 1\nagent: codex\ntitle: \(encodedTitle)\n" + text.dropFirst(4)) }
+                catch LibraryError.invalidResult { continue }  // reported by the scan instead
                 normalized = try MemoryDocument.encode(id: imported.id, title: imported.title, body: imported.body, revision: imported.revision,
                     agent: imported.agent, sourceIDs: imported.sourceIDs, path: path, extraMetadata: imported.extraMetadata,
                     contextSourceIDs: imported.contextSourceIDs, observedAt: imported.observedAt)
@@ -125,12 +140,14 @@ extension LibraryStore {
                 revision: previous?.revision ?? 1, agent: previous?.agent ?? .codex, sourceIDs: previous?.sourceIDs ?? [],
                 path: path, extraMetadata: previous?.extraMetadata ?? "", contextSourceIDs: previous?.contextSourceIDs ?? [], observedAt: previous?.observedAt)
             }
-            _ = try MemoryDocument(normalized)
+            guard (try? MemoryDocument(normalized)) != nil else { continue }  // reported by the scan instead
             try normalized.write(to: url, atomically: true, encoding: .utf8)
         }
     }
 
     func removeMemoryIndex(_ id: String) throws {
+        // Edges pointing at the removed memory become unresolved again instead of dangling.
+        try database.run("UPDATE memory_links SET target_id=NULL WHERE target_id=?", [id])
         try database.run("DELETE FROM memory_passage_search WHERE entry_id=?", [id])
         try database.run("DELETE FROM entry_search WHERE id=?", [id])
         try database.run("DELETE FROM entries WHERE id=?", [id])
@@ -147,7 +164,7 @@ extension LibraryStore {
     }
 }
 
-struct MemoryDocument {
+public struct MemoryDocument {
     let id: UUID
     let revision: Int
     let title: String
@@ -190,7 +207,33 @@ struct MemoryDocument {
         observedAt = fields["observed_at"].flatMap { ISO8601DateFormatter().date(from: unquote($0)) }
         extraMetadata = extras.isEmpty ? "" : extras.joined(separator: "\n") + "\n"
         body = String(text[boundary.upperBound...])
-        guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, title.count <= 240, body.utf8.count <= 128_000 else { throw LibraryError.invalidResult("Memory 正文为空或过长。") }
+        try Self.validate(title: title, body: body)
+    }
+
+    /// Hard cap on one file's Markdown body; the organizing prompt quotes it so the agent splits pages before hitting it.
+    public static let maxBodyBytes = 128_000
+
+    static func validate(title: String, body: String) throws {
+        guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw LibraryError.invalidResult("Memory 正文为空。") }
+        guard title.count <= 240 else { throw LibraryError.invalidResult("Memory 标题过长。") }
+        guard body.utf8.count <= maxBodyBytes else {
+            throw LibraryError.invalidResult("Memory 正文 \(body.utf8.count / 1000) KB，超过 \(maxBodyBytes / 1000) KB 上限。")
+        }
+    }
+
+    /// Reader view of a body: citation lines keep their evidence but show 8-character IDs without repeated timestamps.
+    /// The file on disk is untouched; full IDs stay there for source resolution and the MCP tools.
+    public static func displayMarkdown(_ body: String) -> String {
+        let marker = try! NSRegularExpression(pattern: #"(?:来源(?:截图)?|截图来源)\s*[:：]"#)
+        let citation = try! NSRegularExpression(pattern: #"`?([0-9A-Fa-f]{8})-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}`?\s*(?:（[^）\n]*）|\([^)\n]*\))?"#)
+        var inFence = false
+        return body.split(separator: "\n", omittingEmptySubsequences: false).map { slice -> String in
+            let line = String(slice)
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") { inFence.toggle(); return line }
+            guard !inFence, marker.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil else { return line }
+            return citation.stringByReplacingMatches(in: line, range: NSRange(line.startIndex..., in: line), withTemplate: "`$1`")
+        }.joined(separator: "\n")
     }
 
     static func citedSourceIDs(in body: String) throws -> [UUID] {

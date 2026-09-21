@@ -210,7 +210,9 @@ final class MemorySearchTests: XCTestCase {
         let best = try XCTUnwrap((found.first?["matches"] as? [[String: Any]])?.first)
         XCTAssertEqual(best["sourceIDs"] as? [String], [])
         XCTAssertEqual(best["sourceScope"] as? String, "document")
-        XCTAssertEqual(best["documentSourceIDs"] as? [String], [source.uuidString])
+        XCTAssertNil(best["documentSourceIDs"], "Provenance lists are not repeated per passage")
+        XCTAssertEqual(found.first?["sourceCount"] as? Int, 1)
+        XCTAssertNil(found.first?["contextSourceIDs"], "Listings carry counts, not context ID lists")
     }
 
     private func eventParagraph(_ date: String, text: String, source: UUID) -> String {

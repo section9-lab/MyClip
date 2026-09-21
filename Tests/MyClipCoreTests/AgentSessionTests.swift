@@ -43,7 +43,13 @@ final class AgentSessionTests: XCTestCase {
             let output = pipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
             XCTAssertEqual(process.terminationStatus, 0)
-            let arguments = agent == .codex ? ["resume", sessionID] : ["--cli", "--resume", sessionID]
+            let arguments: [String]
+            switch agent {
+            case .codex: arguments = ["resume", sessionID]
+            case .claude: arguments = ["--cli", "--resume", sessionID]
+            case .opencode: arguments = ["--session", sessionID]
+            case .cursor: arguments = ["--resume", sessionID]
+            }
             XCTAssertEqual(String(data: output, encoding: .utf8), ([workspace.path, environmentValue] + arguments).joined(separator: "\n") + "\n")
         }
     }

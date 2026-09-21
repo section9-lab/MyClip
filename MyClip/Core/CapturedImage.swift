@@ -9,6 +9,8 @@ public struct CapturedImage: Sendable {
     public let fingerprint: String
     public let width: Int
     public let height: Int
+    /// Perceptual fingerprint for near-duplicate detection; nil below `BlockHash.minimumSide` where blocks are meaningless.
+    public let blockHash: BlockHash?
 
     public init(image: CGImage) throws {
         guard image.width > 0, image.height > 0, image.width * image.height <= 80_000_000,
@@ -31,5 +33,6 @@ public struct CapturedImage: Sendable {
         pngData = output as Data
         width = image.width
         height = image.height
+        blockHash = image.width >= BlockHash.minimumSide && image.height >= BlockHash.minimumSide ? try BlockHash(image: normalized) : nil
     }
 }

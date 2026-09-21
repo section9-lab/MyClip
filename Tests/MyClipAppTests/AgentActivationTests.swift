@@ -74,7 +74,9 @@ struct AgentActivationTests {
         UserDefaults.standard.setVolatileDomain([
             "myclip.agent": "codex", "myclip.autoOrganize": true,
             "myclip.codexPath": root.appendingPathComponent("codex-acp").path,
-            "myclip.claudePath": root.appendingPathComponent("claude-agent-acp").path
+            "myclip.claudePath": root.appendingPathComponent("claude-agent-acp").path,
+            "myclip.opencodePath": root.appendingPathComponent("opencode").path,
+            "myclip.cursorPath": root.appendingPathComponent("cursor-agent").path
         ], forName: UserDefaults.argumentDomain)
         func requests(_ agent: ClipAgent, method: String) throws -> [[String: Any]] {
             let log = root.appendingPathComponent("\(agent.rawValue).json.requests")
@@ -111,7 +113,7 @@ struct AgentActivationTests {
         for agent in ClipAgent.allCases {
             check(try requests(agent, method: "session/prompt").isEmpty, "Connection does not send a task to \(agent.name)")
             let mode = try requests(agent, method: "session/set_mode").last?["params"] as? [String: Any]
-            check(mode?["modeId"] as? String == (agent == .codex ? "agent-full-access" : "bypassPermissions"), "\(agent.name) defaults to full access before its first task")
+            check(mode?["modeId"] as? String == agent.fullAccessModeID, "\(agent.name) defaults to full access before its first task")
         }
         check(AgentRuntime(root: root).environment["INITIAL_AGENT_MODE"] == "agent-full-access", "Codex starts in full access mode")
         model.discoverTasks()
@@ -190,7 +192,7 @@ struct AgentActivationTests {
         for agent in ClipAgent.allCases {
             let sessions = try requests(agent, method: "session/new").count
             let modes = try requests(agent, method: "session/set_mode").compactMap { $0["params"] as? [String: Any] }
-            check(modes.count == sessions && modes.allSatisfy { $0["modeId"] as? String == (agent == .codex ? "agent-full-access" : "bypassPermissions") }, "Every \(agent.name) batch and retry uses full access")
+            check(modes.count == sessions && modes.allSatisfy { $0["modeId"] as? String == agent.fullAccessModeID }, "Every \(agent.name) batch and retry uses full access")
         }
         model.stop()
         try await Task.sleep(for: .milliseconds(100))

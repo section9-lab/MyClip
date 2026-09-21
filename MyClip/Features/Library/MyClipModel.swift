@@ -12,6 +12,8 @@ final class ClipPreferences: ObservableObject {
     @Published var excludedApps: String { didSet { defaults.set(excludedApps, forKey: "myclip.excludedApps") } }
     @Published var codexPath: String { didSet { defaults.set(codexPath, forKey: "myclip.codexPath") } }
     @Published var claudePath: String { didSet { defaults.set(claudePath, forKey: "myclip.claudePath") } }
+    @Published var opencodePath: String { didSet { defaults.set(opencodePath, forKey: "myclip.opencodePath") } }
+    @Published var cursorPath: String { didSet { defaults.set(cursorPath, forKey: "myclip.cursorPath") } }
     @Published var mcpClients: Set<MCPClient> { didSet { defaults.set(mcpClients.map(\.rawValue).sorted(), forKey: "myclip.mcpClients") } }
 
     init(preview: Bool) {
@@ -23,10 +25,19 @@ final class ClipPreferences: ObservableObject {
         excludedApps = defaults.string(forKey: "myclip.excludedApps") ?? "com.apple.Passwords\ncom.agilebits.onepassword7\ncom.1password.1password"
         codexPath = defaults.string(forKey: "myclip.codexPath") ?? ""
         claudePath = defaults.string(forKey: "myclip.claudePath") ?? ""
+        opencodePath = defaults.string(forKey: "myclip.opencodePath") ?? ""
+        cursorPath = defaults.string(forKey: "myclip.cursorPath") ?? ""
         mcpClients = defaults.stringArray(forKey: "myclip.mcpClients").map { Set($0.compactMap(MCPClient.init(rawValue:))) } ?? [.codex, .claudeCode]
     }
 
-    func path(for agent: ClipAgent) -> String { agent == .codex ? codexPath : claudePath }
+    func path(for agent: ClipAgent) -> String {
+        switch agent {
+        case .codex: codexPath
+        case .claude: claudePath
+        case .opencode: opencodePath
+        case .cursor: cursorPath
+        }
+    }
 }
 
 enum LibraryPage: String, CaseIterable, Identifiable {
@@ -120,8 +131,13 @@ final class MyClipModel: ObservableObject {
     @Published private(set) var dispatching = false
     var canStartOrganization: Bool {
         guard let agent = preferences.enabledAgent else { return false }
-        return !preview && !dispatching && currentJob == nil && !discoveringTasks && state(agent).phase == .ready
+        // A disconnected Agent reconnects when a batch is due; only a failed one waits for the user.
+        return !preview && !dispatching && currentJob == nil && !discoveringTasks && [.ready, .disconnected].contains(state(agent).phase)
     }
+    /// The batch that stopped the queue, if any. Retrying it resumes automatic organization.
+    var latestFailedJob: ClipJob? { library.jobs.first { $0.state == .failed } }
+    /// A batch waiting for its automatic retry, oldest first.
+    var jobAwaitingRetry: ClipJob? { library.jobs.last { $0.isAwaitingRetry } }
     var canOrganizeNow: Bool {
         canStartOrganization && library.queue.pendingCount > 0 && library.queue.pauseReason == nil
             && library.queue.nextAgent == preferences.enabledAgent
@@ -133,7 +149,7 @@ final class MyClipModel: ObservableObject {
     @Published private(set) var mcpEnabled: Bool
     @Published private(set) var configuringMCP = false
     @Published private(set) var mcpSetupResults: [MCPClient: MCPSetupResult] = [:]
-    @Published var agents: [ClipAgent: ClipAgentState] = [.codex: .init(), .claude: .init()]
+    @Published var agents: [ClipAgent: ClipAgentState] = Dictionary(uniqueKeysWithValues: ClipAgent.allCases.map { ($0, ClipAgentState()) })
     @Published private(set) var localAgents: [ClipAgent: LocalAgentAvailability] = [:]
     @Published private(set) var selectingDefaultAgent: ClipAgent?
     @Published var permissions: [ClipPermission] = []
@@ -189,7 +205,12 @@ final class MyClipModel: ObservableObject {
                 await refresh()
                 startTextRecognition()
                 #if DEBUG
-                if preview { try await previewPanelState() }
+                if preview {
+                    try await previewPanelState()
+                    if let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--page=") }) {
+                        page = LibraryPage(rawValue: String(argument.dropFirst("--page=".count)))
+                    }
+                }
                 #endif
             } catch { notice = error.localizedDescription }
             while !Task.isCancelled {
@@ -441,12 +462,24 @@ final class MyClipModel: ObservableObject {
         preferences.enabledAgent = nil
     }
 
-    func copyClaudeLoginCommand() {
-        guard let command = runtime.command(for: .claude, customPath: preferences.claudePath) else { return }
+    func copyClaudeLoginCommand() { copyLoginCommand(for: .claude) }
+
+    /// Agents that log in through their own terminal command rather than an ACP auth method.
+    func hasLoginCommand(_ agent: ClipAgent) -> Bool { agent != .codex && isInstalled(agent) }
+
+    func copyLoginCommand(for agent: ClipAgent) {
+        guard let command = runtime.command(for: agent, customPath: preferences.path(for: agent)) else { return }
         let quotedPath = "'" + command.executable.path.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
+        let login: String
+        switch agent {
+        case .claude: login = quotedPath + " --cli auth login --claudeai"
+        case .opencode: login = quotedPath + " auth login"
+        case .cursor: login = quotedPath + " login"
+        case .codex: return
+        }
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(quotedPath + " --cli auth login --claudeai", forType: .string)
-        notice = "登录命令已复制。请在终端运行并完成登录，然后回到 MyClip 连接 Claude Code。"
+        NSPasteboard.general.setString(login, forType: .string)
+        notice = "登录命令已复制。请在终端运行并完成登录，然后回到 MyClip 连接 \(agent.name)。"
     }
 
     func openClaudeDesktop() {
@@ -512,11 +545,18 @@ final class MyClipModel: ObservableObject {
         }
     }
 
-    func canRetry(_ job: ClipJob) -> Bool { canStartOrganization && preferences.enabledAgent == job.agent }
+    func canRetry(_ job: ClipJob) -> Bool {
+        guard let agent = preferences.enabledAgent, agent == job.agent, !preview, !dispatching, currentJob == nil, !discoveringTasks else { return false }
+        return !state(agent).busy
+    }
 
     func retry(_ job: ClipJob) {
         Task {
             guard canRetry(job) else { return }
+            if state(job.agent).phase == .failed {
+                agents[job.agent]?.phase = .disconnected
+                agents[job.agent]?.detail = "正在重新连接…"
+            }
             dispatching = true
             do {
                 try await store.retryJob(id: job.id)
@@ -540,15 +580,25 @@ final class MyClipModel: ObservableObject {
             }
             return "\(count) 条等待 · 正在使用 \(job.agent.name)"
         }
-        guard let enabled = preferences.enabledAgent else { return "等待启用 Agent · \(count) 条等待" }
+        guard let enabled = preferences.enabledAgent else { return "等待选择 Agent · \(count) 条等待" }
+        if library.queue.pauseReason != nil { return "整理已停止 · \(count) 条等待" }
         if processingPaused { return "整理已暂停 · \(count) 条等待" }
-        guard state(enabled).available else { return "等待连接 \(enabled.name) · \(count) 条等待" }
+        switch state(enabled).phase {
+        case .failed: return "\(enabled.name) 出错 · \(count) 条等待"
+        case .connecting: return "正在连接 \(enabled.name) · \(count) 条等待"
+        case .installing: return "正在安装 \(enabled.name) 连接组件 · \(count) 条等待"
+        default: break
+        }
         guard count > 0 else { return "等待新的截图" }
         if discoveringTasks { return "\(count) 条等待 · 正在识别任务" }
         if let next = library.queue.nextAgent, next != enabled { return "\(count) 条等待 · 请启用 \(next.name) 继续原任务" }
         if let agent, library.queue.nextAgent != agent { return "\(count) 条等待 · 前方还有其他 Agent 的截图" }
         let seconds = max(0, Int(ceil((library.queue.readyAt ?? date).timeIntervalSince(date))))
-        return seconds == 0 ? "\(count) 条等待 · 即将整理" : "\(count) 条等待 · 约 \(seconds / 60) 分 \(seconds % 60) 秒后整理"
+        let countdown = seconds == 0 ? "即将" : "约 \(seconds / 60) 分 \(seconds % 60) 秒后"
+        if let retrying = jobAwaitingRetry {
+            return "\(count) 条等待 · \(countdown)第 \(retrying.attempts + 1) 次尝试上一批"
+        }
+        return "\(count) 条等待 · \(countdown)整理"
     }
 
     func cancel(_ job: ClipJob) {
@@ -672,7 +722,7 @@ final class MyClipModel: ObservableObject {
         // A connection may prepare a blank session before activation. It is consumed by one batch only.
         if let id = state(agent).sessionID { return id }
         let id = try await client.newSession(directory: try workspaceDirectory(), memoryServer: memoryCommand, ephemeralFor: agent)
-        try await client.setMode(sessionID: id, modeID: agent == .codex ? "agent-full-access" : "bypassPermissions")
+        try await client.setMode(sessionID: id, modeID: agent.fullAccessModeID)
         agents[agent]?.sessionID = id
         agents[agent]?.sessionIsEphemeral = true
         return id
@@ -696,12 +746,12 @@ final class MyClipModel: ObservableObject {
             try await store.reassignPendingCaptures(to: enabled)
             let queue = try await store.organizationQueue()
             guard let target = agent ?? queue.nextAgent, target == preferences.enabledAgent,
-                  state(target).available, !state(target).busy else { return }
+                  !state(target).busy, state(target).phase != .failed else { return }
             if !immediately {
                 guard !queue.paused, let readyAt = queue.readyAt, Date() >= readyAt else { return }
             }
             if jobID == nil { try await store.prepareOrganizationText() }
-            guard target == preferences.enabledAgent, state(target).available, !state(target).busy,
+            guard target == preferences.enabledAgent, !state(target).busy, state(target).phase != .failed,
                   let job = try await store.claimNextJob(immediately: immediately, jobID: jobID) else { return }
             currentJob = job
             currentJobStartedAt = Date()
@@ -725,7 +775,8 @@ final class MyClipModel: ObservableObject {
                 let handoff = try await store.organizationHandoff()
                 activityText = "已提交 \(data.count) 张图片、\(inputs.count - data.count) 条文本，等待 \(job.agent.name) 回复…"
                 let result = try await trackedPrompt(client, agent: job.agent, session: session,
-                    text: KnowledgeComposer.filePrompt(inputs: inputs, handoff: handoff) + "\n" + taskContext, images: data, jobID: job.id)
+                    text: KnowledgeComposer.filePrompt(inputs: inputs, handoff: handoff, previousAttempt: job.attempts > 1 ? job.error : nil) + "\n" + taskContext,
+                    images: data, jobID: job.id)
                 if cancelledJobs.contains(job.id) || result.stopReason == "cancelled" { throw CancellationError() }
                 guard result.stopReason == "end_turn" else { throw LibraryError.invalidResult("Agent 在完成前停止，请重试。") }
                 activityText = "正在同步 Memory 文件…"
@@ -746,8 +797,15 @@ final class MyClipModel: ObservableObject {
                     try await store.finishJob(id: job.id, state: .cancelled)
                     agents[job.agent]?.phase = .disconnected
                     agents[job.agent]?.detail = "整理已取消"
+                } else if RetryPolicy.classify(error) == .transient, RetryPolicy.canRetry(afterAttempt: job.attempts) {
+                    // Timeouts, dropped connections and overloaded providers get another run without stopping the queue.
+                    let delay = RetryPolicy.delay(afterAttempt: job.attempts)
+                    try await store.scheduleRetry(id: job.id, error: error.localizedDescription, at: Date().addingTimeInterval(delay))
+                    agents[job.agent]?.phase = .disconnected
+                    agents[job.agent]?.detail = "\(firstLine(error)) · 将自动重试"
                 } else {
-                    try await store.finishJob(id: job.id, state: .failed, error: error.localizedDescription)
+                    let attemptsNote = job.attempts > 1 ? "已自动重试 \(job.attempts - 1) 次仍未成功。" : ""
+                    try await store.finishJob(id: job.id, state: .failed, error: attemptsNote + error.localizedDescription)
                     setFailure(job.agent, error)
                 }
             }
@@ -808,7 +866,18 @@ final class MyClipModel: ObservableObject {
 
     private func setFailure(_ agent: ClipAgent, _ error: any Error) {
         agents[agent]?.phase = .failed
-        agents[agent]?.detail = error.localizedDescription.components(separatedBy: "\n").first ?? error.localizedDescription
+        agents[agent]?.detail = firstLine(error)
+    }
+
+    private func firstLine(_ error: any Error) -> String {
+        error.localizedDescription.components(separatedBy: "\n").first ?? error.localizedDescription
+    }
+
+    /// "重试并继续": re-run the batch that stopped the queue, or just lift the pause when nothing failed.
+    func resumeAfterFailure() {
+        if let job = latestFailedJob, canRetry(job) { retry(job); return }
+        if let agent = preferences.enabledAgent, state(agent).phase == .failed { connect(agent) }
+        processingPaused = false
     }
 
     private func cleanupIfNeeded() async {

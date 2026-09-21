@@ -10,6 +10,17 @@ public struct ACPCommand: Sendable {
         self.arguments = arguments
         self.environment = environment
     }
+
+    /// Environment variable prefixes that a hosting agent session leaks into MyClip when it launches the app.
+    /// `CLAUDE_CODE_ENTRYPOINT=claude-desktop` makes Claude Code trust the host's short-lived `ANTHROPIC_AUTH_TOKEN`
+    /// and ignore the user's own settings.json routing; the token is never refreshed for MyClip, so it expires into 401s.
+    public static let inheritedAgentPrefixes = ["CLAUDE", "ANTHROPIC_"]
+
+    /// MyClip's own environment with any hosting agent session's variables removed, so the agent MyClip launches
+    /// authenticates exactly like the user's terminal would.
+    public static func launchEnvironment(inheriting base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
+        base.filter { key, _ in !inheritedAgentPrefixes.contains { key.hasPrefix($0) } }
+    }
 }
 
 public struct ACPAuthMethod: Sendable, Identifiable {
@@ -195,9 +206,7 @@ public actor ACPClient {
         let stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
         child.executableURL = command.executable
         child.arguments = command.arguments
-        var environment = ProcessInfo.processInfo.environment
-        environment.merge(command.environment) { _, new in new }
-        child.environment = environment
+        child.environment = ACPCommand.launchEnvironment().merging(command.environment) { _, new in new }
         child.standardInput = stdin
         child.standardOutput = stdout
         child.standardError = stderr
@@ -293,7 +302,7 @@ public actor ACPClient {
 
     public func setMode(sessionID: String, modeID: String) async throws {
         _ = try await request("session/set_mode", params: .object(["sessionId": .string(sessionID), "modeId": .string(modeID)]))
-        if ["agent-full-access", "bypassPermissions"].contains(modeID) { fullAccessSessions.insert(sessionID) }
+        if ClipAgent.allCases.contains(where: { $0.fullAccessModeID == modeID }) { fullAccessSessions.insert(sessionID) }
         else { fullAccessSessions.remove(sessionID) }
     }
 

@@ -104,9 +104,12 @@ final class OrganizationQueueTests: XCTestCase {
         let inputs = try await migrated.organizationInputs(jobID: job)
         XCTAssertEqual(inputs.map { $0.capture.id }, [context.id])
         XCTAssertTrue(try XCTUnwrap(inputs.first).usesImage)
-        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "8")
+        let migratedVersion = try XCTUnwrap(database.run("PRAGMA user_version").first?["user_version"].flatMap(Int.init))
+        XCTAssertGreaterThanOrEqual(migratedVersion, 9, "Version 9 added the retry columns")
+        let columns = Set(try database.run("PRAGMA table_info(jobs)").compactMap { $0["name"] })
+        XCTAssertTrue(columns.isSuperset(of: ["attempts", "retry_at"]), "Legacy jobs gain the retry columns")
         _ = try LibraryStore(root: directory)
-        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "8", "Reopening must not downgrade the schema version")
+        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], String(migratedVersion), "Reopening must not downgrade the schema version")
     }
 
     func testDispatchCombinesOldTinyBatchesIntoEightImages() async throws {
@@ -323,7 +326,7 @@ final class OrganizationQueueTests: XCTestCase {
         XCTAssertEqual(after.pendingCount, 0)
     }
 
-    func testInterruptionPreservesPartialMemoryAndRequiresManualRetry() async throws {
+    func testInterruptionPreservesPartialMemoryAndRetriesAfterBackoff() async throws {
         let store = try LibraryStore(root: directory)
         try await store.record(image: fixtureImage(), context: fixtureContext(), agent: .codex, organize: true)
         let first = try await claim(store, at: 280)
@@ -331,15 +334,19 @@ final class OrganizationQueueTests: XCTestCase {
         let path = directory.appendingPathComponent("Memory/Wiki/Topics/partial.md")
         try "# Partial\n\nKeep this work.\n".write(to: path, atomically: true, encoding: .utf8)
         let reopened = try LibraryStore(root: directory)
-        try await reopened.recoverInterruptedJobs()
-        try await reopened.recoverInterruptedJobs()
+        try await reopened.recoverInterruptedJobs(at: date(300))
+        try await reopened.recoverInterruptedJobs(at: date(300))
         let snapshot = try await reopened.snapshot()
-        XCTAssertEqual(snapshot.jobs.first?.state, .failed)
+        XCTAssertEqual(snapshot.jobs.first?.state, .queued)
+        XCTAssertEqual(snapshot.jobs.first?.isAwaitingRetry, true)
         XCTAssertEqual(snapshot.jobs.first?.sourceIDs, first.sourceIDs)
-        XCTAssertTrue(snapshot.queue.paused)
+        XCTAssertFalse(snapshot.queue.paused)
         XCTAssertTrue(try String(contentsOf: path, encoding: .utf8).contains("Keep this work."))
+        let early = try await reopened.claimNextJob(at: date(300 + RetryPolicy.delay(afterAttempt: 1) - 1))
+        XCTAssertNil(early, "Not before the backoff has passed")
         let automatic = try await reopened.claimNextJob(at: date(1000))
-        XCTAssertNil(automatic)
+        XCTAssertEqual(automatic?.id, first.id)
+        XCTAssertEqual(automatic?.attempts, 2)
     }
 
     func testVersionFiveMigrationRebatchesOnlyUnstartedJobsWithoutLosingSources() async throws {
@@ -351,11 +358,11 @@ final class OrganizationQueueTests: XCTestCase {
             sources.append(context.id)
             try await store.record(image: fixtureImage(changed: true, x: index), context: context, agent: .codex, organize: false)
             let id = UUID().uuidString
-            try database.run("INSERT INTO jobs VALUES(?,?,'queued',?,NULL)", [id, index == 11 ? "claude" : "codex", String(100 + index)])
+            try database.run("INSERT INTO jobs(id,agent,state,created_at,error) VALUES(?,?,'queued',?,NULL)", [id, index == 11 ? "claude" : "codex", String(100 + index)])
             try database.run("INSERT INTO job_sources VALUES(?,?)", [id, context.id.uuidString])
         }
         let running = UUID().uuidString
-        try database.run("INSERT INTO jobs VALUES(?,'codex','running',90,NULL)", [running])
+        try database.run("INSERT INTO jobs(id,agent,state,created_at,error) VALUES(?,'codex','running',90,NULL)", [running])
         try database.run("INSERT INTO job_sources VALUES(?,?)", [running, sources[0].uuidString])
         try database.run("INSERT INTO job_times VALUES(?,270,NULL)", [running])
         try database.script("PRAGMA user_version=5;")
@@ -367,9 +374,13 @@ final class OrganizationQueueTests: XCTestCase {
         XCTAssertEqual(beforeRecovery.queue.pendingCounts, [.codex: 11, .claude: 1])
         XCTAssertEqual(beforeRecovery.queue.lastStartedAt, date(270))
         let reopened = try LibraryStore(root: directory)
-        try await reopened.recoverInterruptedJobs()
-        try await reopened.setOrganizationPaused(false)
-        let batch = try await claim(reopened, at: 450)
+        try await reopened.recoverInterruptedJobs(at: date(280))
+        // The interrupted legacy batch runs again first, then the unstarted jobs are rebatched.
+        let resumed = try await claim(reopened, at: 450)
+        XCTAssertEqual(resumed.id.uuidString, running)
+        XCTAssertEqual(resumed.sourceIDs, [sources[0]])
+        try await reopened.finishJob(id: resumed.id, state: .cancelled)
+        let batch = try await claim(reopened, at: 700)
         XCTAssertEqual(batch.sourceIDs, Array(sources.prefix(8)))
         let snapshot = try await reopened.snapshot()
         XCTAssertEqual(snapshot.captures.count, 12)

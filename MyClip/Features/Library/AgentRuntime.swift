@@ -24,20 +24,27 @@ struct AgentRuntime {
 
     var environment: [String: String] {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let paths = [binDirectory.path] + (searchPaths ?? ["\(home)/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"])
+        let paths = [binDirectory.path] + (searchPaths ?? ["\(home)/.local/bin", "\(home)/.opencode/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"])
         // The session's library must take precedence over a globally registered myclip server.
         return ["PATH": paths.joined(separator: ":"), "INITIAL_AGENT_MODE": "agent-full-access", "DISABLE_MCP_CONFIG_FILTERING": "true"]
     }
 
     private func desktopApplication(for agent: ClipAgent) -> URL? {
         if let desktopApplications { return desktopApplications[agent] }
-        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: agent == .codex ? "com.openai.codex" : "com.anthropic.claudefordesktop")
+        let bundleID: String
+        switch agent {
+        case .codex: bundleID = "com.openai.codex"
+        case .claude: bundleID = "com.anthropic.claudefordesktop"
+        case .cursor: bundleID = "com.todesktop.230313mzl4w4u92"
+        case .opencode: return nil
+        }
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
     }
 
     private func cliExecutable(for agent: ClipAgent, customPath: String) -> URL? {
         var directories = (environment["PATH"] ?? "").split(separator: ":").map { URL(fileURLWithPath: String($0)) }
         if !customPath.isEmpty { directories.insert(URL(fileURLWithPath: customPath).deletingLastPathComponent(), at: 0) }
-        var candidates = directories.map { $0.appendingPathComponent(agent == .codex ? "codex" : "claude") }
+        var candidates = directories.map { $0.appendingPathComponent(agent.cliName) }
         if agent == .codex, let app = desktopApplication(for: agent) {
             candidates.append(app.appendingPathComponent("Contents/Resources/codex"))
         }
@@ -56,7 +63,7 @@ struct AgentRuntime {
             ? (environment["PATH"] ?? "").split(separator: ":").map { URL(fileURLWithPath: String($0)).appendingPathComponent(agent.executableName) }
             : [URL(fileURLWithPath: customPath)]
         guard let executable = locations.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else { return nil }
-        return ACPCommand(executable: executable, environment: environment)
+        return ACPCommand(executable: executable, arguments: agent.acpArguments, environment: environment)
     }
 
     func sessionCommand(for agent: ClipAgent, customPath: String) -> ACPCommand? {
@@ -74,6 +81,9 @@ struct AgentRuntime {
     }
 
     func install(_ agent: ClipAgent) async throws {
+        guard let package = agent.package else {
+            throw LibraryError.invalidResult("\(agent.name) 自带 ACP 支持，无需连接组件；请先安装 \(agent.cliName) 命令行。")
+        }
         let env = environment
         let root = root
         try await Task.detached(priority: .utility) {
@@ -84,8 +94,8 @@ struct AgentRuntime {
             defer { try? handle.close() }
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["npm", "install", "--prefix", root.path, "--save-exact", "--no-audit", "--no-fund", agent.package]
-            process.environment = ProcessInfo.processInfo.environment.merging(env) { _, new in new }
+            process.arguments = ["npm", "install", "--prefix", root.path, "--save-exact", "--no-audit", "--no-fund", package]
+            process.environment = ACPCommand.launchEnvironment().merging(env) { _, new in new }
             process.standardOutput = handle
             process.standardError = handle
             try process.run()

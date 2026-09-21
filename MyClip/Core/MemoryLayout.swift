@@ -67,16 +67,34 @@ public enum MemoryLayout {
         return result.sorted { $0.0 < $1.0 }
     }
 
-    static func documents(in directory: URL) throws -> [(String, URL, String, MemoryDocument)] {
+    public struct InvalidFile: Equatable, Sendable {
+        public let path: String
+        public let reason: String
+        public var description: String { "\(path)（\(reason)）" }
+    }
+
+    /// One unreadable, empty or oversized file is reported rather than failing the whole vault.
+    /// Two files claiming one ID still fail: the index could not tell which one is the memory.
+    static func scan(in directory: URL) throws -> (documents: [(String, URL, String, MemoryDocument)], invalid: [InvalidFile]) {
         var result: [(String, URL, String, MemoryDocument)] = []
-        var ids = Set<UUID>()
+        var invalid: [InvalidFile] = []
+        var ids: [UUID: String] = [:]
         for (path, url) in try markdownFiles(in: directory) {
-            let text = try String(contentsOf: url, encoding: .utf8)
-            let document = try MemoryDocument(text)
-            guard ids.insert(document.id).inserted else { throw LibraryError.invalidResult("多个文件使用同一 Memory ID：\(path)") }
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { invalid.append(InvalidFile(path: path, reason: "不是 UTF-8 文本。")); continue }
+            let document: MemoryDocument
+            do { document = try MemoryDocument(text) } catch LibraryError.invalidResult(let reason) {
+                // A plain note without MyClip metadata is described by its body problem, not by the missing header.
+                var explanation = reason
+                if !text.hasPrefix("---\n") {
+                    do { try MemoryDocument.validate(title: "", body: text) } catch LibraryError.invalidResult(let bodyReason) { explanation = bodyReason } catch {}
+                }
+                invalid.append(InvalidFile(path: path, reason: explanation))
+                continue
+            }
+            guard ids.updateValue(path, forKey: document.id) == nil else { throw LibraryError.invalidResult("多个文件使用同一 Memory ID：\(path)") }
             result.append((path, url, text, document))
         }
-        return result.sorted { $0.0 < $1.0 }
+        return (result.sorted { $0.0 < $1.0 }, invalid.sorted { $0.path < $1.path })
     }
 }
 
@@ -109,7 +127,8 @@ extension LibraryStore {
                 if name == "Profile.md" { try database.run("INSERT INTO protected_entries VALUES(?)", [id.uuidString]) }
             }
             try database.run("INSERT INTO vault_meta VALUES('layout','1')")
-            try database.script("PRAGMA user_version=5")
+            // Never move the schema version backwards; a fresh library is already current.
+            if (Int(try database.run("PRAGMA user_version").first?["user_version"] ?? "0") ?? 0) < 5 { try database.script("PRAGMA user_version=5") }
         }
     }
 }

@@ -17,7 +17,13 @@ public struct ClipAgentSession: Sendable {
     }
 
     public func terminalScript(command: ACPCommand) -> String {
-        let arguments = agent == .codex ? ["resume", id] : ["--cli", "--resume", id]
+        let arguments: [String]
+        switch agent {
+        case .codex: arguments = ["resume", id]
+        case .claude: arguments = ["--cli", "--resume", id]
+        case .opencode: arguments = ["--session", id]
+        case .cursor: arguments = ["--resume", id]
+        }
         let environment = command.environment.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }
         let invocation = (["/usr/bin/env"] + environment + [command.executable.path] + command.arguments + arguments)
             .map(Self.shellQuote).joined(separator: " ")

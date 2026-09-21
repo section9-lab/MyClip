@@ -199,12 +199,14 @@ final class LibraryStoreTests: XCTestCase {
         try await reopened.recoverInterruptedJobs()
         let recovered = try await reopened.snapshot()
         XCTAssertEqual(recovered.captures.count, 2)
-        XCTAssertEqual(recovered.jobs.filter { $0.state == .failed }.count, 1)
-        XCTAssertEqual(recovered.queue.pendingCount, 1)
-        XCTAssertTrue(recovered.queue.paused)
-        try await reopened.retryJob(id: XCTUnwrap(first).id)
+        // The interrupted batch keeps its sources and waits for an automatic retry; nothing is lost or paused.
+        XCTAssertEqual(recovered.jobs.filter(\.isAwaitingRetry).count, 1)
+        XCTAssertEqual(recovered.jobs.filter { $0.state == .failed }.count, 0)
+        XCTAssertEqual(recovered.queue.pendingCount, 2)
+        XCTAssertFalse(recovered.queue.paused)
         let resumed = try await reopened.claimNextJob(immediately: true, jobID: first?.id)
         XCTAssertEqual(resumed?.id, first?.id)
+        XCTAssertEqual(resumed?.attempts, 2)
     }
 
     func testCommitCreatesMarkdownAndChineseShortWordSearchWithSources() async throws {
@@ -314,5 +316,102 @@ final class LibraryStoreTests: XCTestCase {
         let deleted = try await store.snapshot(query: "英文")
         XCTAssertTrue(deleted.entries.isEmpty)
         XCTAssertFalse(FileManager.default.fileExists(atPath: entry.fileURL.path))
+    }
+}
+
+/// A 320×320 "window" with text lines; `cursor` adds a caret, `scrolled` shifts the lines, `dark` repaints everything.
+func sceneFixtureImage(cursor: Bool = false, scrolled: Bool = false, dark: Bool = false) throws -> CapturedImage {
+    let size = 320
+    let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: size * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    context.setFillColor(CGColor(gray: dark ? 0.1 : 0.96, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: size, height: size))
+    context.setFillColor(CGColor(gray: dark ? 0.9 : 0.15, alpha: 1))
+    for line in stride(from: 30, to: size - 30, by: 20) {
+        let offset = scrolled ? 10 : 0
+        context.fill(CGRect(x: 20, y: line + offset, width: 120 + (line * 7) % 160, height: 8))
+    }
+    if cursor { context.fill(CGRect(x: 160, y: 150, width: 2, height: 12)) }
+    return try CapturedImage(image: XCTUnwrap(context.makeImage()))
+}
+
+@MainActor
+final class SceneFoldingTests: XCTestCase {
+    var directory: URL!
+
+    override func setUp() async throws {
+        directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    }
+
+    override func tearDown() async throws {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    func testCursorBlinkReusesImageAndIsNotQueuedTwice() async throws {
+        let store = try LibraryStore(root: directory)
+        try await store.record(image: sceneFixtureImage(), context: fixtureContext(at: 100), agent: .claude, organize: true)
+        try await store.record(image: sceneFixtureImage(cursor: true), context: fixtureContext(at: 140), agent: .claude, organize: true)
+        let snapshot = try await store.snapshot()
+        XCTAssertEqual(snapshot.captures.count, 2, "Every occurrence stays on record")
+        XCTAssertEqual(snapshot.imageCount, 1, "The second frame adds nothing, so it shares the first image")
+        XCTAssertEqual(snapshot.captures[0].imageID, snapshot.captures[1].imageID)
+        XCTAssertEqual(snapshot.captures[0].sceneID, snapshot.captures[1].sceneID)
+        XCTAssertEqual(snapshot.queue.pendingCount, 1, "The Agent sees the picture once")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.appendingPathComponent("Images").path).filter { $0.hasSuffix(".png") }.count, 1)
+    }
+
+    func testScrolledContentStoresANewImageInsideTheSameScene() async throws {
+        let store = try LibraryStore(root: directory)
+        try await store.record(image: sceneFixtureImage(), context: fixtureContext(at: 100), agent: .claude, organize: true)
+        try await store.record(image: sceneFixtureImage(scrolled: true), context: fixtureContext(at: 160), agent: .claude, organize: true)
+        let snapshot = try await store.snapshot()
+        XCTAssertEqual(snapshot.imageCount, 2)
+        XCTAssertEqual(snapshot.queue.pendingCount, 2)
+        XCTAssertEqual(snapshot.captures[0].sceneID, snapshot.captures[1].sceneID, "Same window, a minute apart: one scene for the Timeline")
+    }
+
+    func testManualScreenshotsAlwaysKeepTheirOwnQueueEntry() async throws {
+        let store = try LibraryStore(root: directory)
+        try await store.record(image: sceneFixtureImage(), context: fixtureContext(at: 100), agent: .claude, organize: true)
+        var manual = fixtureContext(at: 130)
+        manual.reason = .manual
+        try await store.record(image: sceneFixtureImage(cursor: true), context: manual, agent: .claude, organize: true)
+        let snapshot = try await store.snapshot()
+        XCTAssertEqual(snapshot.imageCount, 2)
+        XCTAssertEqual(snapshot.queue.pendingCount, 2)
+    }
+
+    func testGapAndOtherWindowStartNewScenes() async throws {
+        let store = try LibraryStore(root: directory)
+        try await store.record(image: sceneFixtureImage(), context: fixtureContext(at: 100), agent: .claude, organize: true)
+        try await store.record(image: sceneFixtureImage(cursor: true), context: fixtureContext(at: 100 + LibraryStore.sceneGap + 1), agent: .claude, organize: true)
+        try await store.record(image: sceneFixtureImage(cursor: true), context: fixtureContext(at: 100 + LibraryStore.sceneGap + 30, windowID: 2), agent: .claude, organize: true)
+        let snapshot = try await store.snapshot()
+        XCTAssertEqual(Set(snapshot.captures.map(\.sceneID)).count, 3)
+        XCTAssertEqual(snapshot.imageCount, 2, "After the gap the cursor frame is compared to nothing and stored")
+        XCTAssertEqual(snapshot.queue.pendingCount, 3)
+    }
+
+    func testTinyImagesKeepPixelExactComparison() async throws {
+        let store = try LibraryStore(root: directory)
+        try await store.record(image: fixtureImage(), context: fixtureContext(at: 100), agent: .claude, organize: true)
+        try await store.record(image: fixtureImage(changed: true), context: fixtureContext(at: 110), agent: .claude, organize: true)
+        let snapshot = try await store.snapshot()
+        XCTAssertEqual(snapshot.imageCount, 2)
+        XCTAssertEqual(snapshot.queue.pendingCount, 2)
+    }
+
+    func testLegacyCapturesAreGroupedIntoScenesOnMigration() async throws {
+        let store = try LibraryStore(root: directory)
+        for offset in [0.0, 40, 80, 500, 540] {
+            try await store.record(image: fixtureImage(changed: true, x: Int(offset) % 60), context: fixtureContext(at: 1000 + offset), agent: .claude, organize: false)
+        }
+        try await store.record(image: fixtureImage(changed: true, x: 3), context: fixtureContext(at: 1010, windowID: 9), agent: .claude, organize: false)
+        let database = try SQLiteConnection(url: directory.appendingPathComponent("Library.sqlite"))
+        try database.script("UPDATE captures SET scene_id=NULL; PRAGMA user_version=10;")
+        let migrated = try LibraryStore(root: directory)
+        let snapshot = try await migrated.snapshot()
+        let byWindow = Dictionary(grouping: snapshot.captures, by: \.windowID)
+        XCTAssertEqual(Set(byWindow[1]!.map(\.sceneID)).count, 2, "A 7 minute gap splits the window into two scenes")
+        XCTAssertEqual(Set(byWindow[9]!.map(\.sceneID)).count, 1)
+        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "11")
     }
 }
