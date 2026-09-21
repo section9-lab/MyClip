@@ -21,6 +21,9 @@ struct MyClipRootView: View {
         .frame(minWidth: 840, minHeight: 580)
         .onAppear { showingOnboarding = model.showPermissions }
         .onChange(of: model.showPermissions) { if $0 { showingOnboarding = true } }
+        .onReceive(NotificationCenter.default.publisher(for: .init("MyClipShowOnboarding"))) { _ in
+            if !model.preview { showingOnboarding = true }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .init("MyClipFocusSearch"))) { _ in
             if !model.showPermissions && !showingOnboarding { searchFocused = true }
         }
@@ -1142,6 +1145,9 @@ private struct MyClipSettingsView: View {
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }.padding(.vertical, 4)
                 LabeledContent("版本", value: appVersion)
+                Button("重新打开设置向导", systemImage: "slider.horizontal.3") {
+                    NotificationCenter.default.post(name: .init("MyClipShowOnboarding"), object: nil)
+                }.disabled(model.preview)
                 Button("退出 MyClip", systemImage: "power") { NSApp.terminate(nil) }
             }
         }.formStyle(.grouped).frame(maxWidth: 850).frame(maxWidth: .infinity)
