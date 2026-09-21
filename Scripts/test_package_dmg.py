@@ -52,6 +52,7 @@ else:
                                 PACKAGE_TEST_ROOT=str(self.root), CI="true")
         for key in ["MYCLIP_ARCH", "DERIVED_DATA_PATH", "CONFIGURATION", "CODE_SIGN_IDENTITY_OVERRIDE", "DMG_PATH_OUTPUT"]:
             self.environment.pop(key, None)
+        self.environment["CODE_SIGN_IDENTITY_OVERRIDE"] = "Developer ID Application: MyClip Test"
 
     def package(self, arch=None, actual_archs=None):
         if arch:
@@ -73,6 +74,19 @@ else:
                 arguments = json.loads((self.root / "build-arguments.json").read_text())
                 self.assertIn(f"ARCHS={arch}", arguments)
                 self.assertIn("ONLY_ACTIVE_ARCH=NO", arguments)
+                self.assertIn("CODE_SIGN_IDENTITY=Developer ID Application: MyClip Test", arguments)
+
+    def test_ci_without_a_signing_identity_cannot_publish_an_unstable_package(self):
+        self.environment.pop("CODE_SIGN_IDENTITY_OVERRIDE")
+        result = self.package("arm64")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.root / "build-arguments.json").exists())
+
+    def test_ad_hoc_identity_is_rejected_before_building(self):
+        self.environment["CODE_SIGN_IDENTITY_OVERRIDE"] = "-"
+        result = self.package("arm64")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.root / "build-arguments.json").exists())
 
     def test_incorrect_binary_architecture_prevents_packaging(self):
         result = self.package("arm64", "x86_64")

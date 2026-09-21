@@ -35,6 +35,25 @@ struct AgentActivationTests {
             }
             check(false, "Timed out waiting for the test adapter")
         }
+        let discoveryRoot = root.appendingPathComponent("Discovery")
+        let discoveryBin = discoveryRoot.appendingPathComponent("node_modules/.bin")
+        try FileManager.default.createDirectory(at: discoveryBin, withIntermediateDirectories: true)
+        let codexApp = discoveryRoot.appendingPathComponent("Renamed Codex.app")
+        let bundledCLI = codexApp.appendingPathComponent("Contents/Resources/codex")
+        try FileManager.default.createDirectory(at: bundledCLI.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let discovery = AgentRuntime(root: discoveryRoot, searchPaths: [], desktopApplications: [.codex: codexApp])
+        check(discovery.availability(of: .claude, customPath: "") == .missing, "Discovery does not invent an installed Agent")
+        check(discovery.availability(of: .codex, customPath: "") == .desktopOnly, "A desktop app without an executable is not a usable Agent")
+        try "#!/bin/sh\nexit 0\n".write(to: bundledCLI, atomically: true, encoding: .utf8)
+        check(discovery.availability(of: .codex, customPath: "") == .desktopOnly, "A non-executable CLI is not advertised as available")
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: bundledCLI.path)
+        check(discovery.availability(of: .codex, customPath: "") == .commandLine, "Discovery finds the CLI bundled in a renamed desktop app")
+        check(discovery.sessionCommand(for: .codex, customPath: "")?.executable == bundledCLI, "Connections use the same bundled CLI that discovery finds")
+        let claudeCLI = discoveryBin.appendingPathComponent("claude")
+        try "#!/bin/sh\nexit 0\n".write(to: claudeCLI, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: claudeCLI.path)
+        check(discovery.availability(of: .claude, customPath: "") == .commandLine, "Discovery finds locally installed Claude Code")
+        check(discovery.availability(of: .claude, customPath: discoveryRoot.appendingPathComponent("missing-adapter").path) == .missing, "An invalid custom adapter is not silently replaced by another installation")
         let fixture = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent("Tests/MyClipCoreTests/Fixtures/acp_agent.py")
         func shellQuote(_ text: String) -> String { "'" + text.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
@@ -46,7 +65,11 @@ struct AgentActivationTests {
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
         }
         let previousEnabled = UserDefaults.standard.object(forKey: "myclip.enabledAgent")
-        defer { UserDefaults.standard.set(previousEnabled, forKey: "myclip.enabledAgent") }
+        let previousCodexPreference = UserDefaults.standard.object(forKey: "myclip.codexPath")
+        defer {
+            UserDefaults.standard.set(previousEnabled, forKey: "myclip.enabledAgent")
+            UserDefaults.standard.set(previousCodexPreference, forKey: "myclip.codexPath")
+        }
         UserDefaults.standard.removeObject(forKey: "myclip.enabledAgent")
         UserDefaults.standard.setVolatileDomain([
             "myclip.agent": "codex", "myclip.autoOrganize": true,
@@ -61,6 +84,8 @@ struct AgentActivationTests {
                 .filter { $0["method"] as? String == method }
         }
         let model = try MyClipModel(root: root.appendingPathComponent("Library"), preview: false)
+        model.refreshAgentAvailability()
+        check(ClipAgent.allCases.allSatisfy { model.localAgents[$0] == .connector }, "Discovery recognizes both configured adapters")
         check(model.preferences.enabledAgent == nil, "A legacy default preference does not implicitly enable an Agent")
         model.enable(.claude)
         check(model.preferences.enabledAgent == nil, "An unconnected Agent cannot be enabled")
@@ -185,6 +210,24 @@ struct AgentActivationTests {
         try await Task.sleep(for: .milliseconds(150))
         check(ClipAgent.allCases.allSatisfy { !disabledRestart.state($0).available }, "A disabled Agent stays disabled after restart")
         disabledRestart.stop()
+        try await Task.sleep(for: .milliseconds(100))
+        let onboarding = try MyClipModel(root: root.appendingPathComponent("Onboarding"), preview: false)
+        await onboarding.selectDefaultAgent(.claude)
+        check(onboarding.state(.claude).available && onboarding.preferences.enabledAgent == .claude, "Onboarding connects and explicitly enables the selected default Agent")
+        check(ClipPreferences(preview: false).enabledAgent == .claude, "The onboarding default survives a restart")
+        let failingAdapter = root.appendingPathComponent("failed-adapter")
+        try "#!/bin/sh\nexit 1\n".write(to: failingAdapter, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: failingAdapter.path)
+        let previousCodexPath = onboarding.preferences.codexPath
+        onboarding.preferences.codexPath = failingAdapter.path
+        await onboarding.selectDefaultAgent(.codex)
+        check(onboarding.state(.codex).phase == .failed, "A failed onboarding connection displays an error")
+        check(onboarding.preferences.enabledAgent == .claude && onboarding.selectingDefaultAgent == nil, "Connection failure preserves the working default and allows retry")
+        onboarding.preferences.codexPath = previousCodexPath
+        await onboarding.selectDefaultAgent(.codex)
+        check(onboarding.preferences.enabledAgent == .codex, "Retry can switch the default after a successful connection")
+        onboarding.stop()
+        onboarding.disableAgent()
         try await Task.sleep(for: .milliseconds(100))
         print("Agent activation checks: \(failures) failure(s)")
         exit(failures == 0 ? 0 : 1)

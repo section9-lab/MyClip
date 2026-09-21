@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "future-observatory.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

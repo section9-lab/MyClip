@@ -40,6 +40,29 @@ jobs:
           test -f "docs/releases/$GITHUB_REF_NAME.md"
           xcodebuild -version
 
+      - name: Import stable signing certificate
+        env:
+          APPLE_SIGNING_CERTIFICATE_P12: ${{ secrets.APPLE_SIGNING_CERTIFICATE_P12 }}
+          APPLE_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_SIGNING_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          if [[ -z "$APPLE_SIGNING_CERTIFICATE_P12" || -z "$APPLE_SIGNING_IDENTITY" || "$APPLE_SIGNING_IDENTITY" == "-" ]]; then
+            echo "::error::Configure a stable Apple signing identity and certificate before publishing. See docs/release-signing.md."
+            exit 1
+          fi
+          certificate="$RUNNER_TEMP/myclip-signing.p12"
+          keychain="$RUNNER_TEMP/myclip-signing.keychain-db"
+          password="$(openssl rand -base64 32)"
+          echo "::add-mask::$password"
+          python3 -c 'import base64, os, pathlib; pathlib.Path(os.environ["RUNNER_TEMP"], "myclip-signing.p12").write_bytes(base64.b64decode(os.environ["APPLE_SIGNING_CERTIFICATE_P12"], validate=True))'
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$certificate" -P "$APPLE_SIGNING_CERTIFICATE_PASSWORD" -k "$keychain" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          rm -f "$certificate"
+
       - name: Test packaging
         run: python3 Scripts/test_package_dmg.py
 
@@ -61,6 +84,7 @@ jobs:
       - name: Build architecture-specific DMG
         env:
           MYCLIP_ARCH: ${{ matrix.arch }}
+          CODE_SIGN_IDENTITY_OVERRIDE: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: bash Scripts/package_dmg.sh
 
       - name: Upload DMG
@@ -70,6 +94,14 @@ jobs:
           path: dist/MyClip-*-${{ matrix.arch }}.dmg
           if-no-files-found: error
           retention-days: 7
+
+      - name: Remove signing material
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/myclip-signing.p12"
+          if [[ -f "$RUNNER_TEMP/myclip-signing.keychain-db" ]]; then
+            security delete-keychain "$RUNNER_TEMP/myclip-signing.keychain-db"
+          fi
 
   release:
     name: Publish GitHub Release

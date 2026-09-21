@@ -6,18 +6,23 @@ import MyClipCore
 struct MyClipRootView: View {
     @ObservedObject var model: MyClipModel
     @FocusState private var searchFocused: Bool
+    @State private var showingOnboarding = false
 
     var body: some View {
         Group {
-            if model.showPermissions { CaptureOnboardingView(model: model) }
+            if model.showPermissions || showingOnboarding {
+                CaptureOnboardingView(model: model) { showingOnboarding = false }
+            }
             else { libraryContent }
         }
         .alert("MyClip", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
             Button("好", role: .cancel) { model.notice = nil }
         } message: { Text(model.notice ?? "") }
         .frame(minWidth: 840, minHeight: 580)
+        .onAppear { showingOnboarding = model.showPermissions }
+        .onChange(of: model.showPermissions) { if $0 { showingOnboarding = true } }
         .onReceive(NotificationCenter.default.publisher(for: .init("MyClipFocusSearch"))) { _ in
-            if !model.showPermissions { searchFocused = true }
+            if !model.showPermissions && !showingOnboarding { searchFocused = true }
         }
     }
 
@@ -1164,40 +1169,180 @@ private struct MyClipSettingsView: View {
 
 private struct CaptureOnboardingView: View {
     @ObservedObject var model: MyClipModel
+    var onContinue: () -> Void = {}
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                Image(systemName: "macwindow").font(.system(size: 42, weight: .light)).foregroundStyle(.blue)
-                Text("欢迎使用 MyClip").font(.largeTitle.bold())
-                Text("截图，成为记忆。完成权限设置，开始记录工作画面。").font(.subheadline)
-                Text(model.preferences.captureSettings.description).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Text("需要允许以下两项权限才能使用 MyClip。全部授权后会自动进入应用并开始采集。").font(.subheadline)
-                permission("屏幕录制", detail: "读取\(model.preferences.captureSettings.scope.label)的画面", allowed: model.screenPermission, action: model.requestScreenPermission)
-                permission("辅助功能", detail: "识别焦点窗口和回车按键", allowed: model.accessibilityPermission, action: model.requestAccessibilityPermission)
-                if !model.screenPermission {
-                    Text("请在系统设置的“隐私与安全 → 录屏与系统录音”中开启 MyClip。如果开关已开启但此处仍未通过，请退出并重新打开 MyClip。").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                ScrollView {
+                    setup(compact: geometry.size.height < 700)
+                        .padding(.horizontal, geometry.size.width < 1000 ? 28 : 48)
+                        .padding(.vertical, geometry.size.height < 700 ? 20 : 28)
+                        .frame(maxWidth: 540)
+                        .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .center)
                 }
-                if model.preferences.autoOrganize {
-                    Text(model.preferences.enabledAgent.map { "自动整理已开启：新截图会交给 \($0.name) 处理。你可以在设置中关闭。" }
-                        ?? "自动整理已开启：新截图先进入等待队列，连接并启用 Agent 后开始整理。")
-                        .font(.caption).foregroundStyle(.secondary)
+                .frame(width: max(400, geometry.size.width * 0.47))
+                GeometryReader { artwork in
+                    Image("OnboardingArtwork")
+                        .resizable().scaledToFill()
+                        .frame(width: artwork.size.width, height: artwork.size.height)
+                        .clipped()
+                        .overlay(alignment: .bottomLeading) {
+                            Text("此刻的灵感，\n明日的线索。")
+                                .font(.system(size: 28, weight: .medium)).lineSpacing(6)
+                                .foregroundStyle(.white).padding(32)
+                        }
                 }
-                HStack {
-                    Button("退出 MyClip") { NSApp.terminate(nil) }
-                    Spacer()
-                    Button("刷新权限状态") { model.refreshPermissions() }.buttonStyle(.borderedProminent)
-                }
-            }.padding(36).frame(maxWidth: 580).frame(maxWidth: .infinity)
-        }.frame(maxWidth: .infinity, maxHeight: .infinity).background(Color(nsColor: .textBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .padding([.top, .bottom, .trailing], 14)
+                .accessibilityHidden(true)
+            }
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear { model.refreshAgentAvailability() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.refreshAgentAvailability()
+        }
     }
 
-    private func permission(_ title: String, detail: String, allowed: Bool, action: @escaping () -> Void) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) { Text(title).font(.headline); Text(detail).font(.caption).foregroundStyle(.secondary) }
+    private func setup(compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Label("MyClip", systemImage: "paperclip")
+                .font(.system(size: 17, weight: .semibold))
+                .padding(.bottom, compact ? 16 : 28)
+            Text("让工作成为记忆。")
+                .font(.system(size: compact ? 32 : 40, weight: .semibold)).tracking(-1)
+                .lineLimit(1).minimumScaleFactor(0.85)
+            Text("完成两项授权，开始记录工作中的线索。")
+                .font(.system(size: 14)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true).padding(.top, 10)
+                .padding(.bottom, compact ? 18 : 24)
+            defaultAgentSection.padding(.bottom, compact ? 18 : 24)
+            HStack {
+                Text("权限设置").fontWeight(.medium)
+                Spacer()
+                Text("\((model.screenPermission ? 1 : 0) + (model.accessibilityPermission ? 1 : 0)) / 2 已授权")
+                    .monospacedDigit()
+            }
+            .font(.caption).foregroundStyle(.secondary).padding(.bottom, 8)
+            permission("屏幕录制", symbol: "rectangle.on.rectangle", detail: "读取\(model.preferences.captureSettings.scope.label)的画面", allowed: model.screenPermission, action: model.requestScreenPermission)
+            Divider()
+            permission("辅助功能", symbol: "cursorarrow.rays", detail: "识别焦点窗口与截图触发操作", allowed: model.accessibilityPermission, action: model.requestAccessibilityPermission)
+            Divider()
+            VStack(alignment: .leading, spacing: 5) {
+                Text("授权后开始采集。默认 Agent 可稍后在 Backstage 更改。")
+                if model.preferences.autoOrganize {
+                    Text(model.preferences.enabledAgent.map { "新截图将由 \($0.name) 自动整理，可在设置中关闭。" }
+                        ?? "新截图先保存在本机，连接 Agent 后可自动整理。")
+                }
+            }
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true).padding(.top, compact ? 12 : 18)
+            DisclosureGroup("已开启权限，但仍未识别？") {
+                Text("更新应用后，系统可能仍保留旧版本的授权。请在对应权限列表中移除 MyClip，再添加“应用程序”中的 MyClip，然后退出并重新打开。")
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 8)
+            }
+            .font(.caption).tint(.secondary).padding(.top, 12)
+            HStack {
+                Button("退出 MyClip") { NSApp.terminate(nil) }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                Spacer()
+                if model.screenPermission && model.accessibilityPermission {
+                    Button("开始使用", systemImage: "arrow.right", action: onContinue)
+                        .buttonStyle(.borderedProminent).controlSize(.large)
+                        .disabled(model.selectingDefaultAgent != nil)
+                } else {
+                    Button("重新检查权限", systemImage: "arrow.clockwise") { model.refreshPermissions() }
+                        .buttonStyle(.borderedProminent).controlSize(.large)
+                }
+            }
+            .padding(.top, compact ? 18 : 24)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var defaultAgentSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("默认 Agent").fontWeight(.medium)
+                Spacer()
+                Button("重新检测", systemImage: "arrow.clockwise", action: model.refreshAgentAvailability)
+                    .buttonStyle(.plain).disabled(model.selectingDefaultAgent != nil)
+            }.font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                ForEach(ClipAgent.allCases) { agent in
+                    let available = model.localAgents[agent] ?? .missing
+                    let state = model.state(agent)
+                    let selected = model.preferences.enabledAgent == agent
+                    Button {
+                        Task { await model.selectDefaultAgent(agent) }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 9) {
+                            HStack(spacing: 8) {
+                                AgentBrandIcon(agent: agent, size: 24)
+                                Text(agent.name).font(.system(size: 13, weight: .semibold))
+                                    .lineLimit(1).minimumScaleFactor(0.8)
+                                Spacer(minLength: 0)
+                                if model.selectingDefaultAgent == agent || state.busy {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(selected ? Color.accentColor : Color.secondary.opacity(0.5))
+                                }
+                            }
+                            Text(state.busy ? state.detail : (state.available ? "已连接 · 可自动整理" : available.detail))
+                                .font(.system(size: 11)).foregroundStyle(.secondary)
+                                .lineLimit(2).frame(height: 28, alignment: .topLeading)
+                        }
+                        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(selected ? Color.accentColor.opacity(0.06) : Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(selected ? Color.accentColor.opacity(0.65) : Color.secondary.opacity(0.18), lineWidth: 1))
+                        .contentShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!available.canSelect || state.busy || model.selectingDefaultAgent != nil)
+                    .accessibilityLabel("\(agent.name)，\(selected ? "默认 Agent" : "设为默认 Agent")，\(available.detail)")
+                    .help(available == .commandLine ? "选择后安装连接组件并验证登录，成功后设为默认 Agent" : "连接成功后设为默认 Agent")
+                }
+            }
+            ForEach(ClipAgent.allCases) { agent in
+                let state = model.state(agent)
+                if state.phase == .failed {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("\(agent.name)：\(state.detail)").foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                        ForEach(state.authMethods) { method in
+                            Button(method.name) { model.authenticate(agent, method: method) }
+                        }
+                        if agent == .claude, model.isInstalled(agent) {
+                            Button("复制 Claude Code 登录命令", action: model.copyClaudeLoginCommand)
+                        }
+                    }.font(.caption).buttonStyle(.borderless)
+                }
+            }
+        }
+    }
+
+    private func permission(_ title: String, symbol: String, detail: String, allowed: Bool, action: @escaping () -> Void) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol).font(.system(size: 20, weight: .regular))
+                .foregroundStyle(.secondary).frame(width: 28)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title).font(.system(size: 14, weight: .semibold))
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Spacer()
-            if allowed { Label("已允许", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
-            else { Button("允许", action: action).accessibilityLabel("允许\(title)") }
-        }.padding(15).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12))
+            if allowed {
+                Label("已授权", systemImage: "checkmark.circle.fill")
+                    .font(.caption.weight(.medium)).foregroundStyle(.blue)
+                    .accessibilityLabel("\(title)已授权")
+            } else {
+                Button("去授权", action: action).controlSize(.regular)
+                    .accessibilityLabel("允许\(title)")
+            }
+        }.padding(.vertical, 18)
     }
 }
 

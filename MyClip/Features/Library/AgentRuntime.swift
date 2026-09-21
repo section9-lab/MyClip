@@ -1,16 +1,54 @@
-import Foundation
+import AppKit
 import MyClipCore
+
+enum LocalAgentAvailability {
+    case connector, commandLine, desktopOnly, missing
+
+    var canSelect: Bool { self == .connector || self == .commandLine }
+    var detail: String {
+        switch self {
+        case .connector: "连接组件已安装"
+        case .commandLine: "已检测到 · 需安装连接组件"
+        case .desktopOnly: "仅检测到桌面端 · 需安装命令行"
+        case .missing: "未检测到"
+        }
+    }
+}
 
 struct AgentRuntime {
     let root: URL
+    var searchPaths: [String]? = nil
+    var desktopApplications: [ClipAgent: URL]? = nil
 
     var binDirectory: URL { root.appendingPathComponent("node_modules/.bin") }
 
     var environment: [String: String] {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let paths = [binDirectory.path, "\(home)/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+        let paths = [binDirectory.path] + (searchPaths ?? ["\(home)/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"])
         // The session's library must take precedence over a globally registered myclip server.
         return ["PATH": paths.joined(separator: ":"), "INITIAL_AGENT_MODE": "agent-full-access", "DISABLE_MCP_CONFIG_FILTERING": "true"]
+    }
+
+    private func desktopApplication(for agent: ClipAgent) -> URL? {
+        if let desktopApplications { return desktopApplications[agent] }
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: agent == .codex ? "com.openai.codex" : "com.anthropic.claudefordesktop")
+    }
+
+    private func cliExecutable(for agent: ClipAgent, customPath: String) -> URL? {
+        var directories = (environment["PATH"] ?? "").split(separator: ":").map { URL(fileURLWithPath: String($0)) }
+        if !customPath.isEmpty { directories.insert(URL(fileURLWithPath: customPath).deletingLastPathComponent(), at: 0) }
+        var candidates = directories.map { $0.appendingPathComponent(agent == .codex ? "codex" : "claude") }
+        if agent == .codex, let app = desktopApplication(for: agent) {
+            candidates.append(app.appendingPathComponent("Contents/Resources/codex"))
+        }
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
+    }
+
+    func availability(of agent: ClipAgent, customPath: String) -> LocalAgentAvailability {
+        if command(for: agent, customPath: customPath) != nil { return .connector }
+        if !customPath.isEmpty { return .missing }
+        if cliExecutable(for: agent, customPath: customPath) != nil { return .commandLine }
+        return desktopApplication(for: agent) == nil ? .missing : .desktopOnly
     }
 
     func command(for agent: ClipAgent, customPath: String) -> ACPCommand? {
@@ -23,10 +61,7 @@ struct AgentRuntime {
 
     func sessionCommand(for agent: ClipAgent, customPath: String) -> ACPCommand? {
         if agent == .claude { return command(for: agent, customPath: customPath) }
-        var directories = (environment["PATH"] ?? "").split(separator: ":").map { URL(fileURLWithPath: String($0)) }
-        if !customPath.isEmpty { directories.insert(URL(fileURLWithPath: customPath).deletingLastPathComponent(), at: 0) }
-        guard let executable = directories.map({ $0.appendingPathComponent("codex") })
-            .first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else { return nil }
+        guard let executable = cliExecutable(for: agent, customPath: customPath) else { return nil }
         return ACPCommand(executable: executable, environment: environment)
     }
 

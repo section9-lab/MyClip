@@ -134,6 +134,8 @@ final class MyClipModel: ObservableObject {
     @Published private(set) var configuringMCP = false
     @Published private(set) var mcpSetupResults: [MCPClient: MCPSetupResult] = [:]
     @Published var agents: [ClipAgent: ClipAgentState] = [.codex: .init(), .claude: .init()]
+    @Published private(set) var localAgents: [ClipAgent: LocalAgentAvailability] = [:]
+    @Published private(set) var selectingDefaultAgent: ClipAgent?
     @Published var permissions: [ClipPermission] = []
     @Published var currentJob: ClipJob?
     @Published var activityText = "" { didSet { lastActivityAt = Date() } }
@@ -247,6 +249,30 @@ final class MyClipModel: ObservableObject {
 
     func isInstalled(_ agent: ClipAgent) -> Bool {
         runtime.command(for: agent, customPath: preferences.path(for: agent)) != nil
+    }
+
+    func refreshAgentAvailability() {
+        localAgents = Dictionary(uniqueKeysWithValues: ClipAgent.allCases.map {
+            ($0, runtime.availability(of: $0, customPath: preferences.path(for: $0)))
+        })
+    }
+
+    func selectDefaultAgent(_ agent: ClipAgent) async {
+        guard !preview, selectingDefaultAgent == nil, !state(agent).busy,
+              !agents.values.contains(where: { $0.phase == .installing }) else { return }
+        refreshAgentAvailability()
+        guard localAgents[agent]?.canSelect == true else { return }
+        selectingDefaultAgent = agent
+        defer { selectingDefaultAgent = nil; refreshAgentAvailability() }
+        do {
+            if !isInstalled(agent) {
+                agents[agent]?.phase = .installing
+                agents[agent]?.detail = "正在安装连接组件…"
+                try await runtime.install(agent)
+            }
+            _ = try await connectedClient(agent)
+            enable(agent)
+        } catch { setFailure(agent, error) }
     }
 
     func refreshPermissions() {
