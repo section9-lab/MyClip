@@ -79,7 +79,8 @@ final class MyClipAppDelegate: NSObject, NSApplicationDelegate {
         let bar = NSMenu()
         let appItem = NSMenuItem()
         let appMenu = NSMenu(title: "MyClip")
-        appMenu.addItem(withTitle: "关于 MyClip", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        let about = appMenu.addItem(withTitle: "关于 MyClip", action: #selector(showAbout), keyEquivalent: "")
+        about.target = self
         appMenu.addItem(.separator())
         let settings = appMenu.addItem(withTitle: "设置…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
@@ -113,6 +114,7 @@ final class MyClipAppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = bar
     }
 
+    @objc private func showAbout() { NSApp.orderFrontStandardAboutPanel(options: [.version: ""]) }
     @objc private func showSettings() { model?.open(.settings) }
     @objc private func openLibrary() { model?.open() }
     @objc private func focusSearch() {
