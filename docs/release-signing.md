@@ -18,7 +18,7 @@ Run **Initialize Community Signing** once from the repository's Actions page bef
 
 Initialization refuses to run if any of these settings already exists, preventing accidental identity rotation. A partially configured run must be investigated before retrying. Private keys and passwords must never be committed, logged, or published as artifacts.
 
-The release workflow imports the identity into a temporary keychain and trusts it for code signing **only on the disposable build runner**. It removes the trust entry, keychain, and temporary signing files after packaging. Both architecture jobs must succeed before publication. Releases include both DMGs, the public `MyClip-signing-certificate.pem`, and `SHA256SUMS`; the private key stays in Actions secrets. Users do not need to install or trust the public certificate.
+The release workflow imports the identity into a temporary keychain and trusts it for code signing **only on the disposable build runner**. It deletes the private keychain and temporary signing files after packaging; the temporary trust configuration is discarded with the runner. Both architecture jobs must succeed before publication. Releases include both DMGs, the public `MyClip-signing-certificate.pem`, and `SHA256SUMS`; the private key stays in Actions secrets. Users do not need to install or trust the public certificate.
 
 ## Installing a community build
 

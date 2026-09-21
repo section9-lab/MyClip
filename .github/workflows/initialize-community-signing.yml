@@ -30,9 +30,6 @@ jobs:
           signing_dir="$(mktemp -d "$RUNNER_TEMP/myclip-community.XXXXXX")"
           keychain="$signing_dir/signing.keychain-db"
           cleanup() {
-            if [[ -f "$signing_dir/certificate.pem" ]]; then
-              sudo security remove-trusted-cert -d "$signing_dir/certificate.pem" >/dev/null 2>&1 || true
-            fi
             if [[ -f "$keychain" ]]; then security delete-keychain "$keychain"; fi
             rm -rf "$signing_dir"
           }
@@ -80,5 +77,6 @@ jobs:
           python3 -c 'import base64, pathlib, sys; sys.stdout.buffer.write(base64.b64encode(pathlib.Path(sys.argv[1]).read_bytes()))' "$signing_dir/signing.p12" | gh secret set MYCLIP_SIGNING_CERTIFICATE_P12 --repo "$GITHUB_REPOSITORY"
           printf '%s' "$signing_password" | gh secret set MYCLIP_SIGNING_CERTIFICATE_PASSWORD --repo "$GITHUB_REPOSITORY"
           gh variable set MYCLIP_SIGNING_CERTIFICATE_SHA1 --repo "$GITHUB_REPOSITORY" --body "$fingerprint"
+          echo "Repository signing settings saved successfully."
           echo "Configured persistent community identity: $fingerprint" >> "$GITHUB_STEP_SUMMARY"
           echo "Two different binaries satisfy the same designated requirement. No existing Apple identity was exported." >> "$GITHUB_STEP_SUMMARY"

@@ -108,11 +108,7 @@ jobs:
       - name: Remove signing material
         if: always()
         run: |
-          rm -f "$RUNNER_TEMP/myclip-signing.p12"
-          if [[ -f "$RUNNER_TEMP/myclip-signing.pem" ]]; then
-            sudo security remove-trusted-cert -d "$RUNNER_TEMP/myclip-signing.pem" || true
-            rm -f "$RUNNER_TEMP/myclip-signing.pem"
-          fi
+          rm -f "$RUNNER_TEMP/myclip-signing.p12" "$RUNNER_TEMP/myclip-signing.pem"
           if [[ -f "$RUNNER_TEMP/myclip-signing.keychain-db" ]]; then
             security delete-keychain "$RUNNER_TEMP/myclip-signing.keychain-db"
           fi
