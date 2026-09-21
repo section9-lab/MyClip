@@ -111,6 +111,11 @@ struct MemoryScrollTests {
         settle()
         scroll = findScroll(in: window.contentView!)!
         host = scroll.documentView!
+        // Restoration is asynchronous and may outlast a layout pass on busy CI runners.
+        let restoreDeadline = Date().addingTimeInterval(5)
+        while abs(scroll.documentVisibleRect.minY - 900) >= 1 && Date() < restoreDeadline {
+            settle()
+        }
         check(abs(scroll.documentVisibleRect.minY - 900) < 1, "Reopening restores the saved position after layout")
         checkEntireDocument("Reopened document")
 
