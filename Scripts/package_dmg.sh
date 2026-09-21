@@ -20,12 +20,16 @@ CODE_SIGN_ARGS=()
 
 if [[ -n "${CODE_SIGN_IDENTITY_OVERRIDE:-}" ]]; then
   if [[ "$CODE_SIGN_IDENTITY_OVERRIDE" == "-" ]]; then
-    echo "Ad-hoc signing cannot preserve macOS permissions across updates. Use an Apple signing certificate." >&2
+    echo "Ad-hoc signing cannot preserve macOS permissions across updates. Use a persistent signing certificate." >&2
     exit 1
   fi
-  CODE_SIGN_ARGS+=(CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY_OVERRIDE")
+  CODE_SIGN_ARGS+=(CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY_OVERRIDE" DEVELOPMENT_TEAM=)
 elif [[ "${CI:-}" == "true" ]]; then
   echo "CI packaging requires CODE_SIGN_IDENTITY_OVERRIDE and its signing certificate. See docs/release-signing.md." >&2
+  exit 1
+fi
+if [[ "${CI:-}" == "true" && ! "${MYCLIP_SIGNING_CERTIFICATE_SHA1:-}" =~ ^[[:xdigit:]]{40}$ ]]; then
+  echo "CI packaging requires MYCLIP_SIGNING_CERTIFICATE_SHA1 to pin the release identity." >&2
   exit 1
 fi
 
@@ -44,7 +48,11 @@ if [[ "$ACTUAL_ARCHS" != "$TARGET_ARCHS" && ! ( "$MYCLIP_ARCH" == "universal" &&
   echo "Unexpected app architecture: $ACTUAL_ARCHS (expected $TARGET_ARCHS)" >&2
   exit 1
 fi
-codesign --verify --deep --strict '-R=anchor apple generic' "$APP_PATH"
+if [[ -n "${MYCLIP_SIGNING_CERTIFICATE_SHA1:-}" ]]; then
+  codesign --verify --deep --strict "-R=certificate leaf = H\"$MYCLIP_SIGNING_CERTIFICATE_SHA1\"" "$APP_PATH"
+else
+  codesign --verify --deep --strict '-R=anchor apple generic' "$APP_PATH"
+fi
 
 rm -rf "$DMG_ROOT" "$DMG_PATH"
 mkdir -p "$DMG_ROOT" dist

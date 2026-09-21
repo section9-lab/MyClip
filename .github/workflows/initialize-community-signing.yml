@@ -1,0 +1,81 @@
+name: Initialize Community Signing
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: initialize-community-signing
+  cancel-in-progress: false
+
+jobs:
+  initialize:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - name: Create and validate a project-only signing identity
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$GH_TOKEN"
+          existing="$(gh secret list --repo "$GITHUB_REPOSITORY" --json name --jq '.[].name')"
+          if [[ "$existing" == *MYCLIP_SIGNING_CERTIFICATE_* ]] || gh variable get MYCLIP_SIGNING_CERTIFICATE_SHA1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Signing is already configured or partially configured. Refusing to rotate its identity."
+            exit 1
+          fi
+          signing_dir="$(mktemp -d "$RUNNER_TEMP/myclip-community.XXXXXX")"
+          keychain="$signing_dir/signing.keychain-db"
+          cleanup() {
+            if [[ -f "$signing_dir/certificate.pem" ]]; then
+              sudo security remove-trusted-cert -d "$signing_dir/certificate.pem" >/dev/null 2>&1 || true
+            fi
+            if [[ -f "$keychain" ]]; then security delete-keychain "$keychain"; fi
+            rm -rf "$signing_dir"
+          }
+          trap cleanup EXIT
+          cat > "$signing_dir/certificate.conf" <<'CONFIG'
+          [req]
+          prompt = no
+          distinguished_name = identity
+          x509_extensions = code_signing
+          [identity]
+          CN = MyClip Community Signing
+          O = MyClip
+          [code_signing]
+          basicConstraints = critical,CA:TRUE
+          keyUsage = critical,digitalSignature,keyCertSign
+          extendedKeyUsage = critical,codeSigning
+          subjectKeyIdentifier = hash
+          CONFIG
+          /usr/bin/openssl req -x509 -newkey rsa:3072 -nodes -sha256 -days 3650 \
+            -config "$signing_dir/certificate.conf" -keyout "$signing_dir/private.key" -out "$signing_dir/certificate.pem" 2>/dev/null
+          signing_password="$(/usr/bin/openssl rand -base64 48)"
+          echo "::add-mask::$signing_password"
+          export MYCLIP_EXPORT_PASSWORD="$signing_password"
+          /usr/bin/openssl pkcs12 -export -inkey "$signing_dir/private.key" -in "$signing_dir/certificate.pem" \
+            -out "$signing_dir/signing.p12" -passout env:MYCLIP_EXPORT_PASSWORD
+          fingerprint="$(/usr/bin/openssl x509 -in "$signing_dir/certificate.pem" -noout -fingerprint -sha1 | cut -d= -f2 | tr -d ':')"
+          security create-keychain -p "$signing_password" "$keychain"
+          security unlock-keychain -p "$signing_password" "$keychain"
+          security import "$signing_dir/signing.p12" -P "$signing_password" -k "$keychain" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -k "$signing_password" "$keychain" >/dev/null
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign -k "$keychain" "$signing_dir/certificate.pem"
+          for version in 1 2; do
+            printf 'int main(void) { return %s; }\n' "$version" | xcrun clang -x c -o "$signing_dir/version-$version" -
+            codesign --force --sign "$fingerprint" --keychain "$keychain" --identifier cc.vibevibe.myclip.signing-test "$signing_dir/version-$version"
+          done
+          first_requirement="$(codesign -d -r- "$signing_dir/version-1" 2>&1 | sed -n 's/^designated => //p')"
+          second_requirement="$(codesign -d -r- "$signing_dir/version-2" 2>&1 | sed -n 's/^designated => //p')"
+          test -n "$first_requirement"
+          test "$first_requirement" = "$second_requirement"
+          codesign --verify --strict "-R=$first_requirement" "$signing_dir/version-2"
+          codesign --verify --strict "-R=certificate leaf = H\"$fingerprint\"" "$signing_dir/version-1"
+          python3 -c 'import base64, pathlib, sys; sys.stdout.buffer.write(base64.b64encode(pathlib.Path(sys.argv[1]).read_bytes()))' "$signing_dir/signing.p12" | gh secret set MYCLIP_SIGNING_CERTIFICATE_P12 --repo "$GITHUB_REPOSITORY"
+          printf '%s' "$signing_password" | gh secret set MYCLIP_SIGNING_CERTIFICATE_PASSWORD --repo "$GITHUB_REPOSITORY"
+          gh variable set MYCLIP_SIGNING_CERTIFICATE_SHA1 --repo "$GITHUB_REPOSITORY" --body "$fingerprint"
+          echo "Configured persistent community identity: $fingerprint" >> "$GITHUB_STEP_SUMMARY"
+          echo "Two different binaries satisfy the same designated requirement. No existing Apple identity was exported." >> "$GITHUB_STEP_SUMMARY"

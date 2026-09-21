@@ -40,27 +40,32 @@ jobs:
           test -f "docs/releases/$GITHUB_REF_NAME.md"
           xcodebuild -version
 
-      - name: Import stable signing certificate
+      - name: Import persistent community signing certificate
         env:
-          APPLE_SIGNING_CERTIFICATE_P12: ${{ secrets.APPLE_SIGNING_CERTIFICATE_P12 }}
-          APPLE_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_SIGNING_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          MYCLIP_SIGNING_CERTIFICATE_P12: ${{ secrets.MYCLIP_SIGNING_CERTIFICATE_P12 }}
+          MYCLIP_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.MYCLIP_SIGNING_CERTIFICATE_PASSWORD }}
+          MYCLIP_SIGNING_CERTIFICATE_SHA1: ${{ vars.MYCLIP_SIGNING_CERTIFICATE_SHA1 }}
         run: |
-          if [[ -z "$APPLE_SIGNING_CERTIFICATE_P12" || -z "$APPLE_SIGNING_IDENTITY" || "$APPLE_SIGNING_IDENTITY" == "-" ]]; then
-            echo "::error::Configure a stable Apple signing identity and certificate before publishing. See docs/release-signing.md."
+          if [[ -z "$MYCLIP_SIGNING_CERTIFICATE_P12" || ! "$MYCLIP_SIGNING_CERTIFICATE_SHA1" =~ ^[[:xdigit:]]{40}$ ]]; then
+            echo "::error::Run Initialize Community Signing before publishing. See docs/release-signing.md."
             exit 1
           fi
           certificate="$RUNNER_TEMP/myclip-signing.p12"
           keychain="$RUNNER_TEMP/myclip-signing.keychain-db"
           password="$(openssl rand -base64 32)"
           echo "::add-mask::$password"
-          python3 -c 'import base64, os, pathlib; pathlib.Path(os.environ["RUNNER_TEMP"], "myclip-signing.p12").write_bytes(base64.b64decode(os.environ["APPLE_SIGNING_CERTIFICATE_P12"], validate=True))'
+          umask 077
+          python3 -c 'import base64, os, pathlib; pathlib.Path(os.environ["RUNNER_TEMP"], "myclip-signing.p12").write_bytes(base64.b64decode(os.environ["MYCLIP_SIGNING_CERTIFICATE_P12"], validate=True))'
+          /usr/bin/openssl pkcs12 -in "$certificate" -passin env:MYCLIP_SIGNING_CERTIFICATE_PASSWORD -clcerts -nokeys -out "$RUNNER_TEMP/myclip-signing.pem"
+          actual_fingerprint="$(/usr/bin/openssl x509 -in "$RUNNER_TEMP/myclip-signing.pem" -noout -fingerprint -sha1 | cut -d= -f2 | tr -d ':')"
+          test "$actual_fingerprint" = "$MYCLIP_SIGNING_CERTIFICATE_SHA1"
           security create-keychain -p "$password" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "$password" "$keychain"
-          security import "$certificate" -P "$APPLE_SIGNING_CERTIFICATE_PASSWORD" -k "$keychain" -T /usr/bin/codesign -T /usr/bin/security
+          security import "$certificate" -P "$MYCLIP_SIGNING_CERTIFICATE_PASSWORD" -k "$keychain" -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple: -k "$password" "$keychain" >/dev/null
           security list-keychains -d user -s "$keychain" login.keychain-db
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign -k "$keychain" "$RUNNER_TEMP/myclip-signing.pem"
           rm -f "$certificate"
 
       - name: Test packaging
@@ -84,14 +89,19 @@ jobs:
       - name: Build architecture-specific DMG
         env:
           MYCLIP_ARCH: ${{ matrix.arch }}
-          CODE_SIGN_IDENTITY_OVERRIDE: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        run: bash Scripts/package_dmg.sh
+          CODE_SIGN_IDENTITY_OVERRIDE: ${{ vars.MYCLIP_SIGNING_CERTIFICATE_SHA1 }}
+          MYCLIP_SIGNING_CERTIFICATE_SHA1: ${{ vars.MYCLIP_SIGNING_CERTIFICATE_SHA1 }}
+        run: |
+          bash Scripts/package_dmg.sh
+          cp "$RUNNER_TEMP/myclip-signing.pem" dist/MyClip-signing-certificate.pem
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
           name: dmg-${{ matrix.arch }}
-          path: dist/MyClip-*-${{ matrix.arch }}.dmg
+          path: |
+            dist/MyClip-*-${{ matrix.arch }}.dmg
+            dist/MyClip-signing-certificate.pem
           if-no-files-found: error
           retention-days: 7
 
@@ -99,6 +109,10 @@ jobs:
         if: always()
         run: |
           rm -f "$RUNNER_TEMP/myclip-signing.p12"
+          if [[ -f "$RUNNER_TEMP/myclip-signing.pem" ]]; then
+            sudo security remove-trusted-cert -d "$RUNNER_TEMP/myclip-signing.pem" || true
+            rm -f "$RUNNER_TEMP/myclip-signing.pem"
+          fi
           if [[ -f "$RUNNER_TEMP/myclip-signing.keychain-db" ]]; then
             security delete-keychain "$RUNNER_TEMP/myclip-signing.keychain-db"
           fi
@@ -127,11 +141,11 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           test -f "dist/MyClip-$version-arm64.dmg"
           test -f "dist/MyClip-$version-x86_64.dmg"
-          (cd dist && sha256sum ./*.dmg > SHA256SUMS)
+          (cd dist && sha256sum ./*.dmg ./MyClip-signing-certificate.pem > SHA256SUMS)
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/*.dmg dist/SHA256SUMS --clobber
+            gh release upload "$GITHUB_REF_NAME" dist/*.dmg dist/MyClip-signing-certificate.pem dist/SHA256SUMS --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/SHA256SUMS \
+            gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/MyClip-signing-certificate.pem dist/SHA256SUMS \
               --verify-tag --title "MyClip $version" \
               --notes-file "docs/releases/$GITHUB_REF_NAME.md" --latest
           fi

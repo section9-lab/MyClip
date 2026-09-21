@@ -25,9 +25,9 @@
 
 ## Get started
 
-Requires **macOS 13 or later** and a **Codex or Claude account**. Installing the agent connector also requires **Node.js 22 or later**. Local build instructions are below.
+Requires **macOS 13 or later** and a **Codex or Claude account**. Installing the agent connector also requires **Node.js 22 or later**. Download the Apple Silicon or Intel DMG from [Releases](https://github.com/section9-lab/MyClip/releases). These community builds are self-signed and not notarized; see [opening the app and permission recovery](docs/release-signing.md). Local build instructions are below.
 
-1. Open MyClip and go to **Backstage** in the sidebar. Install a connector, sign in, and click **Connect** to verify it is available. Then click **Enable** to use that agent for organization. Connecting alone does not start tasks; multiple agents can be connected, but only one is enabled at a time.
+1. Open MyClip and choose a default Agent in onboarding. MyClip detects available local agents and saves your selection after a successful connection. You can change it later in **Backstage**; multiple agents can be connected, but only one is enabled at a time.
 2. Grant **Screen Recording** and **Accessibility** permissions. Capture starts automatically whenever MyClip is open, including after permissions are granted.
 3. Work as usual. By default, MyClip captures the focused window after a click following one second of pointer stillness, after two seconds without vertical scrolling, or after a letter key followed by Return. Automatic organization turns new screenshots into Memory.
 4. Explore **Memory** for notes, **Timeline** for screenshots, and **Kanban** for suggested work.
@@ -109,6 +109,6 @@ xcodebuild -project MyClip.xcodeproj -scheme MyClip -configuration Debug build
 
 To package a DMG, run `Scripts/package_dmg.sh`. The output is `dist/MyClip-<version>.dmg`.
 
-For separate Apple Silicon and Intel packages, run `MYCLIP_ARCH=arm64 bash Scripts/package_dmg.sh` or `MYCLIP_ARCH=x86_64 bash Scripts/package_dmg.sh`. Their filenames end in `-arm64.dmg` and `-x86_64.dmg` respectively. Pushing a `v<version>` tag triggers GitHub Actions to test and package both architectures, then publish a Release with both DMGs and `SHA256SUMS`. The tag must match `CFBundleShortVersionString`, with release notes in `docs/releases/v<version>.md`.
+For separate Apple Silicon and Intel packages, run `MYCLIP_ARCH=arm64 bash Scripts/package_dmg.sh` or `MYCLIP_ARCH=x86_64 bash Scripts/package_dmg.sh`. Their filenames end in `-arm64.dmg` and `-x86_64.dmg` respectively. After the one-time [community signing setup](docs/release-signing.md), pushing a `v<version>` tag triggers GitHub Actions to test and package both architectures, then publish a Release with both DMGs, the public signing certificate, and `SHA256SUMS`. The tag must match `CFBundleShortVersionString`, with release notes in `docs/releases/v<version>.md`.
 
 </details>

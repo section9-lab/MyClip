@@ -42,6 +42,9 @@ elif command == "hdiutil":
     pathlib.Path(args[-1]).write_text("test disk image")
 elif command == "codesign":
     assert pathlib.Path(args[-1]).is_dir()
+    (root / "signing-arguments.json").write_text(json.dumps(args))
+    if os.environ.get("PACKAGE_TEST_SIGNATURE_MISMATCH") == "true":
+        raise SystemExit(1)
 else:
     raise SystemExit("Unexpected tool: " + command)
 ''')
@@ -50,9 +53,10 @@ else:
             (tools / name).symlink_to(fake)
         self.environment = dict(os.environ, PATH=f"{tools}:{os.environ['PATH']}",
                                 PACKAGE_TEST_ROOT=str(self.root), CI="true")
-        for key in ["MYCLIP_ARCH", "DERIVED_DATA_PATH", "CONFIGURATION", "CODE_SIGN_IDENTITY_OVERRIDE", "DMG_PATH_OUTPUT"]:
+        for key in ["MYCLIP_ARCH", "DERIVED_DATA_PATH", "CONFIGURATION", "CODE_SIGN_IDENTITY_OVERRIDE", "DMG_PATH_OUTPUT", "MYCLIP_SIGNING_CERTIFICATE_SHA1"]:
             self.environment.pop(key, None)
         self.environment["CODE_SIGN_IDENTITY_OVERRIDE"] = "Developer ID Application: MyClip Test"
+        self.environment["MYCLIP_SIGNING_CERTIFICATE_SHA1"] = "A" * 40
 
     def package(self, arch=None, actual_archs=None):
         if arch:
@@ -75,6 +79,26 @@ else:
                 self.assertIn(f"ARCHS={arch}", arguments)
                 self.assertIn("ONLY_ACTIVE_ARCH=NO", arguments)
                 self.assertIn("CODE_SIGN_IDENTITY=Developer ID Application: MyClip Test", arguments)
+                self.assertIn("DEVELOPMENT_TEAM=", arguments)
+
+    def test_community_certificate_is_pinned_instead_of_requiring_an_apple_certificate(self):
+        self.environment["CODE_SIGN_IDENTITY_OVERRIDE"] = "MyClip Community Signing"
+        result = self.package("arm64")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        arguments = json.loads((self.root / "signing-arguments.json").read_text())
+        self.assertIn('-R=certificate leaf = H"' + "A" * 40 + '"', arguments)
+
+    def test_ci_without_a_pinned_certificate_stops_before_building(self):
+        self.environment.pop("MYCLIP_SIGNING_CERTIFICATE_SHA1")
+        result = self.package("arm64")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.root / "build-arguments.json").exists())
+
+    def test_unexpected_signing_certificate_prevents_packaging(self):
+        self.environment["PACKAGE_TEST_SIGNATURE_MISMATCH"] = "true"
+        result = self.package("arm64")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(list(self.root.glob("dist/*.dmg")))
 
     def test_ci_without_a_signing_identity_cannot_publish_an_unstable_package(self):
         self.environment.pop("CODE_SIGN_IDENTITY_OVERRIDE")
