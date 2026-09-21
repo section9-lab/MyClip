@@ -3,7 +3,7 @@ import Foundation
 public enum CaptureScope: String, CaseIterable, Sendable, Identifiable {
     case focusedWindow, focusedDisplay
     public var id: String { rawValue }
-    public var label: String { self == .focusedWindow ? "前台焦点窗口" : "当前焦点显示器全屏" }
+    public var label: String { self == .focusedWindow ? "前台焦点应用窗口" : "焦点显示器全屏" }
 }
 
 public enum MouseCaptureTrigger: String, CaseIterable, Sendable, Identifiable {

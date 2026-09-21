@@ -5,6 +5,7 @@ public enum CaptureTextRecognizer {
     public static func recognize(_ data: Data) -> String? {
         autoreleasepool {
             let request = VNRecognizeTextRequest()
+            request.revision = VNRecognizeTextRequestRevision3
             request.recognitionLevel = .accurate
             request.recognitionLanguages = ["zh-Hans", "en-US"]
             request.automaticallyDetectsLanguage = true

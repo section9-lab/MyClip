@@ -49,6 +49,7 @@ public struct WorkTask: Identifiable, Sendable {
     public let confirmedAt: Date?
     public let completedAt: Date?
     public var waitingReason: String = ""
+    public var statusObservedAt: Date? = nil
     public let evidence: [WorkTaskEvidence]
     public var projectTitle: String { project.isEmpty ? "未归类" : project }
 }
@@ -59,6 +60,21 @@ public struct WorkTaskEvent: Identifiable, Sendable {
     public let from: WorkTaskStatus?
     public let to: WorkTaskStatus
     public let date: Date
+    public let actor: WorkTaskActor
+}
+
+public enum WorkTaskActor: String, Sendable {
+    case user, ai
+    public var title: String { self == .ai ? "AI" : "你" }
+}
+
+public struct WorkTaskReview: Sendable {
+    public let taskID: UUID
+    public let title: String
+    public let status: WorkTaskStatus
+    fileprivate let previous: [String: String]
+    fileprivate let applied: [String: String]
+    fileprivate let eventID: String
 }
 
 public struct WorkTaskStatistics: Sendable {
@@ -77,6 +93,19 @@ public struct WorkTaskStatistics: Sendable {
 }
 
 extension LibraryStore {
+    static func migrateWorkTasks(_ database: SQLiteConnection) throws {
+        try database.transaction {
+            if try !database.run("PRAGMA table_info(work_tasks)").contains(where: { $0["name"] == "status_observed_at" }) {
+                try database.script("ALTER TABLE work_tasks ADD COLUMN status_observed_at REAL; UPDATE work_tasks SET status_observed_at=updated_at;")
+            }
+            if try !database.run("PRAGMA table_info(work_task_events)").contains(where: { $0["name"] == "actor" }) {
+                try database.script("ALTER TABLE work_task_events ADD COLUMN actor TEXT NOT NULL DEFAULT 'user';")
+                try database.run("UPDATE work_task_events SET actor='ai' WHERE from_status IS NULL AND to_status='candidate'")
+            }
+            try database.script("PRAGMA user_version=7;")
+        }
+    }
+
     public func workTasks() throws -> [WorkTask] {
         try database.run("SELECT * FROM work_tasks ORDER BY updated_at DESC,id").map { row in
             guard let id = row["id"].flatMap(UUID.init(uuidString:)),
@@ -94,7 +123,7 @@ extension LibraryStore {
             return WorkTask(id: id, title: row["title"] ?? "", project: row["project"] ?? "", status: status,
                 suggestedStatus: row["suggested_status"].flatMap(WorkTaskStatus.init(rawValue:)),
                 createdAt: date("created_at") ?? .distantPast, updatedAt: date("updated_at") ?? .distantPast,
-                confirmedAt: date("confirmed_at"), completedAt: date("completed_at"), waitingReason: row["waiting_reason"] ?? "", evidence: evidence)
+                confirmedAt: date("confirmed_at"), completedAt: date("completed_at"), waitingReason: row["waiting_reason"] ?? "", statusObservedAt: date("status_observed_at"), evidence: evidence)
         }
     }
 
@@ -112,11 +141,21 @@ extension LibraryStore {
                       sources.isSubset(of: allowedSourceIDs), memories.isSubset(of: allowedMemoryIDs) else {
                     throw LibraryError.invalidResult("任务缺少有效依据，或引用了本次分析范围之外的来源。")
                 }
+                var observations: [Date] = []
+                var undatedUpdates: [Date] = []
                 for source in sources {
-                    guard try database.run("SELECT id FROM captures WHERE id=?", [source.uuidString]).first != nil else { throw LibraryError.invalidResult("任务截图来源不存在。") }
+                    guard let row = try database.run("SELECT captured_at FROM captures WHERE id=?", [source.uuidString]).first,
+                          let time = row["captured_at"].flatMap(Double.init) else { throw LibraryError.invalidResult("任务截图来源不存在。") }
+                    observations.append(Date(timeIntervalSince1970: time))
                 }
                 for memory in memories {
-                    guard try database.run("SELECT id FROM entries WHERE id=?", [memory.uuidString]).first != nil else { throw LibraryError.invalidResult("任务 Memory 来源不存在。") }
+                    guard let row = try database.run("SELECT * FROM entries WHERE id=?", [memory.uuidString]).first else { throw LibraryError.invalidResult("任务 Memory 来源不存在。") }
+                    let memory = try entry(row)
+                    if let observed = try memory.observedAt ?? availableCaptures(ids: memory.sourceIDs).map(\.date).max() {
+                        observations.append(observed)
+                    } else {
+                        undatedUpdates.append(memory.updatedAt)
+                    }
                 }
                 let existing: [String: String]?
                 if let id = draft.taskID {
@@ -127,13 +166,25 @@ extension LibraryStore {
                 }
                 if existing?["status"] == WorkTaskStatus.ignored.rawValue { continue }
                 let id = existing?["id"].flatMap(UUID.init(uuidString:)) ?? UUID()
-                if existing == nil { try insertWorkTask(id: id, title: fields.title, project: fields.project, identity: fields.identity, status: .candidate, at: date) }
+                if existing == nil { try insertWorkTask(id: id, title: fields.title, project: fields.project, identity: fields.identity, status: .candidate, at: date, actor: .ai) }
                 let sourceJSON = try Self.taskIDsJSON(sources), memoryJSON = try Self.taskIDsJSON(memories)
                 let fingerprint = Self.memoryHash(quote + "\n" + sourceJSON + "\n" + memoryJSON)
                 if try database.run("SELECT id FROM work_task_evidence WHERE task_id=? AND fingerprint=?", [id.uuidString, fingerprint]).first != nil { continue }
                 try database.run("INSERT INTO work_task_evidence VALUES(?,?,?,?,?,?,?)", [UUID().uuidString, id.uuidString, fingerprint, quote, sourceJSON, memoryJSON, String(date.timeIntervalSince1970)])
-                // Evidence may suggest progress, but it never overwrites a user's confirmed state or title.
-                try database.run("UPDATE work_tasks SET suggested_status=?,updated_at=? WHERE id=?", [draft.suggestedStatus.rawValue, String(date.timeIntervalSince1970), id.uuidString])
+                let status = existing?["status"].flatMap(WorkTaskStatus.init(rawValue:)) ?? .candidate
+                let cutoff = Date(timeIntervalSince1970: (existing?["status_observed_at"] ?? existing?["updated_at"]).flatMap(Double.init) ?? 0)
+                let observedAt = observations.filter { $0 <= date }.max()
+                let fresh = observedAt.map { $0 > cutoff } ?? false
+                if existing == nil || fresh || undatedUpdates.contains(where: { $0 > cutoff && $0 <= date }) {
+                    let advances = (status == .todo && [.doing, .done].contains(draft.suggestedStatus))
+                        || (status == .doing && draft.suggestedStatus == .done)
+                    if advances && fresh {
+                        try changeWorkTaskStatus(id, status: draft.suggestedStatus, at: date, actor: .ai, observedAt: observedAt)
+                    } else {
+                        try database.run("UPDATE work_tasks SET suggested_status=?,updated_at=?,status_observed_at=coalesce(?,status_observed_at) WHERE id=?",
+                            [draft.suggestedStatus == status ? nil : draft.suggestedStatus.rawValue, String(date.timeIntervalSince1970), fresh || existing == nil ? observedAt.map { String($0.timeIntervalSince1970) } : nil, id.uuidString])
+                    }
+                }
                 changed.insert(id)
             }
             return changed.count
@@ -159,23 +210,57 @@ extension LibraryStore {
         try database.transaction {
             guard try database.run("SELECT id FROM work_tasks WHERE id=?", [id.uuidString]).first != nil else { throw LibraryError.invalidResult("任务不存在。") }
             guard try database.run("SELECT id FROM work_tasks WHERE identity=? AND id<>?", [fields.identity, id.uuidString]).isEmpty else { throw LibraryError.invalidResult("同项目下已有同名任务。") }
-            try database.run("UPDATE work_tasks SET title=?,project=?,identity=?,updated_at=?,waiting_reason=coalesce(?,waiting_reason) WHERE id=?", [fields.title, fields.project, fields.identity, String(Date().timeIntervalSince1970), waitingReason?.trimmingCharacters(in: .whitespacesAndNewlines), id.uuidString])
+            let time = String(Date().timeIntervalSince1970)
+            try database.run("UPDATE work_tasks SET title=?,project=?,identity=?,updated_at=?,waiting_reason=coalesce(?,waiting_reason),status_observed_at=? WHERE id=?", [fields.title, fields.project, fields.identity, time, waitingReason?.trimmingCharacters(in: .whitespacesAndNewlines), time, id.uuidString])
         }
     }
 
     public func setWorkTaskStatus(_ id: UUID, status: WorkTaskStatus, at date: Date = Date()) throws {
         try database.transaction {
-            guard let row = try database.run("SELECT status FROM work_tasks WHERE id=?", [id.uuidString]).first,
-                  let previous = row["status"].flatMap(WorkTaskStatus.init(rawValue:)) else { throw LibraryError.invalidResult("任务不存在。") }
-            if previous == status {
-                try database.run("UPDATE work_tasks SET suggested_status=NULL WHERE id=?", [id.uuidString])
-                return
-            }
-            let time = String(date.timeIntervalSince1970)
-            try database.run("UPDATE work_tasks SET status=?,suggested_status=NULL,updated_at=?,confirmed_at=coalesce(confirmed_at,?),completed_at=?,waiting_reason=coalesce(?,waiting_reason) WHERE id=?",
-                [status.rawValue, time, status.isConfirmed ? time : nil, status == .done ? time : nil, status == .done ? "" : nil, id.uuidString])
-            try recordWorkTaskEvent(id, from: previous, to: status, at: date)
+            try changeWorkTaskStatus(id, status: status, at: date, actor: .user)
         }
+    }
+
+    public func reviewWorkTask(_ id: UUID, status: WorkTaskStatus, at date: Date = Date()) throws -> WorkTaskReview {
+        try database.transaction {
+            guard status.isConfirmed || status == .ignored else { throw LibraryError.invalidResult("请选择确认后的任务状态，或忽略这条建议。") }
+            guard let previous = try database.run("SELECT * FROM work_tasks WHERE id=?", [id.uuidString]).first,
+                  previous["status"] == WorkTaskStatus.candidate.rawValue else { throw LibraryError.invalidResult("这项任务已不在待确认列表，请查看最新状态。") }
+            try changeWorkTaskStatus(id, status: status, at: date, actor: .user)
+            guard let applied = try database.run("SELECT * FROM work_tasks WHERE id=?", [id.uuidString]).first,
+                  let eventID = try database.run("SELECT id FROM work_task_events WHERE task_id=? ORDER BY rowid DESC LIMIT 1", [id.uuidString]).first?["id"] else {
+                throw LibraryError.database("无法读取任务确认记录。")
+            }
+            return WorkTaskReview(taskID: id, title: previous["title"] ?? "", status: status, previous: previous, applied: applied, eventID: eventID)
+        }
+    }
+
+    public func undoWorkTaskReview(_ review: WorkTaskReview) throws {
+        try database.transaction {
+            let id = review.taskID.uuidString
+            guard try database.run("SELECT * FROM work_tasks WHERE id=?", [id]).first == review.applied,
+                  try database.run("SELECT id FROM work_task_events WHERE task_id=? ORDER BY rowid DESC LIMIT 1", [id]).first?["id"] == review.eventID else {
+                throw LibraryError.invalidResult("任务已有新的修改，无法撤销这次确认。请在详情中调整状态。")
+            }
+            let previous = review.previous
+            try database.run("UPDATE work_tasks SET status=?,suggested_status=?,updated_at=?,confirmed_at=?,completed_at=?,waiting_reason=?,status_observed_at=? WHERE id=?",
+                [previous["status"], previous["suggested_status"], previous["updated_at"], previous["confirmed_at"], previous["completed_at"], previous["waiting_reason"], previous["status_observed_at"], id])
+            try database.run("DELETE FROM work_task_events WHERE id=?", [review.eventID])
+        }
+    }
+
+    private func changeWorkTaskStatus(_ id: UUID, status: WorkTaskStatus, at date: Date, actor: WorkTaskActor, observedAt: Date? = nil) throws {
+        guard let row = try database.run("SELECT status FROM work_tasks WHERE id=?", [id.uuidString]).first,
+              let previous = row["status"].flatMap(WorkTaskStatus.init(rawValue:)) else { throw LibraryError.invalidResult("任务不存在。") }
+        let observation = String((observedAt ?? date).timeIntervalSince1970)
+        if previous == status {
+            try database.run("UPDATE work_tasks SET suggested_status=NULL,updated_at=?,status_observed_at=? WHERE id=?", [String(date.timeIntervalSince1970), observation, id.uuidString])
+            return
+        }
+        let time = String(date.timeIntervalSince1970)
+        try database.run("UPDATE work_tasks SET status=?,suggested_status=NULL,updated_at=?,confirmed_at=coalesce(confirmed_at,?),completed_at=?,waiting_reason=coalesce(?,waiting_reason),status_observed_at=? WHERE id=?",
+            [status.rawValue, time, status.isConfirmed ? time : nil, status == .done ? time : nil, status == .done ? "" : nil, observation, id.uuidString])
+        try recordWorkTaskEvent(id, from: previous, to: status, at: date, actor: actor)
     }
 
     public func workTaskEvents(_ id: UUID? = nil) throws -> [WorkTaskEvent] {
@@ -183,7 +268,7 @@ extension LibraryStore {
             guard let eventID = row["id"].flatMap(UUID.init(uuidString:)), let taskID = row["task_id"].flatMap(UUID.init(uuidString:)),
                   let to = row["to_status"].flatMap(WorkTaskStatus.init(rawValue:)) else { throw LibraryError.database("任务历史格式错误。") }
             return WorkTaskEvent(id: eventID, taskID: taskID, from: row["from_status"].flatMap(WorkTaskStatus.init(rawValue:)), to: to,
-                date: Date(timeIntervalSince1970: Double(row["created_at"] ?? "0") ?? 0))
+                date: Date(timeIntervalSince1970: Double(row["created_at"] ?? "0") ?? 0), actor: row["actor"].flatMap(WorkTaskActor.init(rawValue:)) ?? .user)
         }
     }
 
@@ -232,13 +317,13 @@ extension LibraryStore {
         String(decoding: try JSONEncoder().encode(ids.sorted { $0.uuidString < $1.uuidString }), as: UTF8.self)
     }
 
-    private func insertWorkTask(id: UUID, title: String, project: String, identity: String, status: WorkTaskStatus, at date: Date) throws {
+    private func insertWorkTask(id: UUID, title: String, project: String, identity: String, status: WorkTaskStatus, at date: Date, actor: WorkTaskActor = .user) throws {
         let time = String(date.timeIntervalSince1970)
-        try database.run("INSERT INTO work_tasks(id,identity,title,project,status,created_at,updated_at,confirmed_at) VALUES(?,?,?,?,?,?,?,?)", [id.uuidString, identity, title, project, status.rawValue, time, time, status.isConfirmed ? time : nil])
-        try recordWorkTaskEvent(id, from: nil, to: status, at: date)
+        try database.run("INSERT INTO work_tasks(id,identity,title,project,status,created_at,updated_at,confirmed_at,status_observed_at) VALUES(?,?,?,?,?,?,?,?,?)", [id.uuidString, identity, title, project, status.rawValue, time, time, status.isConfirmed ? time : nil, time])
+        try recordWorkTaskEvent(id, from: nil, to: status, at: date, actor: actor)
     }
 
-    private func recordWorkTaskEvent(_ id: UUID, from: WorkTaskStatus?, to: WorkTaskStatus, at date: Date) throws {
-        try database.run("INSERT INTO work_task_events VALUES(?,?,?,?,?)", [UUID().uuidString, id.uuidString, from?.rawValue, to.rawValue, String(date.timeIntervalSince1970)])
+    private func recordWorkTaskEvent(_ id: UUID, from: WorkTaskStatus?, to: WorkTaskStatus, at date: Date, actor: WorkTaskActor) throws {
+        try database.run("INSERT INTO work_task_events(id,task_id,from_status,to_status,created_at,actor) VALUES(?,?,?,?,?,?)", [UUID().uuidString, id.uuidString, from?.rawValue, to.rawValue, String(date.timeIntervalSince1970), actor.rawValue])
     }
 }

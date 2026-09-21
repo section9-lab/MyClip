@@ -40,6 +40,64 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertFalse(needsIndex)
     }
 
+    func testRecordedTextCreatesUTF8DocumentBesideOriginal() async throws {
+        let store = try LibraryStore(root: directory)
+        let image = try fixtureImage()
+        let text = "上海客户会议\nMyClip screenshot notes"
+        try await store.record(image: image, context: fixtureContext(), agent: .codex, organize: false, extractedText: text)
+        let document = directory.appendingPathComponent("Images/\(image.fingerprint).txt")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: document.path))
+        XCTAssertEqual(try String(contentsOf: document, encoding: .utf8), text)
+    }
+
+    func testBackgroundIndexCreatesDocumentForRepeatedCaptures() async throws {
+        let store = try LibraryStore(root: directory)
+        let image = try fixtureImage()
+        try await store.record(image: image, context: fixtureContext(), agent: .codex, organize: false)
+        try await store.record(image: image, context: fixtureContext(at: 200), agent: .codex, organize: false)
+        try await store.indexImageText(id: image.fingerprint, text: "后台提取\nShared document")
+        let document = directory.appendingPathComponent("Images/\(image.fingerprint).txt")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: document.path))
+        XCTAssertEqual(try String(contentsOf: document, encoding: .utf8), "后台提取\nShared document")
+        let files = try FileManager.default.contentsOfDirectory(at: document.deletingLastPathComponent(), includingPropertiesForKeys: nil)
+        XCTAssertEqual(files.filter { $0.pathExtension == "txt" }.count, 1)
+    }
+
+    func testBlankScreenshotStillHasAnEmptyDocument() async throws {
+        let store = try LibraryStore(root: directory)
+        let image = try fixtureImage()
+        try await store.record(image: image, context: fixtureContext(), agent: .codex, organize: false)
+        try await store.indexImageText(id: image.fingerprint, text: "")
+        let document = directory.appendingPathComponent("Images/\(image.fingerprint).txt")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: document.path))
+        XCTAssertEqual(try String(contentsOf: document, encoding: .utf8), "")
+        let pending = try await store.nextImageForTextIndex()
+        XCTAssertNil(pending)
+    }
+
+    func testReopeningLibraryRestoresDocumentsFromExistingOCRIndex() async throws {
+        let store = try LibraryStore(root: directory)
+        let image = try fixtureImage()
+        try await store.record(image: image, context: fixtureContext(), agent: .codex, organize: false, extractedText: "旧截图的文字")
+        let document = directory.appendingPathComponent("Images/\(image.fingerprint).txt")
+        if FileManager.default.fileExists(atPath: document.path) { try FileManager.default.removeItem(at: document) }
+        _ = try LibraryStore(root: directory)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: document.path))
+        XCTAssertEqual(try String(contentsOf: document, encoding: .utf8), "旧截图的文字")
+    }
+
+    func testExpirationRemovesOCRDocumentAndLateIndexCannotRestoreIt() async throws {
+        let store = try LibraryStore(root: directory)
+        let image = try fixtureImage()
+        try await store.record(image: image, context: fixtureContext(), agent: .codex, organize: false, extractedText: "临时内容")
+        let document = directory.appendingPathComponent("Images/\(image.fingerprint).txt")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: document.path))
+        try await store.expireImages(before: Date(timeIntervalSince1970: 500))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: document.path))
+        try await store.indexImageText(id: image.fingerprint, text: "过期结果")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: document.path))
+    }
+
     func testIndexRebuildReadsAuthoritativeMarkdown() async throws {
         let store = try LibraryStore(root: directory)
         let context = fixtureContext()

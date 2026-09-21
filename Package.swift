@@ -3,10 +3,10 @@ import PackageDescription
 
 let package = Package(
     name: "MyClipCore",
-    platforms: [.macOS("26.0")],
+    platforms: [.macOS(.v13)],
     products: [.library(name: "MyClipCore", targets: ["MyClipCore"]), .executable(name: "myclip-mcp", targets: ["MyClipMCP"])],
     targets: [
-        .target(name: "MyClipCore", path: "MyClip/Core"),
+        .target(name: "MyClipCore", path: "MyClip/Core", resources: [.copy("Resources")]),
         .executableTarget(name: "MyClipMCP", dependencies: ["MyClipCore"], path: "Sources/MyClipMCP"),
         .testTarget(name: "MyClipCoreTests", dependencies: ["MyClipCore"], path: "Tests/MyClipCoreTests", resources: [.copy("Fixtures")])
     ]

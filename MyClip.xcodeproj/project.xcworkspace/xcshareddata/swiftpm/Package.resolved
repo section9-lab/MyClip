@@ -1,40 +1,31 @@
 {
-  "originHash" : "5cfcd4b3ed45d4c0cc233d5f3f01d8ed9d858d981176168716fbdcabf100d0c4",
+  "originHash" : "c988943cdb30a7ef038933bf9fe8ada9d1253ca0a894930493ff5d4a60ec3c8e",
   "pins" : [
     {
-      "identity" : "swift-concurrency-extras",
+      "identity" : "networkimage",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pointfreeco/swift-concurrency-extras",
+      "location" : "https://github.com/gonzalezreal/NetworkImage",
       "state" : {
-        "revision" : "5fa253428866f2360c3754e88537f700ed2656b5",
-        "version" : "1.4.1"
+        "revision" : "2849f5323265386e200484b0d0f896e73c3411b9",
+        "version" : "6.0.1"
       }
     },
     {
-      "identity" : "swiftui-math",
+      "identity" : "swift-cmark",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/gonzalezreal/swiftui-math",
+      "location" : "https://github.com/swiftlang/swift-cmark",
       "state" : {
-        "revision" : "0b5c2cfaaec8d6193db206f675048eeb5ce95f71",
-        "version" : "0.1.0"
+        "revision" : "924936d0427cb25a61169739a7660230bffa6ea6",
+        "version" : "0.8.0"
       }
     },
     {
-      "identity" : "textual",
+      "identity" : "swift-markdown-ui",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/gonzalezreal/textual.git",
+      "location" : "https://github.com/gonzalezreal/swift-markdown-ui.git",
       "state" : {
-        "revision" : "01b51875a5406eefc95f52a058cb059e7bc94dc4",
-        "version" : "0.5.0"
-      }
-    },
-    {
-      "identity" : "wchat-claw-swfit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/section9-lab/wchat-claw-swfit.git",
-      "state" : {
-        "branch" : "main",
-        "revision" : "ed981ac73b75a43606453beb42a8b07e4e72c9e6"
+        "revision" : "5f613358148239d0292c0cef674a3c2314737f9e",
+        "version" : "2.4.1"
       }
     }
   ],

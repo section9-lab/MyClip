@@ -25,6 +25,7 @@ final class FocusedCaptureService {
 
     var hasScreenPermission: Bool { CGPreflightScreenCaptureAccess() }
     var hasAccessibilityPermission: Bool { AXIsProcessTrusted() }
+    var isRunning: Bool { enabled }
 
     func configure(settings: CaptureSettings, excludedBundleIDs: Set<String>) {
         guard self.settings != settings || self.excludedBundleIDs != excludedBundleIDs else { return }
@@ -271,10 +272,12 @@ final class FocusedCaptureService {
                       enabled, !suspended, !screenLocked, generation == startedGeneration, stillFocused(focused) else { onStatus?("本次跳过：焦点窗口发生变化或无法匹配"); return }
                 let filter: SCContentFilter
                 let title: String
+                let captureFrame: CGRect
+                let displays = content.displays.map { DisplayCandidate(id: $0.displayID, frame: $0.frame) }
+                let displayID = FocusedDisplayMatcher.match(frame: focused.frame, displays: displays)
+                let focusedDisplay = content.displays.first { $0.displayID == displayID }
                 if settings.scope == .focusedDisplay {
-                    let displays = content.displays.map { DisplayCandidate(id: $0.displayID, frame: $0.frame) }
-                    guard let displayID = FocusedDisplayMatcher.match(frame: focused.frame, displays: displays),
-                          let display = content.displays.first(where: { $0.displayID == displayID }) else {
+                    guard let display = focusedDisplay else {
                         onStatus?("本次跳过：无法确认焦点窗口所在的显示器")
                         return
                     }
@@ -282,19 +285,30 @@ final class FocusedCaptureService {
                         $0.processID == ProcessInfo.processInfo.processIdentifier || excludedBundleIDs.contains($0.bundleIdentifier)
                     }
                     filter = SCContentFilter(display: display, excludingApplications: excluded, exceptingWindows: [])
+                    captureFrame = display.frame
                     title = focused.title.isEmpty ? "显示器全屏" : focused.title + " · 显示器全屏"
                 } else {
                     filter = SCContentFilter(desktopIndependentWindow: window)
+                    captureFrame = window.frame
                     title = focused.title
                 }
                 let config = SCStreamConfiguration()
-                let scale = min(Double(filter.pointPixelScale), 4096 / max(filter.contentRect.width, filter.contentRect.height))
-                config.width = max(1, Int(filter.contentRect.width * scale))
-                config.height = max(1, Int(filter.contentRect.height * scale))
+                let bounds: CGRect
+                let pixelScale: Double
+                if #available(macOS 14.0, *) {
+                    bounds = filter.contentRect
+                    pixelScale = Double(filter.pointPixelScale)
+                    config.ignoreShadowsSingleWindow = true
+                } else {
+                    bounds = captureFrame
+                    pixelScale = focusedDisplay.map { Double($0.width) / $0.frame.width } ?? 2
+                }
+                let scale = min(pixelScale, 4096 / max(bounds.width, bounds.height))
+                config.width = max(1, Int(bounds.width * scale))
+                config.height = max(1, Int(bounds.height * scale))
                 config.showsCursor = false
-                config.ignoreShadowsSingleWindow = true
                 onStatus?("正在读取 \(focused.app.localizedName ?? "应用") 的截图")
-                let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                let image = try await WindowImageCapture.capture(filter: filter, configuration: config)
                 guard enabled, !suspended, !screenLocked, generation == startedGeneration, stillFocused(focused) else { onStatus?("本次跳过：焦点窗口发生变化或无法匹配"); return }
                 let captured = try await Task.detached(priority: .utility) { try CapturedImage(image: image) }.value
                 guard enabled, generation == startedGeneration else { return }

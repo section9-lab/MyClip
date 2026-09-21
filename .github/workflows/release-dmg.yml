@@ -2,71 +2,104 @@ name: Release DMG
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    tags:
+      - 'v[0-9]*'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-dmg-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build and publish DMG
-    runs-on: macos-26
+  build:
+    name: Test and package ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-26
+          - arch: x86_64
+            runner: macos-26-intel
 
     steps:
-      - name: Check out repository
+      - name: Check out release tag
         uses: actions/checkout@v4
 
-      - name: Show Xcode version
-        run: xcodebuild -version
-
-      - name: Configure private package access
+      - name: Validate release version and runner
         env:
-          GIT_AUTH_TOKEN: ${{ secrets.RELEASE_PAT || github.token }}
+          EXPECTED_ARCH: ${{ matrix.arch }}
         run: |
-          git config --global url."https://x-access-token:${GIT_AUTH_TOKEN}@github.com/".insteadOf "https://github.com/"
-
-      - name: Test MyClip core
-        run: swift test
-
-      - name: Build DMG
-        id: package
-        run: |
-          chmod +x Scripts/package_dmg.sh
-          dmg_output="$(mktemp)"
-          DMG_PATH_OUTPUT="$dmg_output" Scripts/package_dmg.sh
-          dmg_path="$(cat "$dmg_output")"
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' MyClip/Supporting/Info.plist)"
-          short_sha="${GITHUB_SHA::7}"
+          test "$GITHUB_REF_NAME" = "v$version"
+          test "$(uname -m)" = "$EXPECTED_ARCH"
+          test -f "docs/releases/$GITHUB_REF_NAME.md"
+          xcodebuild -version
 
-          test -f "$dmg_path"
+      - name: Test packaging
+        run: python3 Scripts/test_package_dmg.py
 
-          echo "dmg_path=$dmg_path" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "short_sha=$short_sha" >> "$GITHUB_OUTPUT"
-          echo "tag=v$version-$short_sha" >> "$GITHUB_OUTPUT"
-
-      - name: Publish GitHub Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.package.outputs.tag }}
-          VERSION: ${{ steps.package.outputs.version }}
-          SHORT_SHA: ${{ steps.package.outputs.short_sha }}
-          DMG_PATH: ${{ steps.package.outputs.dmg_path }}
+      - name: Test MyClip core and local adapters
         run: |
-          title="MyClip $VERSION ($SHORT_SHA)"
-          notes="Automated DMG release for commit $GITHUB_SHA on main."
+          swift test
+          node --test Scripts/test_ephemeral_codex.cjs
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$DMG_PATH" --clobber
+      - name: Test native app with macOS 13 deployment target
+        run: |
+          bash Scripts/test_agent_activation.sh
+          bash Scripts/test_capture_lifecycle.sh
+          bash Scripts/test_capture_filters.sh
+          bash Scripts/test_screenshot_documents.sh
+          bash Scripts/test_memory_directory.sh
+          bash Scripts/test_memory_scrolling.sh
+          bash Scripts/test_task_board_scrolling.sh
+
+      - name: Build architecture-specific DMG
+        env:
+          MYCLIP_ARCH: ${{ matrix.arch }}
+        run: bash Scripts/package_dmg.sh
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg-${{ matrix.arch }}
+          path: dist/MyClip-*-${{ matrix.arch }}.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release notes
+        uses: actions/checkout@v4
+
+      - name: Download both DMGs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dmg-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release with checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          test -f "dist/MyClip-$version-arm64.dmg"
+          test -f "dist/MyClip-$version-x86_64.dmg"
+          (cd dist && sha256sum ./*.dmg > SHA256SUMS)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.dmg dist/SHA256SUMS --clobber
           else
-            gh release create "$TAG" "$DMG_PATH" \
-              --target "$GITHUB_SHA" \
-              --title "$title" \
-              --notes "$notes"
+            gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/SHA256SUMS \
+              --verify-tag --title "MyClip $version" \
+              --notes-file "docs/releases/$GITHUB_REF_NAME.md" --latest
           fi

@@ -23,6 +23,92 @@ final class OrganizationQueueTests: XCTestCase {
         XCTAssertTrue(snapshot.jobs.isEmpty, "An execution batch should only be created when dispatching")
     }
 
+    func testMouseTextAllowsThirtyTwoRecordsInChronologicalOrder() async throws {
+        let store = try LibraryStore(root: directory)
+        var sources: [UUID] = []
+        for index in 0..<35 {
+            var context = fixtureContext(at: 100 + Double(index))
+            context.reason = .scrollIdle
+            sources.append(context.id)
+            try await store.record(image: fixtureImage(changed: true, x: index), context: context,
+                agent: .codex, organize: true, extractedText: "OCR \(index)")
+        }
+        let job = try await claim(store, at: 280)
+        XCTAssertEqual(job.sourceIDs, Array(sources.prefix(32)))
+    }
+
+    func testTextBudgetStopsBeforeNextRecordWithoutSkippingIt() async throws {
+        let store = try LibraryStore(root: directory)
+        var sources: [UUID] = []
+        for index in 0..<3 {
+            var context = fixtureContext(at: 100 + Double(index))
+            context.reason = index == 2 ? .enter : .clickAfterIdle
+            sources.append(context.id)
+            try await store.record(image: fixtureImage(changed: true, x: index), context: context,
+                agent: .codex, organize: true, extractedText: String(repeating: "文", count: 7_000))
+        }
+        let job = try await claim(store, at: 280)
+        XCTAssertEqual(job.sourceIDs, [sources[0]])
+    }
+
+    func testMixedInputsUseIndependentLimitsAndRemainFrozenOnRetry() async throws {
+        let store = try LibraryStore(root: directory)
+        var sources: [UUID] = []
+        for index in 0..<41 {
+            var context = fixtureContext(at: 100 + Double(index))
+            context.reason = index < 8 || index == 40 ? .enter : .scrollIdle
+            sources.append(context.id)
+            try await store.record(image: fixtureImage(changed: true, x: index), context: context,
+                agent: .codex, organize: true, extractedText: "OCR \(index)")
+        }
+        let first = try await claim(store, at: 280)
+        XCTAssertEqual(first.sourceIDs, Array(sources.prefix(40)))
+        let original = try await store.organizationInputs(jobID: first.id)
+        XCTAssertEqual(original.filter(\.usesImage).count, 8)
+        XCTAssertEqual(original.compactMap(\.text).count, 32)
+        try await store.indexImageText(id: original[8].capture.imageID, text: "Changed OCR")
+        try await store.finishJob(id: first.id, state: .failed)
+        let reopened = try LibraryStore(root: directory)
+        try await reopened.retryJob(id: first.id)
+        let retried = try await reopened.claimNextJob(at: date(460), immediately: true, jobID: first.id)
+        let retry = try XCTUnwrap(retried)
+        let inputs = try await reopened.organizationInputs(jobID: retry.id)
+        XCTAssertEqual(retry.id, first.id)
+        XCTAssertEqual(inputs.map(\.text), original.map(\.text))
+        XCTAssertEqual(inputs.map { $0.capture.id }, first.sourceIDs)
+    }
+
+    func testMouseFallbackAndManualReorganizationUseImages() async throws {
+        let store = try LibraryStore(root: directory)
+        for (index, text) in [nil, " \n", String(repeating: "x", count: 12_001), "useful text"].enumerated() {
+            try await store.record(image: fixtureImage(changed: true, x: index), context: fixtureContext(at: 100 + Double(index)),
+                agent: .codex, organize: true, extractedText: text)
+        }
+        let job = try await claim(store, at: 280)
+        let inputs = try await store.organizationInputs(jobID: job.id)
+        XCTAssertEqual(inputs.map(\.usesImage), [true, true, true, false])
+        try await store.finishJob(id: job.id, state: .cancelled)
+        let manual = try await store.enqueue(sourceIDs: [inputs[3].capture.id], agent: .codex)
+        let manualInputs = try await store.organizationInputs(jobID: manual)
+        XCTAssertTrue(try XCTUnwrap(manualInputs.first).usesImage)
+    }
+
+    func testVersionSevenMigrationKeepsLegacyJobImagesAndBlocksOlderReaders() async throws {
+        let store = try LibraryStore(root: directory)
+        let context = fixtureContext()
+        try await store.record(image: fixtureImage(), context: context, agent: .codex, organize: false, extractedText: "existing OCR")
+        let job = try await store.enqueue(sourceIDs: [context.id], agent: .codex)
+        let database = try SQLiteConnection(url: directory.appendingPathComponent("Library.sqlite"))
+        try database.script("DROP TABLE job_inputs; PRAGMA user_version=7;")
+        let migrated = try LibraryStore(root: directory)
+        let inputs = try await migrated.organizationInputs(jobID: job)
+        XCTAssertEqual(inputs.map { $0.capture.id }, [context.id])
+        XCTAssertTrue(try XCTUnwrap(inputs.first).usesImage)
+        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "8")
+        _ = try LibraryStore(root: directory)
+        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "8", "Reopening must not downgrade the schema version")
+    }
+
     func testDispatchCombinesOldTinyBatchesIntoEightImages() async throws {
         let store = try LibraryStore(root: directory)
         for index in 0..<20 {
@@ -84,6 +170,86 @@ final class OrganizationQueueTests: XCTestCase {
         let second = try await claim(store, at: 460)
         XCTAssertEqual(second.agent, .claude)
         XCTAssertEqual(second.sourceIDs, [claude.id])
+    }
+
+    func testChangingDefaultAgentRetargetsPendingCapturesWithoutResettingQueue() async throws {
+        let store = try LibraryStore(root: directory)
+        let first = fixtureContext()
+        let second = fixtureContext(at: 101)
+        try await store.record(image: fixtureImage(), context: first, agent: .codex, organize: true)
+        try await store.record(image: fixtureImage(changed: true), context: second, agent: .claude, organize: true)
+        try await store.setOrganizationPaused(true, reason: "Offline")
+        let before = try await store.organizationQueue()
+
+        try await store.reassignPendingCaptures(to: .claude)
+
+        let reopened = try LibraryStore(root: directory)
+        let after = try await reopened.organizationQueue()
+        XCTAssertEqual(after.pendingCounts, [.claude: 2])
+        XCTAssertEqual(after.nextAgent, .claude)
+        XCTAssertEqual(after.readyAt, before.readyAt)
+        XCTAssertEqual(after.lastStartedAt, before.lastStartedAt)
+        XCTAssertTrue(after.paused)
+        XCTAssertEqual(after.pauseReason, "Offline")
+        let automatic = try await reopened.claimNextJob(at: date(1000))
+        XCTAssertNil(automatic)
+        let manual = try await reopened.claimNextJob(at: date(200), immediately: true)
+        XCTAssertEqual(manual?.agent, .claude)
+        XCTAssertEqual(manual?.sourceIDs, [first.id, second.id])
+    }
+
+    func testDefaultChangePreservesRunningBatchAndExplicitAgentChoice() async throws {
+        let store = try LibraryStore(root: directory)
+        let first = fixtureContext()
+        try await store.record(image: fixtureImage(), context: first, agent: .codex, organize: true)
+        let running = try await claim(store, at: 280)
+        let pending = fixtureContext(at: 281)
+        try await store.record(image: fixtureImage(changed: true), context: pending, agent: .codex, organize: true)
+        let selected = fixtureContext(at: 282)
+        try await store.record(image: fixtureImage(changed: true, x: 2), context: selected, agent: .codex, organize: false)
+        let explicitID = try await store.enqueue(sourceIDs: [selected.id], agent: .codex)
+
+        try await store.reassignPendingCaptures(to: .claude)
+
+        let snapshot = try await store.snapshot()
+        let unchanged = try XCTUnwrap(snapshot.jobs.first { $0.id == running.id })
+        XCTAssertEqual(unchanged.state, .running)
+        XCTAssertEqual(unchanged.agent, .codex)
+        XCTAssertEqual(unchanged.sourceIDs, [first.id])
+        XCTAssertEqual(snapshot.queue.pendingCounts, [.codex: 1, .claude: 1])
+        XCTAssertEqual(snapshot.queue.lastStartedAt, date(280))
+        try await store.commit(jobID: running.id, drafts: [])
+        let next = try await claim(store, at: 461)
+        XCTAssertEqual(next.agent, .claude)
+        XCTAssertEqual(next.sourceIDs, [pending.id])
+        try await store.commit(jobID: next.id, drafts: [])
+        let explicit = try await store.claimNextJob(immediately: true, jobID: explicitID)
+        XCTAssertEqual(explicit?.agent, .codex)
+        XCTAssertEqual(explicit?.sourceIDs, [selected.id])
+        let completed = try await store.snapshot().jobs.first { $0.id == running.id }
+        XCTAssertEqual(completed?.state, .completed)
+        XCTAssertEqual(completed?.agent, .codex)
+    }
+
+    func testDefaultChangeMergesDuplicatePendingSourcesAtTheirOldestTime() async throws {
+        let store = try LibraryStore(root: directory)
+        let context = fixtureContext()
+        try await store.record(image: fixtureImage(), context: context, agent: .codex, organize: true)
+        let database = try SQLiteConnection(url: directory.appendingPathComponent("Library.sqlite"))
+        try database.run("INSERT INTO pending_captures VALUES(?,'claude',200)", [context.id.uuidString])
+
+        try await store.reassignPendingCaptures(to: .claude)
+        try await store.reassignPendingCaptures(to: .claude)
+
+        let queue = try await store.organizationQueue()
+        XCTAssertEqual(queue.pendingCounts, [.claude: 1])
+        XCTAssertEqual(queue.readyAt, date(280))
+        let job = try await claim(store, at: 280)
+        XCTAssertEqual(job.agent, .claude)
+        XCTAssertEqual(job.sourceIDs, [context.id])
+        let snapshot = try await store.snapshot()
+        XCTAssertEqual(snapshot.queue.pendingCount, 0)
+        XCTAssertEqual(snapshot.captures.count, 1)
     }
 
     func testExactDuplicatesKeepOccurrencesAndOnePixelChangesRemainPending() async throws {

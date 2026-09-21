@@ -1,5 +1,5 @@
 import SwiftUI
-import Textual
+import MarkdownUI
 import MyClipCore
 
 struct MemoryMarkdownView: View {
@@ -8,12 +8,10 @@ struct MemoryMarkdownView: View {
     var openMemoryLink: ((URL) -> Void)?
 
     var body: some View {
-        StructuredText(markdown: Wikilink.markdown(markdown), baseURL: baseURL)
-            .font(.system(size: 15))
-            .textual.structuredTextStyle(.default)
-            .textual.tableStyle(.overflow)
-            .textual.imageAttachmentLoader(.image(relativeTo: baseURL))
-            .textual.textSelection(.enabled)
+        Markdown(Wikilink.markdown(markdown), baseURL: baseURL, imageBaseURL: baseURL)
+            .markdownTextStyle { FontSize(15) }
+            .markdownImageProvider(MemoryImageProvider())
+            .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .environment(\.openURL, OpenURLAction { url in
                 if url.scheme == "myclip-memory" {
@@ -23,5 +21,15 @@ struct MemoryMarkdownView: View {
                 }
                 return .systemAction
             })
+    }
+}
+
+private struct MemoryImageProvider: ImageProvider {
+    @ViewBuilder func makeImage(url: URL?) -> some View {
+        if let url, url.isFileURL, let image = NSImage(contentsOf: url) {
+            Image(nsImage: image).resizable().scaledToFit()
+        } else {
+            DefaultImageProvider.default.makeImage(url: url)
+        }
     }
 }

@@ -31,7 +31,7 @@ final class MCPConfigurationTests: XCTestCase {
     }
 
     func testJSONClientsPreserveOtherSettingsAndUseExactCommandArguments() async throws {
-        for client in [MCPClient.claudeCode, .cursor, .openCode] {
+        for client in MCPClient.allCases.filter({ $0 != .codex }) {
             let url = installer.configurationURL(for: client)
             let key = client == .openCode ? "mcp" : "mcpServers"
             let original = "{\"theme\":\"dark\",\"\(key)\":{\"existing\":{\"url\":\"https://example.com/mcp\"}}}"
@@ -61,8 +61,40 @@ final class MCPConfigurationTests: XCTestCase {
     func testOnlySelectedClientIsConfigured() async throws {
         try await installer.install(.cursor, command: command)
         XCTAssertTrue(FileManager.default.fileExists(atPath: installer.configurationURL(for: .cursor).path))
-        for client in [MCPClient.codex, .claudeCode, .openCode] {
+        for client in MCPClient.allCases.filter({ $0 != .cursor }) {
             XCTAssertFalse(FileManager.default.fileExists(atPath: installer.configurationURL(for: client).path))
+        }
+    }
+
+    func testClaudeDesktopUsesItsOwnConfigurationWithoutChangingCLI() async throws {
+        let desktop = try XCTUnwrap(MCPClient(rawValue: "claudeDesktop"), "Claude Desktop must be a separate MCP client")
+        let customCLI = root.appendingPathComponent("Custom Claude Code")
+        let installer = MCPClientInstaller(homeDirectory: root, environment: ["CLAUDE_CONFIG_DIR": customCLI.path])
+        let desktopURL = root.appendingPathComponent("Library/Application Support/Claude/claude_desktop_config.json")
+        XCTAssertEqual(installer.configurationURL(for: desktop), desktopURL)
+        let cliURLs = [root.appendingPathComponent(".claude.json"), customCLI.appendingPathComponent(".claude.json")]
+        let cliSettings = "{\"mcpServers\":{\"existing\":{\"command\":\"my-cli-server\"}}}"
+        for url in cliURLs { try write(cliSettings, to: url) }
+
+        try await installer.install(desktop, command: command)
+
+        let servers = try XCTUnwrap(try json(desktopURL)["mcpServers"] as? [String: [String: Any]])
+        let memory = try XCTUnwrap(servers["myclip"])
+        XCTAssertEqual(memory["command"] as? String, executable.path)
+        XCTAssertEqual(memory["args"] as? [String], command.arguments)
+        for url in cliURLs { XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), cliSettings) }
+    }
+
+    func testClaudeDesktopPreservesMalformedAndConflictingConfiguration() async throws {
+        let desktop = try XCTUnwrap(MCPClient(rawValue: "claudeDesktop"), "Claude Desktop must be a separate MCP client")
+        let url = installer.configurationURL(for: desktop)
+        for original in ["{invalid", "[]", "{\"mcpServers\": []}", "{\"mcpServers\":{\"myclip\":{\"command\":\"another-server\"}}}"] {
+            try write(original, to: url)
+            do {
+                try await installer.install(desktop, command: command)
+                XCTFail("Invalid or unrelated Desktop configuration must be preserved")
+            } catch { }
+            XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), original)
         }
     }
 

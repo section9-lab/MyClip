@@ -73,14 +73,15 @@ extension LibraryStore {
                     let previous = try String(contentsOf: root.appendingPathComponent(row["path"]!), encoding: .utf8)
                     if previous != text || paths[document.id.uuidString] != path {
                         let revision = max(Int(row["revision"] ?? "1") ?? 1, document.revision) + 1
-                        let sources = Array(Set(try MemoryDocument(previous).sourceIDs + document.sourceIDs)).sorted { $0.uuidString < $1.uuidString }
-                        _ = try saveEntry(id: document.id, kind: .memory, title: document.title, body: document.body, revision: revision, agent: document.agent, sourceIDs: sources, relativePath: path, extraMetadata: document.extraMetadata)
+                        _ = try saveEntry(id: document.id, kind: .memory, title: document.title, body: document.body, revision: revision, agent: document.agent, sourceIDs: document.sourceIDs, relativePath: path, extraMetadata: document.extraMetadata,
+                            contextSourceIDs: document.contextSourceIDs, observedAt: document.observedAt)
                         if previous != text { try database.run("INSERT OR IGNORE INTO protected_entries VALUES(?)", [document.id.uuidString]) }
                     }
                 } else {
                     let history = (try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("Entries/\(document.id.uuidString)").path)) ?? []
                     let lastRevision = history.compactMap { Int(($0 as NSString).deletingPathExtension) }.max() ?? 0
-                    _ = try saveEntry(id: document.id, kind: .memory, title: document.title, body: document.body, revision: max(document.revision, lastRevision + 1), agent: document.agent, sourceIDs: document.sourceIDs, relativePath: path, updatedAt: document.updatedAt, extraMetadata: document.extraMetadata)
+                    _ = try saveEntry(id: document.id, kind: .memory, title: document.title, body: document.body, revision: max(document.revision, lastRevision + 1), agent: document.agent, sourceIDs: document.sourceIDs, relativePath: path, updatedAt: document.updatedAt, extraMetadata: document.extraMetadata,
+                        contextSourceIDs: document.contextSourceIDs, observedAt: document.observedAt)
                     try database.run("INSERT OR IGNORE INTO protected_entries VALUES(?)", [document.id.uuidString])
                 }
                 try database.run("UPDATE memory_files SET path=?,published_hash=? WHERE id=?", [path, Self.memoryHash(text), document.id.uuidString])
@@ -91,26 +92,46 @@ extension LibraryStore {
             }
             if !redirects.isEmpty { try rewriteMemoryLinks(redirects) }
             try flushMemoryFiles()
+            // Rebuild derived passage data for older libraries or edits made by an older app.
+            for row in try database.run("SELECT e.* FROM entries e WHERE NOT EXISTS (SELECT 1 FROM memory_passages p WHERE p.entry_id=e.id AND p.revision=e.revision)") {
+                let item = try entry(row)
+                let searchBody = try indexMemoryPassages(id: item.id, title: item.title, body: item.body, revision: item.revision, sourceIDs: item.sourceIDs)
+                try database.run("UPDATE entry_search SET body=?,terms=? WHERE id=?", [searchBody, Self.tokens(item.title + " " + searchBody), item.id.uuidString])
+            }
         }
     }
 
     private func importPlainMarkdownFiles() throws {
         for (path, url) in try MemoryLayout.markdownFiles(in: root.appendingPathComponent("Memory")) {
             let text = try String(contentsOf: url, encoding: .utf8)
-            guard !text.hasPrefix("---\n") else { continue }
+            if text.hasPrefix("---\n"), let boundary = text.range(of: "\n---\n"),
+               text[..<boundary.lowerBound].split(separator: "\n").contains(where: { $0.hasPrefix("id:") }) { continue }
             let row = try database.run("SELECT e.path FROM entries e JOIN memory_files f ON f.id=e.id WHERE f.path=?", [path]).first
             let previous = try row?["path"].map { try MemoryDocument(String(contentsOf: root.appendingPathComponent($0), encoding: .utf8)) }
             let heading = text.split(separator: "\n").first { $0.hasPrefix("# ") }.map { String($0.dropFirst(2)).trimmingCharacters(in: .whitespaces) }
             let title = heading.flatMap { $0.isEmpty ? nil : $0 } ?? url.deletingPathExtension().lastPathComponent
-            let normalized = try MemoryDocument.encode(id: previous?.id ?? UUID(), title: title, body: text,
+            let normalized: String
+            if text.hasPrefix("---\n") {
+                // Ordinary front matter on a new note has no MyClip identity yet.
+                // Existing identities must never be silently replaced or repaired.
+                guard previous == nil else { continue }
+                let encodedTitle = String(decoding: try JSONEncoder().encode(title), as: UTF8.self)
+                let imported = try MemoryDocument("---\nid: \(UUID())\nrevision: 1\nagent: codex\ntitle: \(encodedTitle)\n" + text.dropFirst(4))
+                normalized = try MemoryDocument.encode(id: imported.id, title: imported.title, body: imported.body, revision: imported.revision,
+                    agent: imported.agent, sourceIDs: imported.sourceIDs, path: path, extraMetadata: imported.extraMetadata,
+                    contextSourceIDs: imported.contextSourceIDs, observedAt: imported.observedAt)
+            } else {
+                normalized = try MemoryDocument.encode(id: previous?.id ?? UUID(), title: title, body: text,
                 revision: previous?.revision ?? 1, agent: previous?.agent ?? .codex, sourceIDs: previous?.sourceIDs ?? [],
-                path: path, extraMetadata: previous?.extraMetadata ?? "")
+                path: path, extraMetadata: previous?.extraMetadata ?? "", contextSourceIDs: previous?.contextSourceIDs ?? [], observedAt: previous?.observedAt)
+            }
             _ = try MemoryDocument(normalized)
             try normalized.write(to: url, atomically: true, encoding: .utf8)
         }
     }
 
     func removeMemoryIndex(_ id: String) throws {
+        try database.run("DELETE FROM memory_passage_search WHERE entry_id=?", [id])
         try database.run("DELETE FROM entry_search WHERE id=?", [id])
         try database.run("DELETE FROM entries WHERE id=?", [id])
     }
@@ -132,15 +153,17 @@ struct MemoryDocument {
     let title: String
     let body: String
     let sourceIDs: [UUID]
+    let contextSourceIDs: [UUID]
     let agent: ClipAgent
     let updatedAt: Date?
+    let observedAt: Date?
     let extraMetadata: String
 
     init(_ text: String) throws {
         guard text.hasPrefix("---\n"), let boundary = text.range(of: "\n---\n") else { throw LibraryError.invalidResult("请保留 Memory 的 Markdown 元信息。") }
         var fields: [String: String] = [:], sourceList: [String] = [], extras: [String] = []
         var currentKey = ""
-        let known = Set(["id", "revision", "title", "kind", "type", "agent", "updated", "updated_at", "sources", "source_ids"])
+        let known = Set(["id", "revision", "title", "kind", "type", "agent", "updated", "updated_at", "sources", "source_ids", "context_source_ids", "observed_at"])
         for line in text[..<boundary.lowerBound].split(separator: "\n").dropFirst() {
             if !line.hasPrefix(" "), let colon = line.firstIndex(of: ":") {
                 currentKey = String(line[..<colon])
@@ -158,15 +181,31 @@ struct MemoryDocument {
         sourceIDs = try (sourceList.isEmpty ? inlineSources : sourceList).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.map {
             guard let id = UUID(uuidString: unquote($0.trimmingCharacters(in: .whitespaces))) else { throw LibraryError.invalidResult("Memory 来源 ID 无效。") }; return id
         }
+        contextSourceIDs = try (fields["context_source_ids"] ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "[]")).split(separator: ",").map {
+            guard let id = UUID(uuidString: unquote($0.trimmingCharacters(in: .whitespaces))) else { throw LibraryError.invalidResult("Memory 参考截图 ID 无效。") }; return id
+        }
         agent = ClipAgent(rawValue: unquote(fields["agent"] ?? "")) ?? .codex
         title = unquote(rawTitle)
         updatedAt = (fields["updated_at"] ?? fields["updated"]).flatMap { ISO8601DateFormatter().date(from: unquote($0)) }
+        observedAt = fields["observed_at"].flatMap { ISO8601DateFormatter().date(from: unquote($0)) }
         extraMetadata = extras.isEmpty ? "" : extras.joined(separator: "\n") + "\n"
         body = String(text[boundary.upperBound...])
         guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, title.count <= 240, body.utf8.count <= 128_000 else { throw LibraryError.invalidResult("Memory 正文为空或过长。") }
     }
 
-    static func encode(id: UUID, title: String, body: String, revision: Int, agent: ClipAgent, sourceIDs: [UUID], path: String, updatedAt: Date = Date(), extraMetadata: String = "") throws -> String {
+    static func citedSourceIDs(in body: String) throws -> [UUID] {
+        var content = body
+        for pattern in ["(?ms)^ {0,3}(`{3,}|~{3,})[^\\n]*\\n.*?(?:^ {0,3}\\1[ \\t]*(?:\\n|$)|\\z)", #"\[\[[^\]\n]+\]\]"#] {
+            let code = try NSRegularExpression(pattern: pattern)
+            content = code.stringByReplacingMatches(in: content, range: NSRange(content.startIndex..., in: content), withTemplate: "")
+        }
+        let expression = try NSRegularExpression(pattern: #"(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b"#)
+        return Array(Set(expression.matches(in: content, range: NSRange(content.startIndex..., in: content)).compactMap {
+            Range($0.range, in: content).flatMap { UUID(uuidString: String(content[$0])) }
+        })).sorted { $0.uuidString < $1.uuidString }
+    }
+
+    static func encode(id: UUID, title: String, body: String, revision: Int, agent: ClipAgent, sourceIDs: [UUID], path: String, updatedAt: Date = Date(), extraMetadata: String = "", contextSourceIDs: [UUID] = [], observedAt: Date? = nil) throws -> String {
         let encodedTitle = String(data: try JSONEncoder().encode(title), encoding: .utf8)!
         let kind: String
         if path == "Memory.md" { kind = "index" }
@@ -178,6 +217,8 @@ struct MemoryDocument {
         else if path.hasPrefix("Daily/") { kind = "daily" }
         else if path.hasPrefix("Inbox/") { kind = "inbox" }
         else { kind = "memory" }
-        return "---\nid: \(id.uuidString)\nkind: memory\ntype: \(kind)\ntitle: \(encodedTitle)\nrevision: \(revision)\nagent: \(agent.rawValue)\nupdated_at: \(updatedAt.ISO8601Format())\nsource_ids: [\(sourceIDs.map(\.uuidString).joined(separator: ", "))]\n\(extraMetadata)---\n\(body)"
+        let observation = observedAt.map { "observed_at: \($0.ISO8601Format())\n" } ?? ""
+        let context = contextSourceIDs.isEmpty ? "" : "context_source_ids: [\(contextSourceIDs.map(\.uuidString).joined(separator: ", "))]\n"
+        return "---\nid: \(id.uuidString)\nkind: memory\ntype: \(kind)\ntitle: \(encodedTitle)\nrevision: \(revision)\nagent: \(agent.rawValue)\nupdated_at: \(updatedAt.ISO8601Format())\n\(observation)source_ids: [\(sourceIDs.map(\.uuidString).joined(separator: ", "))]\n\(context)\(extraMetadata)---\n\(body)"
     }
 }

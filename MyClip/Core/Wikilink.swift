@@ -5,7 +5,7 @@ public struct Wikilink: Sendable, Hashable {
     public let label: String
     let range: NSRange
 
-    public static func parse(_ text: String) -> [Wikilink] {
+    private static func maskingCode(_ text: String) -> NSMutableString {
         // Mask code without changing UTF-16 offsets used for replacements.
         let masked = NSMutableString(string: text)
         for pattern in ["(?ms)^ {0,3}(`{3,}|~{3,})[^\\n]*\\n.*?(?:^ {0,3}\\1[ \\t]*(?:\\n|$)|\\z)", "`+[^`\\n]*`+"] {
@@ -14,6 +14,11 @@ public struct Wikilink: Sendable, Hashable {
                 masked.replaceCharacters(in: match.range, with: String(repeating: " ", count: match.range.length))
             }
         }
+        return masked
+    }
+
+    public static func parse(_ text: String) -> [Wikilink] {
+        let masked = maskingCode(text)
         let expression = try! NSRegularExpression(pattern: #"(?<!\\)\[\[([^\]\n|]+)(?:\|([^\]\n]+))?\]\]"#)
         return expression.matches(in: masked as String, range: NSRange(location: 0, length: masked.length)).compactMap { match in
             let target = masked.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespaces)
@@ -29,6 +34,12 @@ public struct Wikilink: Sendable, Hashable {
             guard let target = link.target.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "%?#"))) else { continue }
             let label = link.label.replacingOccurrences(of: "[", with: "\\[").replacingOccurrences(of: "]", with: "\\]")
             result.replaceCharacters(in: link.range, with: "[\(label)](myclip-memory:///\(target))")
+        }
+        let masked = maskingCode(result as String)
+        let annotations = try! NSRegularExpression(pattern: #"(?m)^<!-- myclip-event [^\r\n]* -->[ \t]*(?:\r?\n|$)"#)
+        for match in annotations.matches(in: result as String, range: NSRange(location: 0, length: result.length)).reversed()
+            where masked.substring(with: match.range).hasPrefix("<!-- myclip-event ") {
+            result.replaceCharacters(in: match.range, with: "")
         }
         return result as String
     }
@@ -102,25 +113,6 @@ extension LibraryStore {
             try Wikilink.parse(candidate.body).contains { try resolveMemory($0.target)?.id == id }
         }
         return MemoryRelations(outgoing: outgoing, incoming: incoming, unresolved: unresolved)
-    }
-
-    public func searchMemories(query: String, limit: Int = 20, offset: Int = 0, since: Date? = nil, app: String? = nil) throws -> [KnowledgeEntry] {
-        try synchronizeMemoryFiles()
-        var filters: [String] = [], args: [String?] = []
-        let term = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if !term.isEmpty {
-            let words = Self.tokens(term).split(separator: " ").map { "\"\($0.replacingOccurrences(of: "\"", with: "\"\""))\"" }.joined(separator: " AND ")
-            filters.append("id IN (SELECT id FROM entry_search WHERE entry_search MATCH ? UNION SELECT id FROM entry_search WHERE instr(lower(title),?)>0 OR instr(lower(body),?)>0)")
-            args += [words.isEmpty ? "\"\(term.replacingOccurrences(of: "\"", with: "\"\""))\"" : words, term, term]
-        }
-        if let since { filters.append("updated_at>=?"); args.append(String(since.timeIntervalSince1970)) }
-        if let app, !app.isEmpty {
-            filters.append("id IN (SELECT s.entry_id FROM entry_sources s JOIN captures c ON c.id=s.capture_id WHERE c.app_name=? OR c.bundle_id=?)")
-            args += [app, app]
-        }
-        let clause = filters.isEmpty ? "" : "WHERE " + filters.joined(separator: " AND ")
-        args += [String(min(max(limit, 1), 50)), String(max(0, offset))]
-        return try database.run("SELECT * FROM entries \(clause) ORDER BY updated_at DESC,id LIMIT ? OFFSET ?", args).map(entry)
     }
 
     func indexLinks(id: UUID, body: String) throws {

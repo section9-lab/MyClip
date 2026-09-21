@@ -37,6 +37,7 @@ public struct ACPPermissionRequest: Sendable, Identifiable {
 
 public enum ACPEvent: Sendable {
     case message(sessionID: String, text: String)
+    case thinking(sessionID: String)
     case tool(sessionID: String, title: String, status: String)
     case permission(ACPPermissionRequest)
     case permissionResolved(String)
@@ -46,6 +47,8 @@ public enum ACPEvent: Sendable {
 public struct ACPCompletion: Sendable {
     public let text: String
     public let stopReason: String
+    public let usage: TokenUsage?
+    public let cost: ExecutionCost?
 }
 
 public struct ACPConversation: Sendable {
@@ -57,6 +60,15 @@ public struct ACPConversation: Sendable {
 private struct ACPConversationRecord: Codable {
     let id: String
     let directory: String
+}
+
+private struct ACPExecutionState {
+    let onUpdate: (@Sendable (ACPExecutionUpdate) async throws -> Void)?
+    let costBaseline: ExecutionCost?
+    let startsAtZero: Bool
+    var reportedCost = false
+    var cost: ExecutionCost?
+    var tools: [String: ACPToolCall] = [:]
 }
 
 public enum ACPError: Error, LocalizedError, Sendable {
@@ -72,7 +84,12 @@ public enum ACPError: Error, LocalizedError, Sendable {
         case .protocolError(let message): "Agent 通信错误：\(message)"
         case .unsupportedImages: "此 Agent 未提供截图处理能力。"
         case .timeout: "Agent 响应超时，可以重试。"
-        case .remote(_, let message): message
+        case .remote(_, let message):
+            if message.localizedCaseInsensitiveContains("connection refused") {
+                "无法连接 Agent 服务或代理，请检查 Claude Code / Codex 的网络配置。\n\(message)"
+            } else if message.contains("model_not_found") || message.contains("No available channel for model") {
+                "当前配置的模型不可用，请检查 Claude Code / Codex 的模型和登录配置。\n\(message)"
+            } else { message }
         }
     }
 }
@@ -113,6 +130,25 @@ private enum JSONValue: Codable, Sendable {
     var boolean: Bool { if case .bool(let value) = self { return value }; return false }
     var array: [JSONValue] { if case .array(let value) = self { return value }; return [] }
     var key: String? { string ?? integer.map(String.init) }
+    var formatted: String? {
+        if case .null = self { return nil }
+        if let string { return string }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return (try? encoder.encode(self)).map { String(decoding: $0, as: UTF8.self) }
+    }
+
+    var cost: ExecutionCost? {
+        let amount: Decimal?
+        switch self["amount"] {
+        case .number(let value): amount = Decimal(value)
+        case .decimal(let value): amount = value.isFinite ? Decimal(string: String(value), locale: Locale(identifier: "en_US_POSIX")) : nil
+        default: amount = nil
+        }
+        guard let amount, amount >= 0, let currency = self["currency"].string,
+              currency.count == 3, currency.utf8.allSatisfy({ (65...90).contains($0) }) else { return nil }
+        return ExecutionCost(amount: amount, currency: currency)
+    }
 }
 
 public actor ACPClient {
@@ -130,14 +166,24 @@ public actor ACPClient {
     private var pending: [Int: CheckedContinuation<JSONValue, any Error>] = [:]
     private var timeouts: [Int: Task<Void, Never>] = [:]
     private var permissions: [String: (wireID: JSONValue, request: ACPPermissionRequest)] = [:]
+    private var fullAccessSessions: Set<String> = []
+    private var cancelledPrompts: Set<String> = []
     private var responses: [String: String] = [:]
+    private var executions: [String: ACPExecutionState] = [:]
+    private var sessionCosts: [String: ExecutionCost] = [:]
+    private var freshCostSessions: Set<String> = []
+    private var lastPromptActivity: [String: ContinuousClock.Instant] = [:]
     private var supportsImages = false
     private var supportsSessionLoading = false
     private var supportsSessionResume = false
     private var conversations: [URL: ACPConversationRecord] = [:]
     private var closed = false
+    private let promptIdleTimeout: Duration
+    private let promptMaximumDuration: Duration
 
-    public init() {
+    public init(promptIdleTimeout: Duration = .seconds(300), promptMaximumDuration: Duration = .seconds(900)) {
+        self.promptIdleTimeout = promptIdleTimeout
+        self.promptMaximumDuration = promptMaximumDuration
         let stream = AsyncStream<ACPEvent>.makeStream()
         events = stream.stream
         eventContinuation = stream.continuation
@@ -191,11 +237,17 @@ public actor ACPClient {
         })
     }
 
-    public func newSession(directory: URL, memoryServer: ACPCommand? = nil) async throws -> String {
-        let result = try await request("session/new", params: .object(sessionParameters(directory: directory, memoryServer: memoryServer)))
+    public func newSession(directory: URL, memoryServer: ACPCommand? = nil, ephemeralFor agent: ClipAgent? = nil) async throws -> String {
+        var parameters = sessionParameters(directory: directory, memoryServer: memoryServer)
+        if agent == .claude {
+            parameters["_meta"] = .object(["claudeCode": .object(["options": .object(["persistSession": .bool(false)])])])
+        }
+        // Codex persistence is enforced by EphemeralCodexCommand at the app-server boundary.
+        let result = try await request("session/new", params: .object(parameters))
         guard let id = result["sessionId"].string, !id.isEmpty else {
             throw ACPError.protocolError("缺少会话标识。")
         }
+        freshCostSessions.insert(id)
         return id
     }
 
@@ -220,7 +272,7 @@ public actor ACPClient {
             var params = sessionParameters(directory: directory, memoryServer: memoryServer)
             params["sessionId"] = .string(saved.id)
             do {
-                _ = try await request(supportsSessionResume ? "session/resume" : "session/load", params: .object(params), timeout: 60)
+                _ = try await request(supportsSessionResume ? "session/resume" : "session/load", params: .object(params), timeout: .seconds(60))
                 conversations[stateFile] = saved
                 return ACPConversation(id: saved.id, origin: .restored)
             } catch ACPError.remote(let code, _) where [-32601, -32602, -32002].contains(code) {
@@ -236,25 +288,66 @@ public actor ACPClient {
     }
 
     public func authenticate(methodID: String) async throws {
-        _ = try await request("authenticate", params: .object(["methodId": .string(methodID)]), timeout: 180)
+        _ = try await request("authenticate", params: .object(["methodId": .string(methodID)]), timeout: .seconds(180))
     }
 
     public func setMode(sessionID: String, modeID: String) async throws {
         _ = try await request("session/set_mode", params: .object(["sessionId": .string(sessionID), "modeId": .string(modeID)]))
+        if ["agent-full-access", "bypassPermissions"].contains(modeID) { fullAccessSessions.insert(sessionID) }
+        else { fullAccessSessions.remove(sessionID) }
     }
 
-    public func prompt(sessionID: String, text: String, images: [Data]) async throws -> ACPCompletion {
+    public func prompt(sessionID: String, text: String, images: [Data],
+                       onUpdate: (@Sendable (ACPExecutionUpdate) async throws -> Void)? = nil) async throws -> ACPCompletion {
         guard images.isEmpty || supportsImages else { throw ACPError.unsupportedImages }
         guard responses[sessionID] == nil else { throw ACPError.protocolError("此会话正在整理。") }
         var blocks: [JSONValue] = [.object(["type": .string("text"), "text": .string(text)])]
         blocks += images.map { .object(["type": .string("image"), "mimeType": .string("image/png"), "data": .string($0.base64EncodedString())]) }
         responses[sessionID] = ""
-        defer { responses.removeValue(forKey: sessionID) }
+        cancelledPrompts.remove(sessionID)
+        let fresh = freshCostSessions.remove(sessionID) != nil
+        executions[sessionID] = ACPExecutionState(onUpdate: onUpdate, costBaseline: sessionCosts[sessionID],
+            startsAtZero: fresh && sessionCosts[sessionID] == nil)
+        lastPromptActivity[sessionID] = .now
+        defer {
+            responses.removeValue(forKey: sessionID)
+            cancelledPrompts.remove(sessionID)
+            if executions.removeValue(forKey: sessionID)?.reportedCost != true { sessionCosts.removeValue(forKey: sessionID) }
+            lastPromptActivity.removeValue(forKey: sessionID)
+        }
         let result = try await request("session/prompt", params: .object([
             "sessionId": .string(sessionID), "prompt": .array(blocks)
-        ]), timeout: 300)
+        ]), timeout: promptIdleTimeout)
         guard let stopReason = result["stopReason"].string else { throw ACPError.protocolError("缺少结束状态。") }
-        return ACPCompletion(text: responses[sessionID] ?? "", stopReason: stopReason)
+        return ACPCompletion(text: responses[sessionID] ?? "", stopReason: stopReason, usage: Self.tokenUsage(result), cost: executions[sessionID]?.cost)
+    }
+
+    private static func tokenUsage(_ result: JSONValue) -> TokenUsage? {
+        func decode(_ value: JSONValue, quota: Bool = false) -> TokenUsage? {
+            guard let total = value["totalTokens"].integer, total >= 0,
+                  let input = value["inputTokens"].integer, input >= 0,
+                  let output = value["outputTokens"].integer, output >= 0 else { return nil }
+            func optional(_ key: String) -> Int? { value[key].integer.flatMap { $0 >= 0 ? $0 : nil } }
+            return TokenUsage(totalTokens: total, inputTokens: input, outputTokens: output,
+                cachedReadTokens: optional(quota ? "cachedInputTokens" : "cachedReadTokens"),
+                cachedWriteTokens: optional("cachedWriteTokens"),
+                thoughtTokens: optional(quota ? "reasoningOutputTokens" : "thoughtTokens"))
+        }
+        // Claude's model totals include subagents. They replace, rather than add to, the main-loop usage.
+        let models = result["_meta"]["quota"]["model_usage"].array
+        let usages = models.compactMap { decode($0["token_count"], quota: true) }
+        if !models.isEmpty, usages.count == models.count {
+            func sum(_ key: KeyPath<TokenUsage, Int?>) -> Int? {
+                let values = usages.compactMap { $0[keyPath: key] }
+                return values.isEmpty ? nil : values.reduce(0, +)
+            }
+            return TokenUsage(totalTokens: usages.reduce(0) { $0 + $1.totalTokens },
+                inputTokens: usages.reduce(0) { $0 + $1.inputTokens },
+                outputTokens: usages.reduce(0) { $0 + $1.outputTokens },
+                cachedReadTokens: sum(\.cachedReadTokens), cachedWriteTokens: sum(\.cachedWriteTokens),
+                thoughtTokens: sum(\.thoughtTokens))
+        }
+        return decode(result["usage"]) ?? decode(result["_meta"]["quota"]["token_count"], quota: true)
     }
 
     public func respondToPermission(id: String, optionID: String?) throws {
@@ -268,10 +361,12 @@ public actor ACPClient {
         try send(.object(["jsonrpc": .string("2.0"), "id": permission.wireID,
                           "result": .object(["outcome": outcome])]))
         permissions.removeValue(forKey: id)
+        recordPromptActivity(permission.request.sessionID)
         eventContinuation.yield(.permissionResolved(id))
     }
 
     public func cancel(sessionID: String) throws {
+        cancelledPrompts.insert(sessionID)
         for permission in permissions.values.filter({ $0.request.sessionID == sessionID }) {
             try respondToPermission(id: permission.request.id, optionID: nil)
         }
@@ -292,7 +387,22 @@ public actor ACPClient {
         errorReader?.cancel()
         failPending(ACPError.disconnected(""))
         permissions.removeAll()
+        fullAccessSessions.removeAll()
+        cancelledPrompts.removeAll()
         eventContinuation.finish()
+    }
+
+    public func cancelAndClose(sessionID: String?) async {
+        if let sessionID {
+            try? cancel(sessionID: sessionID)
+            // Give the agent a bounded chance to report tokens already spent before terminating it.
+            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+            while responses[sessionID] != nil, ContinuousClock.now < deadline {
+                do { try await Task.sleep(for: .milliseconds(50)) }
+                catch { break }
+            }
+        }
+        close()
     }
 
     private static func chunks(from handle: FileHandle) -> AsyncStream<Data> {
@@ -308,7 +418,7 @@ public actor ACPClient {
         }
     }
 
-    private func request(_ method: String, params: JSONValue, timeout: Double = 30) async throws -> JSONValue {
+    private func request(_ method: String, params: JSONValue, timeout: Duration = .seconds(30)) async throws -> JSONValue {
         guard !closed, process?.isRunning == true else { throw ACPError.disconnected("") }
         nextID += 1
         let id = nextID
@@ -318,16 +428,31 @@ public actor ACPClient {
                 do {
                     try send(.object(["jsonrpc": .string("2.0"), "id": .number(id),
                                       "method": .string(method), "params": params]))
+                    let session = method == "session/prompt" ? params["sessionId"].string : nil
                     timeouts[id] = Task { [weak self] in
-                        do { try await Task.sleep(for: .seconds(timeout)) }
-                        catch { return }
-                        await self?.expireRequest(id)
+                        await self?.watchTimeout(id, sessionID: session, timeout: timeout)
                     }
                 } catch {
                     pending.removeValue(forKey: id)?.resume(throwing: error)
                 }
             }
         } onCancel: { Task { await self.expireRequest(id) } }
+    }
+
+    private func watchTimeout(_ id: Int, sessionID: String?, timeout: Duration) async {
+        let clock = ContinuousClock(), started = ContinuousClock.now
+        let limit = started.advanced(by: sessionID == nil ? timeout : promptMaximumDuration)
+        while pending[id] != nil {
+            let activity = sessionID.flatMap { lastPromptActivity[$0] } ?? started
+            let deadline = min(limit, activity.advanced(by: timeout))
+            guard clock.now < deadline else { expireRequest(id); return }
+            do { try await clock.sleep(until: deadline) }
+            catch { return }
+        }
+    }
+
+    private func recordPromptActivity(_ sessionID: String) {
+        if lastPromptActivity[sessionID] != nil { lastPromptActivity[sessionID] = .now }
     }
 
     private func send(_ message: JSONValue) throws {
@@ -337,7 +462,7 @@ public actor ACPClient {
         try input.write(contentsOf: data)
     }
 
-    private func receive(_ data: Data) {
+    private func receive(_ data: Data) async {
         guard !closed else { return }
         buffer.append(data)
         while let newline = buffer.firstIndex(of: 0x0A) {
@@ -345,31 +470,58 @@ public actor ACPClient {
             buffer.removeSubrange(...newline)
             if line.isEmpty { continue }
             if line.count > 16 * 1024 * 1024 { disconnect("消息超过大小限制。"); return }
-            do { try handle(JSONDecoder().decode(JSONValue.self, from: line)) }
+            do { try await handle(JSONDecoder().decode(JSONValue.self, from: line)) }
             catch { disconnect(error.localizedDescription); return }
         }
         if buffer.count > 16 * 1024 * 1024 { disconnect("消息超过大小限制。") }
     }
 
-    private func handle(_ message: JSONValue) throws {
+    private func handle(_ message: JSONValue) async throws {
         guard message["jsonrpc"].string == "2.0" else { throw ACPError.protocolError("无效的 JSON-RPC 消息。") }
         if let method = message["method"].string {
             let params = message["params"]
             if method == "session/update", let session = params["sessionId"].string {
                 let update = params["update"]
                 switch update["sessionUpdate"].string {
+                case "agent_thought_chunk":
+                    if responses[session] != nil, let text = update["content"]["text"].string, !text.isEmpty {
+                        recordPromptActivity(session)
+                        eventContinuation.yield(.thinking(sessionID: session))
+                    }
                 case "agent_message_chunk":
                     if update["content"]["type"].string == "text", let text = update["content"]["text"].string,
-                       responses[session] != nil {
+                       !text.isEmpty, responses[session] != nil {
                         guard (responses[session]?.utf8.count ?? 0) + text.utf8.count < 2 * 1024 * 1024 else {
                             throw ACPError.protocolError("整理结果过长。")
                         }
                         responses[session, default: ""] += text
+                        recordPromptActivity(session)
                         eventContinuation.yield(.message(sessionID: session, text: text))
                     }
                 case "tool_call", "tool_call_update":
-                    eventContinuation.yield(.tool(sessionID: session, title: update["title"].string ?? "正在整理",
-                                                  status: update["status"].string ?? "in_progress"))
+                    guard responses[session] != nil else { break }
+                    recordPromptActivity(session)
+                    if let tool = try await recordTool(update, session: session) {
+                        eventContinuation.yield(.tool(sessionID: session, title: tool.title, status: tool.status))
+                    } else {
+                        eventContinuation.yield(.tool(sessionID: session, title: update["title"].string ?? "正在整理",
+                                                      status: update["status"].string ?? "in_progress"))
+                    }
+                case "usage_update":
+                    if let cost = update["cost"].cost {
+                        sessionCosts[session] = cost
+                        if let execution = executions[session] {
+                            var delta: ExecutionCost?
+                            if execution.startsAtZero { delta = cost }
+                            else if let baseline = execution.costBaseline, baseline.currency == cost.currency,
+                                    cost.amount >= baseline.amount {
+                                delta = ExecutionCost(amount: cost.amount - baseline.amount, currency: cost.currency)
+                            }
+                            executions[session]?.reportedCost = true
+                            executions[session]?.cost = delta
+                            try await execution.onUpdate?(.cost(delta))
+                        }
+                    }
                 default: break
                 }
             } else if method == "session/request_permission", let key = message["id"].key {
@@ -379,7 +531,15 @@ public actor ACPClient {
                         return ACPPermissionOption(id: id, name: $0["name"].string ?? id, kind: $0["kind"].string ?? "")
                     })
                 permissions[key] = (message["id"], request)
-                eventContinuation.yield(.permission(request))
+                if responses[request.sessionID] != nil { _ = try await recordTool(params["toolCall"], session: request.sessionID) }
+                recordPromptActivity(request.sessionID)
+                if fullAccessSessions.contains(request.sessionID) {
+                    // Full access applies to this session; prefer allowing once over saving extra rules.
+                    let option = request.options.first { $0.kind == "allow_once" }
+                        ?? request.options.first { $0.kind == "allow_always" }
+                    let active = responses[request.sessionID] != nil && !cancelledPrompts.contains(request.sessionID)
+                    try respondToPermission(id: key, optionID: active ? option?.id : nil)
+                } else { eventContinuation.yield(.permission(request)) }
             } else if message["id"].key != nil {
                 try send(.object(["jsonrpc": .string("2.0"), "id": message["id"],
                     "error": .object(["code": .number(-32601), "message": .string("Method not supported")])]))
@@ -390,6 +550,41 @@ public actor ACPClient {
                 continuation.resume(throwing: ACPError.remote(code: code, message: message["error"]["message"].string ?? "Agent 返回错误。"))
             } else { continuation.resume(returning: message["result"]) }
         }
+    }
+
+    private func recordTool(_ update: JSONValue, session: String) async throws -> ACPToolCall? {
+        guard let id = update["toolCallId"].string, !id.isEmpty else { return nil }
+        var tool = executions[session]?.tools[id] ?? ACPToolCall(id: id, title: "工具调用", startedAt: .now, updatedAt: .now)
+        if let title = update["title"].string { tool.title = title }
+        if let name = update["name"].string { tool.name = name }
+        if let kind = update["kind"].string { tool.kind = kind }
+        if let status = update["status"].string { tool.status = status }
+        if let input = update["rawInput"].formatted { tool.rawInput = input }
+        if let output = update["rawOutput"].formatted { tool.rawOutput = output }
+        if case .array(let locations) = update["locations"] {
+            tool.locations = locations.compactMap { location in
+                guard let path = location["path"].string else { return nil }
+                return ACPToolLocation(path: path, line: location["line"].integer)
+            }
+        }
+        if case .array(let content) = update["content"] {
+            tool.content = content.map { item in
+                switch item["type"].string {
+                case "diff":
+                    ACPToolContent(type: "diff", path: item["path"].string,
+                        oldText: item["oldText"].string, newText: item["newText"].string)
+                case "content":
+                    ACPToolContent(type: "text", text: item["content"]["text"].string
+                        ?? item["content"]["resource"]["text"].string ?? "非文本结果（\(item["content"]["type"].string ?? "未知类型")）")
+                case "terminal": ACPToolContent(type: "terminal", text: "终端：\(item["terminalId"].string ?? "未回传标识")")
+                default: ACPToolContent(type: "text", text: item.formatted)
+                }
+            }
+        }
+        tool.updatedAt = .now
+        executions[session]?.tools[id] = tool
+        try await executions[session]?.onUpdate?(.tool(tool))
+        return tool
     }
 
     private func receiveDiagnostics(_ data: Data) {

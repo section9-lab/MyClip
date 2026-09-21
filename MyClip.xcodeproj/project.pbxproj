@@ -7,13 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		06A265ECCE7EF8DBCCB6D66B /* IMChannelService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26D123E0134F8B267EF6774D /* IMChannelService.swift */; };
 		09493D58F29CA97863642E5A /* AgentStatusIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF34964DFBA230E51655E20 /* AgentStatusIcon.swift */; };
-		0E060200594B277B9143D95F /* SettingsPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E62836EBEF1BBBC4A75AFE0 /* SettingsPanelView.swift */; };
-		29D692C21473C5791765C060 /* AgentBridgeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B736F797F2F4B24D65A74D9F /* AgentBridgeModels.swift */; };
 		33E814F999C5155F94B896CC /* FocusedCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3381289629BF73DF20266A7 /* FocusedCaptureService.swift */; };
-		34911EECB6124498463BE857 /* CursorCompanionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2BB4CB536001685A017AFD8 /* CursorCompanionController.swift */; };
-		3551EA705918CA8A2245B373 /* Textual in Frameworks */ = {isa = PBXBuildFile; productRef = 6E85D64E863EB9DAFFFBFB1E /* Textual */; };
+		3C862B368DABCFD030859575 /* LibraryCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67182996F61325E45927A1DE /* LibraryCompatibility.swift */; };
 		3CD75CE86D030A06FD9AB21B /* PermissionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D297476682CA691E13EDB2D1 /* PermissionCoordinator.swift */; };
 		46E2D0D6D45A92C6BFEE4463 /* MyClipModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5E5F0881A737B85E44E2AA /* MyClipModel.swift */; };
 		49A465A98D2C71E9D0E04172 /* AnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85FD22EF3BF4339FB4D41B95 /* AnalyticsView.swift */; };
@@ -21,62 +17,37 @@
 		601B31C23F6CAC773173BD12 /* AgentRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F1DEDE5F4B08506C2155E7 /* AgentRuntime.swift */; };
 		64B50CEF8586DF62220C71A8 /* MyClipCore in Frameworks */ = {isa = PBXBuildFile; productRef = 08C930E7912187BDB9B11F7E /* MyClipCore */; };
 		6EE097D37687B09ECD532957 /* MyClipViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3411BD87E9E8BAA48F2AA31 /* MyClipViews.swift */; };
-		714737D90707EE5E685C04A6 /* KaraApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 871771C72D2D42991CA9BAC1 /* KaraApp.swift */; };
-		7197CF5B72A2D59F3562A8CC /* CursorCompanionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157ABED4F6C7A7ECDD5B4C61 /* CursorCompanionModel.swift */; };
 		8061428CAE741EC9A223298D /* AgentCharacterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 428FC34F097036C20B32E18E /* AgentCharacterView.swift */; };
 		8F0DA65FE5828D606D28AC31 /* MyClipMenuBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 652C8CAFBFF2AB791C4BBFEB /* MyClipMenuBar.swift */; };
-		8F1BD4B6EB64404A4C6EEF4D /* AgentBridgeEventStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D14EFFEAF6838286E2A31C /* AgentBridgeEventStore.swift */; };
-		A9716B49D88E6251B9DCB9C2 /* AIToolType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D321060632795DAE76D26F5 /* AIToolType.swift */; };
-		AD624A1DD958E623E6F144DE /* ScheduledTaskService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08688BAE15F9C43D23EC69F1 /* ScheduledTaskService.swift */; };
+		9ACE35AE85BEF08754185E4F /* WindowImageCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 418F9B75B5DD9D13703EC647 /* WindowImageCapture.swift */; };
 		B4440E613F7363981D933F35 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C0591743E8AF1CE014CB1016 /* Assets.xcassets */; };
-		B537DCA7BD2AC57378F44909 /* WChatClawSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 73B0E49E0350497493A10729 /* WChatClawSwift */; };
-		B753E01E43A4EAF898E3AE82 /* IMPlatformType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C18907283728D921A67F60C /* IMPlatformType.swift */; };
-		BCDD647DD5312D463376CA31 /* AgentSessionRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 980E018EC40A6692F4557918 /* AgentSessionRouter.swift */; };
-		C17A612714416BE125A4B010 /* AIIntegrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61E0E1301E7FD26514C1809 /* AIIntegrationService.swift */; };
-		C4EB2E5B29FF5C0E160F2D76 /* SpeechTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A599DD9F3C566C684D7BE7F7 /* SpeechTranscriptionService.swift */; };
-		C6E688DCC578A1BE496EB350 /* AIHotkeyController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D08938715868DE1F0C18420C /* AIHotkeyController.swift */; };
-		C98C5D1D403BF9B88DD2C6B2 /* CursorCompanionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1728960275FA2E84234AC50D /* CursorCompanionView.swift */; };
-		D53627E9AFEDBB2BE59363CA /* AgentCLIAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F815F7E5C41E4658FEE13166 /* AgentCLIAdapter.swift */; };
+		B537DCA7BD2AC57378F44909 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 893EE47D89D1C46AA406DDE3 /* MarkdownUI */; };
+		D2B59596CD4C1960409C0D9D /* ExecutionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 640EBAAF7E6B14C1A195C6A6 /* ExecutionDetailView.swift */; };
 		D53C9A553FE33DB790CA60A6 /* TaskDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27375C14A6AE1644A55D790C /* TaskDashboardView.swift */; };
 		E1A9348A9B3B3191D9BD9E4F /* MemoryMarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C65AAFF4E4BA9FEC91C9CDD /* MemoryMarkdownView.swift */; };
-		E2D3F49B335AD12EEF6A8E14 /* AgentBridgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02B724B3C3B8D26CD0832FAD /* AgentBridgeService.swift */; };
 		FD08315AB518ADF1981415A3 /* MyClipApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64AB631DA26E7316F978FC4E /* MyClipApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		02B724B3C3B8D26CD0832FAD /* AgentBridgeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBridgeService.swift; sourceTree = "<group>"; };
-		08688BAE15F9C43D23EC69F1 /* ScheduledTaskService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTaskService.swift; sourceTree = "<group>"; };
 		0C65AAFF4E4BA9FEC91C9CDD /* MemoryMarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryMarkdownView.swift; sourceTree = "<group>"; };
-		157ABED4F6C7A7ECDD5B4C61 /* CursorCompanionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorCompanionModel.swift; sourceTree = "<group>"; };
-		1728960275FA2E84234AC50D /* CursorCompanionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorCompanionView.swift; sourceTree = "<group>"; };
-		26D123E0134F8B267EF6774D /* IMChannelService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMChannelService.swift; sourceTree = "<group>"; };
 		27375C14A6AE1644A55D790C /* TaskDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDashboardView.swift; sourceTree = "<group>"; };
-		2C18907283728D921A67F60C /* IMPlatformType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMPlatformType.swift; sourceTree = "<group>"; };
 		357E53D3B46FD41B1CD21920 /* MyClip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MyClip.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		418F9B75B5DD9D13703EC647 /* WindowImageCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowImageCapture.swift; sourceTree = "<group>"; };
 		428FC34F097036C20B32E18E /* AgentCharacterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCharacterView.swift; sourceTree = "<group>"; };
-		4E62836EBEF1BBBC4A75AFE0 /* SettingsPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPanelView.swift; sourceTree = "<group>"; };
+		640EBAAF7E6B14C1A195C6A6 /* ExecutionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionDetailView.swift; sourceTree = "<group>"; };
 		64AB631DA26E7316F978FC4E /* MyClipApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyClipApp.swift; sourceTree = "<group>"; };
 		652C8CAFBFF2AB791C4BBFEB /* MyClipMenuBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyClipMenuBar.swift; sourceTree = "<group>"; };
+		67182996F61325E45927A1DE /* LibraryCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCompatibility.swift; sourceTree = "<group>"; };
 		6BF48A94D66DB8CBAD8C2C37 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		6DFD8534C004BDE34F4C81F2 /* MyClip */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MyClip; path = .; sourceTree = SOURCE_ROOT; };
 		85FD22EF3BF4339FB4D41B95 /* AnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsView.swift; sourceTree = "<group>"; };
-		871771C72D2D42991CA9BAC1 /* KaraApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KaraApp.swift; sourceTree = "<group>"; };
-		980E018EC40A6692F4557918 /* AgentSessionRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionRouter.swift; sourceTree = "<group>"; };
-		9D321060632795DAE76D26F5 /* AIToolType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIToolType.swift; sourceTree = "<group>"; };
 		A2F1DEDE5F4B08506C2155E7 /* AgentRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRuntime.swift; sourceTree = "<group>"; };
-		A599DD9F3C566C684D7BE7F7 /* SpeechTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTranscriptionService.swift; sourceTree = "<group>"; };
-		B736F797F2F4B24D65A74D9F /* AgentBridgeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBridgeModels.swift; sourceTree = "<group>"; };
 		C0591743E8AF1CE014CB1016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C3381289629BF73DF20266A7 /* FocusedCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusedCaptureService.swift; sourceTree = "<group>"; };
 		C5C76804C327A0A0B592C603 /* MarkdownThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = MarkdownThirdPartyNotices.txt; sourceTree = "<group>"; };
-		C61E0E1301E7FD26514C1809 /* AIIntegrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIIntegrationService.swift; sourceTree = "<group>"; };
-		D08938715868DE1F0C18420C /* AIHotkeyController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIHotkeyController.swift; sourceTree = "<group>"; };
 		D297476682CA691E13EDB2D1 /* PermissionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionCoordinator.swift; sourceTree = "<group>"; };
 		E25B03C51C65E327F4389E00 /* MyClip.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MyClip.entitlements; sourceTree = "<group>"; };
-		E2BB4CB536001685A017AFD8 /* CursorCompanionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorCompanionController.swift; sourceTree = "<group>"; };
 		F3411BD87E9E8BAA48F2AA31 /* MyClipViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyClipViews.swift; sourceTree = "<group>"; };
-		F3D14EFFEAF6838286E2A31C /* AgentBridgeEventStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBridgeEventStore.swift; sourceTree = "<group>"; };
-		F815F7E5C41E4658FEE13166 /* AgentCLIAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCLIAdapter.swift; sourceTree = "<group>"; };
 		FBF34964DFBA230E51655E20 /* AgentStatusIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStatusIcon.swift; sourceTree = "<group>"; };
 		FD5E5F0881A737B85E44E2AA /* MyClipModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyClipModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -87,8 +58,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				64B50CEF8586DF62220C71A8 /* MyClipCore in Frameworks */,
-				B537DCA7BD2AC57378F44909 /* WChatClawSwift in Frameworks */,
-				3551EA705918CA8A2245B373 /* Textual in Frameworks */,
+				B537DCA7BD2AC57378F44909 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -103,41 +73,15 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		0C92DCB31A6F490C86AABF40 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				A599DD9F3C566C684D7BE7F7 /* SpeechTranscriptionService.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		1D9A068C9DB10F68D3907523 /* ScheduledTasks */ = {
-			isa = PBXGroup;
-			children = (
-				08688BAE15F9C43D23EC69F1 /* ScheduledTaskService.swift */,
-			);
-			path = ScheduledTasks;
-			sourceTree = "<group>";
-		};
 		39B1BE9AC38F2603D6D811A1 /* MyClip */ = {
 			isa = PBXGroup;
 			children = (
 				C0591743E8AF1CE014CB1016 /* Assets.xcassets */,
 				597D8D7CF752A72CFFF6C697 /* App */,
 				A71DEFC96FE8500289FADC1B /* Features */,
-				0C92DCB31A6F490C86AABF40 /* Services */,
 				72C26A6AAAFCD09021CC9F7E /* Supporting */,
 			);
 			path = MyClip;
-			sourceTree = "<group>";
-		};
-		466D5C48110FA950E4DE2C53 /* IMChannel */ = {
-			isa = PBXGroup;
-			children = (
-				26D123E0134F8B267EF6774D /* IMChannelService.swift */,
-				2C18907283728D921A67F60C /* IMPlatformType.swift */,
-			);
-			path = IMChannel;
 			sourceTree = "<group>";
 		};
 		5303457A185CD385701705CC = {
@@ -152,7 +96,6 @@
 		597D8D7CF752A72CFFF6C697 /* App */ = {
 			isa = PBXGroup;
 			children = (
-				871771C72D2D42991CA9BAC1 /* KaraApp.swift */,
 				64AB631DA26E7316F978FC4E /* MyClipApp.swift */,
 				D297476682CA691E13EDB2D1 /* PermissionCoordinator.swift */,
 			);
@@ -166,24 +109,17 @@
 				A2F1DEDE5F4B08506C2155E7 /* AgentRuntime.swift */,
 				FBF34964DFBA230E51655E20 /* AgentStatusIcon.swift */,
 				85FD22EF3BF4339FB4D41B95 /* AnalyticsView.swift */,
+				640EBAAF7E6B14C1A195C6A6 /* ExecutionDetailView.swift */,
 				C3381289629BF73DF20266A7 /* FocusedCaptureService.swift */,
+				67182996F61325E45927A1DE /* LibraryCompatibility.swift */,
 				0C65AAFF4E4BA9FEC91C9CDD /* MemoryMarkdownView.swift */,
 				652C8CAFBFF2AB791C4BBFEB /* MyClipMenuBar.swift */,
 				FD5E5F0881A737B85E44E2AA /* MyClipModel.swift */,
 				F3411BD87E9E8BAA48F2AA31 /* MyClipViews.swift */,
 				27375C14A6AE1644A55D790C /* TaskDashboardView.swift */,
+				418F9B75B5DD9D13703EC647 /* WindowImageCapture.swift */,
 			);
 			path = Library;
-			sourceTree = "<group>";
-		};
-		6DC6552896964F52D328D541 /* CursorCompanion */ = {
-			isa = PBXGroup;
-			children = (
-				E2BB4CB536001685A017AFD8 /* CursorCompanionController.swift */,
-				157ABED4F6C7A7ECDD5B4C61 /* CursorCompanionModel.swift */,
-				1728960275FA2E84234AC50D /* CursorCompanionView.swift */,
-			);
-			path = CursorCompanion;
 			sourceTree = "<group>";
 		};
 		6DFA8A1FD5EC8594D790914D /* Packages */ = {
@@ -192,18 +128,6 @@
 				6DFD8534C004BDE34F4C81F2 /* MyClip */,
 			);
 			name = Packages;
-			sourceTree = "<group>";
-		};
-		70FCF449BDF326BDCFE370FA /* AgentBridge */ = {
-			isa = PBXGroup;
-			children = (
-				F3D14EFFEAF6838286E2A31C /* AgentBridgeEventStore.swift */,
-				B736F797F2F4B24D65A74D9F /* AgentBridgeModels.swift */,
-				02B724B3C3B8D26CD0832FAD /* AgentBridgeService.swift */,
-				F815F7E5C41E4658FEE13166 /* AgentCLIAdapter.swift */,
-				980E018EC40A6692F4557918 /* AgentSessionRouter.swift */,
-			);
-			path = AgentBridge;
 			sourceTree = "<group>";
 		};
 		72C26A6AAAFCD09021CC9F7E /* Supporting */ = {
@@ -219,33 +143,9 @@
 		A71DEFC96FE8500289FADC1B /* Features */ = {
 			isa = PBXGroup;
 			children = (
-				70FCF449BDF326BDCFE370FA /* AgentBridge */,
-				FDD9748BE6C3864FF3F9F92A /* AIIntegration */,
-				6DC6552896964F52D328D541 /* CursorCompanion */,
-				466D5C48110FA950E4DE2C53 /* IMChannel */,
 				5B774977BE7159578CF4FD18 /* Library */,
-				1D9A068C9DB10F68D3907523 /* ScheduledTasks */,
-				EF93F4B0CAACB46A10FB3CB0 /* Settings */,
 			);
 			path = Features;
-			sourceTree = "<group>";
-		};
-		EF93F4B0CAACB46A10FB3CB0 /* Settings */ = {
-			isa = PBXGroup;
-			children = (
-				4E62836EBEF1BBBC4A75AFE0 /* SettingsPanelView.swift */,
-			);
-			path = Settings;
-			sourceTree = "<group>";
-		};
-		FDD9748BE6C3864FF3F9F92A /* AIIntegration */ = {
-			isa = PBXGroup;
-			children = (
-				D08938715868DE1F0C18420C /* AIHotkeyController.swift */,
-				C61E0E1301E7FD26514C1809 /* AIIntegrationService.swift */,
-				9D321060632795DAE76D26F5 /* AIToolType.swift */,
-			);
-			path = AIIntegration;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -266,8 +166,7 @@
 			name = MyClip;
 			packageProductDependencies = (
 				08C930E7912187BDB9B11F7E /* MyClipCore */,
-				73B0E49E0350497493A10729 /* WChatClawSwift */,
-				6E85D64E863EB9DAFFFBFB1E /* Textual */,
+				893EE47D89D1C46AA406DDE3 /* MarkdownUI */,
 			);
 			productName = MyClip;
 			productReference = 357E53D3B46FD41B1CD21920 /* MyClip.app */;
@@ -298,8 +197,7 @@
 			mainGroup = 5303457A185CD385701705CC;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				85B8CBE72559F789FD29026B /* XCRemoteSwiftPackageReference "textual" */,
-				5A7301AF2BC5EC3B095019FF /* XCRemoteSwiftPackageReference "wchat-claw-swfit" */,
+				E7DDEB510057EFB1C6C89A9C /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 				4AC3F864B3B4A90B694E7ADA /* XCLocalSwiftPackageReference "." */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -329,35 +227,21 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C6E688DCC578A1BE496EB350 /* AIHotkeyController.swift in Sources */,
-				C17A612714416BE125A4B010 /* AIIntegrationService.swift in Sources */,
-				A9716B49D88E6251B9DCB9C2 /* AIToolType.swift in Sources */,
-				8F1BD4B6EB64404A4C6EEF4D /* AgentBridgeEventStore.swift in Sources */,
-				29D692C21473C5791765C060 /* AgentBridgeModels.swift in Sources */,
-				E2D3F49B335AD12EEF6A8E14 /* AgentBridgeService.swift in Sources */,
-				D53627E9AFEDBB2BE59363CA /* AgentCLIAdapter.swift in Sources */,
 				8061428CAE741EC9A223298D /* AgentCharacterView.swift in Sources */,
 				601B31C23F6CAC773173BD12 /* AgentRuntime.swift in Sources */,
-				BCDD647DD5312D463376CA31 /* AgentSessionRouter.swift in Sources */,
 				09493D58F29CA97863642E5A /* AgentStatusIcon.swift in Sources */,
 				49A465A98D2C71E9D0E04172 /* AnalyticsView.swift in Sources */,
-				34911EECB6124498463BE857 /* CursorCompanionController.swift in Sources */,
-				7197CF5B72A2D59F3562A8CC /* CursorCompanionModel.swift in Sources */,
-				C98C5D1D403BF9B88DD2C6B2 /* CursorCompanionView.swift in Sources */,
+				D2B59596CD4C1960409C0D9D /* ExecutionDetailView.swift in Sources */,
 				33E814F999C5155F94B896CC /* FocusedCaptureService.swift in Sources */,
-				06A265ECCE7EF8DBCCB6D66B /* IMChannelService.swift in Sources */,
-				B753E01E43A4EAF898E3AE82 /* IMPlatformType.swift in Sources */,
-				714737D90707EE5E685C04A6 /* KaraApp.swift in Sources */,
+				3C862B368DABCFD030859575 /* LibraryCompatibility.swift in Sources */,
 				E1A9348A9B3B3191D9BD9E4F /* MemoryMarkdownView.swift in Sources */,
 				FD08315AB518ADF1981415A3 /* MyClipApp.swift in Sources */,
 				8F0DA65FE5828D606D28AC31 /* MyClipMenuBar.swift in Sources */,
 				46E2D0D6D45A92C6BFEE4463 /* MyClipModel.swift in Sources */,
 				6EE097D37687B09ECD532957 /* MyClipViews.swift in Sources */,
 				3CD75CE86D030A06FD9AB21B /* PermissionCoordinator.swift in Sources */,
-				AD624A1DD958E623E6F144DE /* ScheduledTaskService.swift in Sources */,
-				0E060200594B277B9143D95F /* SettingsPanelView.swift in Sources */,
-				C4EB2E5B29FF5C0E160F2D76 /* SpeechTranscriptionService.swift in Sources */,
 				D53C9A553FE33DB790CA60A6 /* TaskDashboardView.swift in Sources */,
+				9ACE35AE85BEF08754185E4F /* WindowImageCapture.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -416,7 +300,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -443,8 +327,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LSUIElement = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				LSUIElement = NO;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cc.vibevibe.myclip;
 				PRODUCT_NAME = MyClip;
 				SDKROOT = macosx;
@@ -466,8 +350,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LSUIElement = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				LSUIElement = NO;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cc.vibevibe.myclip;
 				PRODUCT_NAME = MyClip;
 				SDKROOT = macosx;
@@ -520,7 +404,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -562,20 +446,12 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		5A7301AF2BC5EC3B095019FF /* XCRemoteSwiftPackageReference "wchat-claw-swfit" */ = {
+		E7DDEB510057EFB1C6C89A9C /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/section9-lab/wchat-claw-swfit.git";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
-		85B8CBE72559F789FD29026B /* XCRemoteSwiftPackageReference "textual" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/gonzalezreal/textual.git";
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui.git";
 			requirement = {
 				kind = exactVersion;
-				version = 0.5.0;
+				version = 2.4.1;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -585,15 +461,10 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = MyClipCore;
 		};
-		6E85D64E863EB9DAFFFBFB1E /* Textual */ = {
+		893EE47D89D1C46AA406DDE3 /* MarkdownUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 85B8CBE72559F789FD29026B /* XCRemoteSwiftPackageReference "textual" */;
-			productName = Textual;
-		};
-		73B0E49E0350497493A10729 /* WChatClawSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 5A7301AF2BC5EC3B095019FF /* XCRemoteSwiftPackageReference "wchat-claw-swfit" */;
-			productName = WChatClawSwift;
+			package = E7DDEB510057EFB1C6C89A9C /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

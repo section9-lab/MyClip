@@ -44,15 +44,15 @@ final class WorkTaskTests: XCTestCase {
         XCTAssertEqual(stats.completed, 0)
     }
 
-    func testNewEvidencePreservesConfirmedAndIgnoredStatesAcrossRestart() async throws {
+    func testNewEvidenceAdvancesConfirmedTasksAndPreservesIgnoredStateAcrossRestart() async throws {
         let store = try LibraryStore(root: root)
-        let source = fixtureContext()
+        let source = fixtureContext(at: 300)
         try await store.record(image: fixtureImage(), context: source, agent: .codex, organize: false)
         var draft = WorkTaskDraft(title: "Review API", project: "MyClip", evidence: "需要检查 API", sourceIDs: [source.id])
         try await store.ingestTaskSuggestions([draft], allowedSourceIDs: [source.id], allowedMemoryIDs: [])
         let initial = try await store.workTasks()
         let id = try XCTUnwrap(initial.first?.id)
-        try await store.setWorkTaskStatus(id, status: .doing)
+        try await store.setWorkTaskStatus(id, status: .doing, at: Date(timeIntervalSince1970: 200))
         draft.title = "  review   api  "
         draft.project = "myclip"
         draft.evidence = "API 验证已完成"
@@ -60,7 +60,8 @@ final class WorkTaskTests: XCTestCase {
         try await store.ingestTaskSuggestions([draft], allowedSourceIDs: [source.id], allowedMemoryIDs: [])
         let tasks = try await store.workTasks()
         XCTAssertEqual(tasks.count, 1)
-        XCTAssertEqual(tasks.first?.status, .doing)
+        XCTAssertEqual(tasks.first?.status, .done)
+        XCTAssertNil(tasks.first?.suggestedStatus)
         XCTAssertEqual(tasks.first?.evidence.count, 2)
         try await store.setWorkTaskStatus(id, status: .ignored)
         let reopened = try LibraryStore(root: root)
@@ -68,6 +69,113 @@ final class WorkTaskTests: XCTestCase {
         let restored = try await reopened.workTasks()
         XCTAssertEqual(restored.count, 1)
         XCTAssertEqual(restored.first?.status, .ignored)
+    }
+
+    func testAIProgressIsRecordedAndOldEvidenceCannotUndoManualCorrection() async throws {
+        let store = try LibraryStore(root: root)
+        let id = try await store.createWorkTask(title: "验证导出", waitingReason: "等待环境", at: Date(timeIntervalSince1970: 100))
+        let source = fixtureContext(at: 200)
+        try await store.record(image: fixtureImage(), context: source, agent: .codex, organize: false)
+        var draft = WorkTaskDraft(taskID: id, title: "验证导出", suggestedStatus: .doing, evidence: "正在执行导出测试", sourceIDs: [source.id])
+        try await store.ingestTaskSuggestions([draft], allowedSourceIDs: [source.id], allowedMemoryIDs: [], at: Date(timeIntervalSince1970: 210))
+        var tasks = try await store.workTasks()
+        XCTAssertEqual(tasks.first?.status, .doing)
+        let database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
+        let events = try database.run("SELECT * FROM work_task_events WHERE task_id=? ORDER BY created_at", [id.uuidString])
+        XCTAssertEqual(events.last?["actor"], "ai")
+
+        try await store.setWorkTaskStatus(id, status: .todo, at: Date(timeIntervalSince1970: 220))
+        draft.evidence = "重新措辞的旧线索：测试已完成"
+        draft.suggestedStatus = .done
+        try await store.ingestTaskSuggestions([draft], allowedSourceIDs: [source.id], allowedMemoryIDs: [], at: Date(timeIntervalSince1970: 230))
+        tasks = try await store.workTasks()
+        XCTAssertEqual(tasks.first?.status, .todo)
+        XCTAssertNil(tasks.first?.suggestedStatus)
+
+        let fresh = fixtureContext(at: 300)
+        try await store.record(image: fixtureImage(), context: fresh, agent: .codex, organize: false)
+        draft.sourceIDs = [fresh.id]
+        draft.evidence = "导出回归测试全部通过"
+        for _ in 0..<2 {
+            try await store.ingestTaskSuggestions([draft], allowedSourceIDs: [fresh.id], allowedMemoryIDs: [], at: Date(timeIntervalSince1970: 310))
+        }
+        tasks = try await store.workTasks()
+        XCTAssertEqual(tasks.first?.status, .done)
+        XCTAssertEqual(tasks.first?.completedAt, Date(timeIntervalSince1970: 310))
+        XCTAssertEqual(tasks.first?.waitingReason, "")
+        let history = try await store.workTaskEvents(id)
+        XCTAssertEqual(history.count, 4)
+    }
+
+    func testAIRegressionRemainsAReviewableSuggestion() async throws {
+        let store = try LibraryStore(root: root)
+        let id = try await store.createWorkTask(title: "验收发布", at: Date(timeIntervalSince1970: 100))
+        try await store.setWorkTaskStatus(id, status: .done, at: Date(timeIntervalSince1970: 200))
+        let source = fixtureContext(at: 300)
+        try await store.record(image: fixtureImage(), context: source, agent: .codex, organize: false)
+        let draft = WorkTaskDraft(taskID: id, title: "验收发布", suggestedStatus: .doing, evidence: "新发现的问题需要继续排查", sourceIDs: [source.id])
+        try await store.ingestTaskSuggestions([draft], allowedSourceIDs: [source.id], allowedMemoryIDs: [], at: Date(timeIntervalSince1970: 310))
+        let tasks = try await store.workTasks()
+        XCTAssertEqual(tasks.first?.status, .done)
+        XCTAssertEqual(tasks.first?.suggestedStatus, .doing)
+        try await store.setWorkTaskStatus(id, status: .doing, at: Date(timeIntervalSince1970: 320))
+        let updated = try await store.workTasks()
+        XCTAssertNil(updated.first?.completedAt)
+    }
+
+    func testUndatedMemoryRequiresReviewInsteadOfAutomaticCompletion() async throws {
+        let store = try LibraryStore(root: root)
+        let id = try await store.createWorkTask(title: "验证交付", at: Date(timeIntervalSince1970: 100))
+        let snapshot = try await store.snapshot()
+        let memory = try XCTUnwrap(snapshot.entries.first { $0.relativePath == "Now.md" })
+        XCTAssertNil(memory.observedAt)
+        let draft = WorkTaskDraft(taskID: id, title: "验证交付", suggestedStatus: .done, evidence: "未标明发生时间的完成记录", memoryIDs: [memory.id])
+        try await store.ingestTaskSuggestions([draft], allowedSourceIDs: [], allowedMemoryIDs: [memory.id])
+        let tasks = try await store.workTasks()
+        XCTAssertEqual(tasks.first?.status, .todo)
+        XCTAssertEqual(tasks.first?.suggestedStatus, .done)
+    }
+
+    func testInvalidBatchRollsBackAutomaticStatusChanges() async throws {
+        let store = try LibraryStore(root: root)
+        let id = try await store.createWorkTask(title: "核对结果", at: Date(timeIntervalSince1970: 100))
+        let source = fixtureContext(at: 200)
+        try await store.record(image: fixtureImage(), context: source, agent: .codex, organize: false)
+        let valid = WorkTaskDraft(taskID: id, title: "核对结果", suggestedStatus: .done, evidence: "核对通过", sourceIDs: [source.id])
+        let invalid = WorkTaskDraft(title: "不存在的来源", evidence: "来源无效", sourceIDs: [UUID()])
+        do {
+            try await store.ingestTaskSuggestions([valid, invalid], allowedSourceIDs: [source.id], allowedMemoryIDs: [])
+            XCTFail("Invalid provenance must reject the complete batch")
+        } catch LibraryError.invalidResult { }
+        let tasks = try await store.workTasks(), events = try await store.workTaskEvents(id)
+        XCTAssertEqual(tasks.first?.status, .todo)
+        XCTAssertTrue(tasks.first?.evidence.isEmpty == true)
+        XCTAssertEqual(events.count, 1)
+    }
+
+    func testDelayedBatchesAdvanceUsingObservationTimeInsteadOfProcessingTime() async throws {
+        let store = try LibraryStore(root: root)
+        let started = fixtureContext(at: 200), finished = fixtureContext(at: 300)
+        for source in [started, finished] {
+            try await store.record(image: fixtureImage(), context: source, agent: .codex, organize: false)
+        }
+        for separateBatches in [true, false] {
+            let id = try await store.createWorkTask(title: separateBatches ? "分批处理" : "同批处理", at: Date(timeIntervalSince1970: 100))
+            let doing = WorkTaskDraft(taskID: id, title: "更新任务", suggestedStatus: .doing, evidence: "正在测试", sourceIDs: [started.id])
+            let done = WorkTaskDraft(taskID: id, title: "更新任务", suggestedStatus: .done, evidence: "测试通过", sourceIDs: [finished.id])
+            if separateBatches {
+                try await store.ingestTaskSuggestions([doing], allowedSourceIDs: [started.id], allowedMemoryIDs: [], at: Date(timeIntervalSince1970: 1000))
+            }
+            try await store.ingestTaskSuggestions(separateBatches ? [done] : [doing, done], allowedSourceIDs: [started.id, finished.id], allowedMemoryIDs: [], at: Date(timeIntervalSince1970: 1001))
+            var tasks = try await store.workTasks()
+            XCTAssertEqual(tasks.first(where: { $0.id == id })?.status, .done)
+            XCTAssertEqual(tasks.first(where: { $0.id == id })?.completedAt, Date(timeIntervalSince1970: 1001))
+            var old = doing
+            old.evidence = "重读旧的测试中记录"
+            try await store.ingestTaskSuggestions([old], allowedSourceIDs: [started.id], allowedMemoryIDs: [], at: Date(timeIntervalSince1970: 1002))
+            tasks = try await store.workTasks()
+            XCTAssertNil(tasks.first(where: { $0.id == id })?.suggestedStatus)
+        }
     }
 
     func testInventedSourcesRejectWholeBatch() async throws {
@@ -169,10 +277,37 @@ final class WorkTaskTests: XCTestCase {
         let after = try await upgraded.snapshot()
         XCTAssertEqual(after.captures.map(\.id), before.captures.map(\.id))
         XCTAssertEqual(after.entries.map(\.id), before.entries.map(\.id))
-        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "6")
+        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "8")
         _ = try await upgraded.createWorkTask(title: "升级后的新任务")
         let tasks = try await upgraded.workTasks()
         XCTAssertEqual(tasks.count, 1)
+    }
+
+    func testVersionSixTaskHistoryMigratesWithoutLosingEvents() async throws {
+        let store = try LibraryStore(root: root)
+        let id = try await store.createWorkTask(title: "保留已有任务")
+        let snapshot = try await store.snapshot()
+        let memory = try XCTUnwrap(snapshot.entries.first)
+        try await store.ingestTaskSuggestions([WorkTaskDraft(title: "历史候选任务", evidence: "需要确认的工作", memoryIDs: [memory.id])], allowedSourceIDs: [], allowedMemoryIDs: [memory.id])
+        let database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
+        if try database.run("PRAGMA table_info(work_tasks)").contains(where: { $0["name"] == "status_observed_at" }) {
+            try database.script("ALTER TABLE work_tasks DROP COLUMN status_observed_at;")
+        }
+        try database.script("""
+            CREATE TABLE legacy_events AS SELECT id,task_id,from_status,to_status,created_at FROM work_task_events;
+            DROP TABLE work_task_events;
+            ALTER TABLE legacy_events RENAME TO work_task_events;
+            PRAGMA user_version=6;
+            """)
+        let upgraded = try LibraryStore(root: root)
+        let tasks = try await upgraded.workTasks()
+        let events = try await upgraded.workTaskEvents(id)
+        XCTAssertEqual(tasks.first(where: { $0.id == id })?.title, "保留已有任务")
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(try database.run("SELECT * FROM work_task_events WHERE task_id=?", [id.uuidString]).first?["actor"], "user")
+        XCTAssertEqual(try database.run("SELECT * FROM work_task_events WHERE to_status='candidate'").first?["actor"], "ai")
+        let migrated = try XCTUnwrap(database.run("SELECT * FROM work_tasks WHERE id=?", [id.uuidString]).first)
+        XCTAssertEqual(migrated["status_observed_at"], migrated["updated_at"])
     }
 
     func testMissingEvidenceAndInventedMemoryAreRejected() async throws {

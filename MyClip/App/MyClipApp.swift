@@ -24,7 +24,7 @@ final class MyClipAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        NSApp.setActivationPolicy(.regular)
         ProcessInfo.processInfo.disableAutomaticTermination("MyClip keeps its menu bar and capture queue available")
         installMenus()
         let preview = CommandLine.arguments.contains("--preview")
@@ -105,12 +105,6 @@ final class MyClipAppDelegate: NSObject, NSApplicationDelegate {
         let windows = NSMenu(title: "窗口")
         let open = windows.addItem(withTitle: "MyClip 资料库", action: #selector(openLibrary), keyEquivalent: "0")
         open.target = self
-        let codex = windows.addItem(withTitle: "Codex 状态", action: #selector(showCodexStatus), keyEquivalent: "1")
-        codex.keyEquivalentModifierMask = [.command, .shift]
-        codex.target = self
-        let claude = windows.addItem(withTitle: "Claude 状态", action: #selector(showClaudeStatus), keyEquivalent: "2")
-        claude.keyEquivalentModifierMask = [.command, .shift]
-        claude.target = self
         windows.addItem(withTitle: "最小化", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         windows.addItem(withTitle: "关闭", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         windowItem.submenu = windows
@@ -119,8 +113,6 @@ final class MyClipAppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = bar
     }
 
-    @objc private func showCodexStatus() { menuBar?.showPanel(for: .codex) }
-    @objc private func showClaudeStatus() { menuBar?.showPanel(for: .claude) }
     @objc private func showSettings() { model?.open(.settings) }
     @objc private func openLibrary() { model?.open() }
     @objc private func focusSearch() {

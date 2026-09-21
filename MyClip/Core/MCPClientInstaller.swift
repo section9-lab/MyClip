@@ -1,12 +1,13 @@
 import Foundation
 
 public enum MCPClient: String, CaseIterable, Identifiable, Sendable {
-    case codex, claudeCode, cursor, openCode
+    case codex, claudeCode, claudeDesktop, cursor, openCode
     public var id: String { rawValue }
     public var name: String {
         switch self {
         case .codex: "Codex"
-        case .claudeCode: "Claude Code"
+        case .claudeCode: "Claude Code（命令行）"
+        case .claudeDesktop: "Claude Desktop（桌面端）"
         case .cursor: "Cursor"
         case .openCode: "OpenCode"
         }
@@ -32,6 +33,8 @@ public struct MCPClientInstaller: Sendable {
         case .claudeCode:
             return environment["CLAUDE_CONFIG_DIR"].map { URL(fileURLWithPath: $0).appendingPathComponent(".claude.json") }
                 ?? homeDirectory.appendingPathComponent(".claude.json")
+        case .claudeDesktop:
+            return homeDirectory.appendingPathComponent("Library/Application Support/Claude/claude_desktop_config.json")
         case .cursor:
             return homeDirectory.appendingPathComponent(".cursor/mcp.json")
         case .openCode:

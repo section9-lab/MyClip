@@ -10,7 +10,7 @@ struct AgentRuntime {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let paths = [binDirectory.path, "\(home)/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
         // The session's library must take precedence over a globally registered myclip server.
-        return ["PATH": paths.joined(separator: ":"), "INITIAL_AGENT_MODE": "agent", "DISABLE_MCP_CONFIG_FILTERING": "true"]
+        return ["PATH": paths.joined(separator: ":"), "INITIAL_AGENT_MODE": "agent-full-access", "DISABLE_MCP_CONFIG_FILTERING": "true"]
     }
 
     func command(for agent: ClipAgent, customPath: String) -> ACPCommand? {
@@ -19,6 +19,23 @@ struct AgentRuntime {
             : [URL(fileURLWithPath: customPath)]
         guard let executable = locations.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else { return nil }
         return ACPCommand(executable: executable, environment: environment)
+    }
+
+    func sessionCommand(for agent: ClipAgent, customPath: String) -> ACPCommand? {
+        if agent == .claude { return command(for: agent, customPath: customPath) }
+        var directories = (environment["PATH"] ?? "").split(separator: ":").map { URL(fileURLWithPath: String($0)) }
+        if !customPath.isEmpty { directories.insert(URL(fileURLWithPath: customPath).deletingLastPathComponent(), at: 0) }
+        guard let executable = directories.map({ $0.appendingPathComponent("codex") })
+            .first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else { return nil }
+        return ACPCommand(executable: executable, environment: environment)
+    }
+
+    func organizationCommand(for agent: ClipAgent, customPath: String) throws -> ACPCommand? {
+        guard let command = command(for: agent, customPath: customPath) else { return nil }
+        guard agent == .codex else { return command }
+        let codex = sessionCommand(for: .codex, customPath: customPath)?.executable
+            ?? binDirectory.appendingPathComponent("codex")
+        return try EphemeralCodexCommand.prepare(command, codexExecutable: codex, directory: root)
     }
 
     func install(_ agent: ClipAgent) async throws {

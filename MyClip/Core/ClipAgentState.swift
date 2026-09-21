@@ -8,8 +8,11 @@ public struct ClipAgentState: Sendable {
     public var detail = "尚未连接"
     public var authMethods: [ACPAuthMethod] = []
     public var lastCompleted: Date?
+    public var sessionID: String?
+    public var sessionIsEphemeral = false
     public var available: Bool { phase == .ready || phase == .working || phase == .permission }
     public var busy: Bool { [.connecting, .working, .permission, .installing].contains(phase) }
+    public var canOpenSession: Bool { !sessionIsEphemeral && available && sessionID.flatMap(UUID.init(uuidString:)) != nil }
 
     public init() {}
 

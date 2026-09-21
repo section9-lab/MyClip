@@ -3,12 +3,12 @@ import Charts
 import MyClipCore
 
 struct AnalyticsView: View {
-    @Bindable var model: MyClipModel
+    @ObservedObject var model: MyClipModel
     var body: some View { TaskDashboardView(model: model) }
 }
 
 struct ProposalReviewView: View {
-    let model: MyClipModel
+    @ObservedObject var model: MyClipModel
     let proposal: MemoryProposal
     @Environment(\.dismiss) private var dismiss
     @State private var originals: [UUID: KnowledgeEntry] = [:]

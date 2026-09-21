@@ -3,6 +3,7 @@ import AVFAudio
 import CoreGraphics
 import Foundation
 
+@available(macOS 14.0, *)
 enum MicrophonePermissionStatus: Sendable {
     case undetermined
     case denied
@@ -32,6 +33,7 @@ enum ScreenCapturePermissionStatus: Sendable {
 }
 
 enum PermissionCoordinator {
+    @available(macOS 14.0, *)
     static var microphoneStatus: MicrophonePermissionStatus {
         MicrophonePermissionStatus(AVAudioApplication.shared.recordPermission)
     }
@@ -40,6 +42,7 @@ enum PermissionCoordinator {
         ScreenCapturePermissionStatus(isGranted: CGPreflightScreenCaptureAccess())
     }
 
+    @available(macOS 14.0, *)
     static func requestMicrophoneAccess() async -> Bool {
         await withCheckedContinuation { continuation in
             AVAudioApplication.requestRecordPermission { granted in

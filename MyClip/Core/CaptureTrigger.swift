@@ -8,6 +8,25 @@ public enum CaptureReason: String, Codable, Sendable {
     case scrollIdle
     case enter
     case manual
+
+    public var systemImage: String {
+        switch self {
+        case .pointerIdle, .clickIdle, .clickAfterIdle, .scrollIdle: "computermouse"
+        case .enter: "keyboard"
+        case .manual: "camera"
+        }
+    }
+
+    public var label: String {
+        switch self {
+        case .pointerIdle: "鼠标活动停止 2 秒"
+        case .clickIdle: "移动后点击，停顿 2 秒"
+        case .clickAfterIdle: "移动并静止后点击"
+        case .scrollIdle: "上下滚动停止 2 秒"
+        case .enter: "回车触发"
+        case .manual: "手动截图"
+        }
+    }
 }
 
 public struct CaptureTrigger: Sendable {

@@ -5,7 +5,7 @@ public enum ClipAgent: String, CaseIterable, Codable, Sendable, Identifiable {
     case claude
 
     public var id: String { rawValue }
-    public var name: String { self == .codex ? "Codex" : "Claude" }
+    public var name: String { self == .codex ? "Codex" : "Claude Code" }
     public var executableName: String { self == .codex ? "codex-acp" : "claude-agent-acp" }
     public var package: String {
         self == .codex ? "@agentclientprotocol/codex-acp@1.12.0" : "@agentclientprotocol/claude-agent-acp@0.78.0"
@@ -17,6 +17,7 @@ public enum LibraryError: Error, LocalizedError, Sendable {
     case database(String)
     case invalidResult(String)
     case missingSource
+    case textRecognitionFailed
     case conflict
 
     public var errorDescription: String? {
@@ -25,6 +26,7 @@ public enum LibraryError: Error, LocalizedError, Sendable {
         case .database(let message): "资料库错误：\(message)"
         case .invalidResult(let message): "整理结果无效：\(message)"
         case .missingSource: "来源截图已过期或不可用。"
+        case .textRecognitionFailed: "OCR 文字提取失败，请重试。"
         case .conflict: "这条知识已更新，请重新整理后再保存。"
         }
     }
@@ -62,6 +64,7 @@ public struct ClipCapture: Identifiable, Sendable {
     public let imageURL: URL
     public let width: Int
     public let height: Int
+    public var textURL: URL { imageURL.deletingPathExtension().appendingPathExtension("txt") }
 }
 
 public enum KnowledgeKind: String, Codable, CaseIterable, Sendable {
@@ -104,6 +107,8 @@ public struct KnowledgeEntry: Identifiable, Sendable {
     public let sourceIDs: [UUID]
     public let fileURL: URL
     public let relativePath: String
+    public var contextSourceIDs: [UUID] = []
+    public var observedAt: Date? = nil
     public var isRootDocument: Bool { MemoryLayout.rootFiles.contains(relativePath) }
 }
 
@@ -126,6 +131,8 @@ public struct ClipJob: Identifiable, Sendable {
 
 public struct LibrarySnapshot: Sendable {
     public var captures: [ClipCapture] = []
+    public var captureCount = 0
+    public var captureAppNames: [String] = []
     public var entries: [KnowledgeEntry] = []
     public var memoryFolders: [String] = []
     public var jobs: [ClipJob] = []

@@ -1,25 +1,22 @@
 import AppKit
-import Observation
+import Combine
 import MyClipCore
 
 @MainActor
-@Observable
-final class ClipPreferences {
+final class ClipPreferences: ObservableObject {
     private let defaults: UserDefaults
-    var captureWasEnabled: Bool { didSet { defaults.set(captureWasEnabled, forKey: "myclip.captureWasEnabled") } }
-    var agent: ClipAgent { didSet { defaults.set(agent.rawValue, forKey: "myclip.agent") } }
-    var autoOrganize: Bool { didSet { defaults.set(autoOrganize, forKey: "myclip.autoOrganize") } }
-    var captureSettings: CaptureSettings { didSet { captureSettings.save(to: defaults) } }
-    var retentionDays: Int { didSet { defaults.set(retentionDays, forKey: "myclip.retentionDays") } }
-    var excludedApps: String { didSet { defaults.set(excludedApps, forKey: "myclip.excludedApps") } }
-    var codexPath: String { didSet { defaults.set(codexPath, forKey: "myclip.codexPath") } }
-    var claudePath: String { didSet { defaults.set(claudePath, forKey: "myclip.claudePath") } }
-    var mcpClients: Set<MCPClient> { didSet { defaults.set(mcpClients.map(\.rawValue).sorted(), forKey: "myclip.mcpClients") } }
+    @Published var enabledAgent: ClipAgent? { didSet { defaults.set(enabledAgent?.rawValue, forKey: "myclip.enabledAgent") } }
+    @Published var autoOrganize: Bool { didSet { defaults.set(autoOrganize, forKey: "myclip.autoOrganize") } }
+    @Published var captureSettings: CaptureSettings { didSet { captureSettings.save(to: defaults) } }
+    @Published var retentionDays: Int { didSet { defaults.set(retentionDays, forKey: "myclip.retentionDays") } }
+    @Published var excludedApps: String { didSet { defaults.set(excludedApps, forKey: "myclip.excludedApps") } }
+    @Published var codexPath: String { didSet { defaults.set(codexPath, forKey: "myclip.codexPath") } }
+    @Published var claudePath: String { didSet { defaults.set(claudePath, forKey: "myclip.claudePath") } }
+    @Published var mcpClients: Set<MCPClient> { didSet { defaults.set(mcpClients.map(\.rawValue).sorted(), forKey: "myclip.mcpClients") } }
 
     init(preview: Bool) {
         defaults = preview ? UserDefaults(suiteName: "MyClip.Preview")! : .standard
-        captureWasEnabled = defaults.bool(forKey: "myclip.captureWasEnabled")
-        agent = ClipAgent(rawValue: defaults.string(forKey: "myclip.agent") ?? "") ?? .codex
+        enabledAgent = ClipAgent(rawValue: defaults.string(forKey: "myclip.enabledAgent") ?? "")
         autoOrganize = defaults.object(forKey: "myclip.autoOrganize") as? Bool ?? true
         captureSettings = CaptureSettings.load(from: defaults)
         retentionDays = defaults.object(forKey: "myclip.retentionDays") as? Int ?? 30
@@ -33,14 +30,14 @@ final class ClipPreferences {
 }
 
 enum LibraryPage: String, CaseIterable, Identifiable {
-    case captures, memory, dashboard, agents, settings
+    case memory, captures, dashboard, agents, settings
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .dashboard: "任务看板"
+        case .dashboard: "Kanban"
         case .memory: "Memory"
-        case .captures: "截图时间线"
-        case .agents: "Agent"
+        case .captures: "Timeline"
+        case .agents: "Backstage"
         case .settings: "设置"
         }
     }
@@ -67,13 +64,12 @@ enum MCPSetupResult {
 }
 
 @MainActor
-@Observable
-final class MyClipModel {
+final class MyClipModel: ObservableObject {
     let store: LibraryStore
     let preferences: ClipPreferences
     let preview: Bool
-    var page: LibraryPage? = .captures
-    var search = "" {
+    @Published var page: LibraryPage? = .captures
+    @Published var search = "" {
         didSet {
             guard search != oldValue else { return }
             if oldValue.isEmpty { selectionBeforeSearch = (selectedEntry, memoryFolder) }
@@ -81,7 +77,7 @@ final class MyClipModel {
                 selectedEntry = selectionBeforeSearch?.entry
                 memoryFolder = selectionBeforeSearch?.folder
                 selectionBeforeSearch = nil
-                results = library
+                if !captureFilter.isActive { results = library }
             } else {
                 selectedEntry = nil
                 memoryFolder = nil
@@ -89,23 +85,29 @@ final class MyClipModel {
             scheduleSearch()
         }
     }
-    var library = LibrarySnapshot()
-    var results = LibrarySnapshot()
-    var selectedEntry: UUID?
-    var memoryFolder: String?
-    var selectedCapture: UUID?
-    @ObservationIgnored var memoryScrollOffsets: [UUID: CGFloat] = [:]
-    var capturing = false
-    var workTasks: [WorkTask] = []
-    var statistics = LibraryStatistics()
-    var taskStatistics = WorkTaskStatistics()
-    var discoveringTasks = false
-    var taskDiscoveryMessage: String?
-    var taskDiscoveryFailed = false
-    var updatingTaskIDs: Set<UUID> = []
-    var proposals: [MemoryProposal] = []
-    var analyticsDays = 7 { didSet { Task { await refresh() } } }
-    var captureStatus = "采集已暂停"
+    @Published var library = LibrarySnapshot()
+    @Published var results = LibrarySnapshot()
+    @Published var captureFilter = CaptureFilter() {
+        didSet { if captureFilter != oldValue { scheduleSearch() } }
+    }
+    @Published var selectedEntry: UUID?
+    @Published var memoryFolder: String?
+    @Published var selectedCapture: UUID?
+    var memoryScrollOffsets: [UUID: CGFloat] = [:]
+    @Published var capturing = false
+    @Published var workTasks: [WorkTask] = []
+    @Published var statistics = LibraryStatistics()
+    @Published var tokenUsage = TokenUsageStatistics()
+    @Published var workTaskEvents: [WorkTaskEvent] = []
+    @Published var showingTaskReports = false
+    @Published var discoveringTasks = false
+    @Published var taskDiscoveryMessage: String?
+    @Published var taskDiscoveryFailed = false
+    @Published var updatingTaskIDs: Set<UUID> = []
+    @Published var lastTaskReview: WorkTaskReview?
+    @Published var proposals: [MemoryProposal] = []
+    @Published var analyticsDays = 7 { didSet { Task { await refresh() } } }
+    @Published var captureStatus = "正在准备采集"
     var processingPaused: Bool {
         get { library.queue.paused }
         set {
@@ -115,37 +117,43 @@ final class MyClipModel {
             }
         }
     }
-    private(set) var dispatching = false
-    var canStartOrganization: Bool { !preview && !dispatching && currentJob == nil && !discoveringTasks }
-    var canOrganizeNow: Bool { canStartOrganization && library.queue.pendingCount > 0 && library.queue.pauseReason == nil }
-    var showPermissions = false
-    var screenPermission = false
-    var accessibilityPermission = false
-    var notice: String?
-    private(set) var mcpEnabled: Bool
-    private(set) var configuringMCP = false
-    private(set) var mcpSetupResults: [MCPClient: MCPSetupResult] = [:]
-    var agents: [ClipAgent: ClipAgentState] = [.codex: .init(), .claude: .init()] {
-        didSet { onStatusChange?() }
+    @Published private(set) var dispatching = false
+    var canStartOrganization: Bool {
+        guard let agent = preferences.enabledAgent else { return false }
+        return !preview && !dispatching && currentJob == nil && !discoveringTasks && state(agent).phase == .ready
     }
-    var permissions: [ClipPermission] = []
-    var currentJob: ClipJob?
-    var activityText = ""
+    var canOrganizeNow: Bool {
+        canStartOrganization && library.queue.pendingCount > 0 && library.queue.pauseReason == nil
+            && library.queue.nextAgent == preferences.enabledAgent
+    }
+    var showPermissions: Bool { !preview && (!screenPermission || !accessibilityPermission) }
+    @Published var screenPermission = false
+    @Published var accessibilityPermission = false
+    @Published var notice: String?
+    @Published private(set) var mcpEnabled: Bool
+    @Published private(set) var configuringMCP = false
+    @Published private(set) var mcpSetupResults: [MCPClient: MCPSetupResult] = [:]
+    @Published var agents: [ClipAgent: ClipAgentState] = [.codex: .init(), .claude: .init()]
+    @Published var permissions: [ClipPermission] = []
+    @Published var currentJob: ClipJob?
+    @Published var activityText = "" { didSet { lastActivityAt = Date() } }
+    private var currentJobStartedAt: Date?
+    private var lastActivityAt = Date()
     var onOpenWindow: (() -> Void)?
-    var onStatusChange: (() -> Void)?
 
-    @ObservationIgnored private let captureService = FocusedCaptureService()
-    @ObservationIgnored private let runtime: AgentRuntime
-    @ObservationIgnored private var clients: [ClipAgent: ACPClient] = [:]
-    @ObservationIgnored private var sessions: [ClipAgent: String] = [:]
-    @ObservationIgnored private var eventTasks: [ClipAgent: Task<Void, Never>] = [:]
-    @ObservationIgnored private var worker: Task<Void, Never>?
-    @ObservationIgnored private var searchTask: Task<Void, Never>?
-    @ObservationIgnored private var selectionBeforeSearch: (entry: UUID?, folder: String?)?
-    @ObservationIgnored private var taskDiscovery: Task<Void, Never>?
-    @ObservationIgnored private var discoveryAgent: ClipAgent?
-    @ObservationIgnored private var cancelledJobs: Set<UUID> = []
-    @ObservationIgnored private var lastCleanup = Date.distantPast
+    private let captureService = FocusedCaptureService()
+    private let runtime: AgentRuntime
+    private var clients: [ClipAgent: ACPClient] = [:]
+    private var eventTasks: [ClipAgent: Task<Void, Never>] = [:]
+    private var preferencesObservation: AnyCancellable?
+    private var textWorker: Task<Void, Never>?
+    private var worker: Task<Void, Never>?
+    private var searchTask: Task<Void, Never>?
+    private var selectionBeforeSearch: (entry: UUID?, folder: String?)?
+    private var taskDiscovery: Task<Void, Never>?
+    private var discoveryAgent: ClipAgent?
+    private var cancelledJobs: Set<UUID> = []
+    private var lastCleanup = Date.distantPast
 
     init(root: URL, preview: Bool) throws {
         self.preview = preview
@@ -157,27 +165,27 @@ final class MyClipModel {
             guard let self else { return }
             do {
                 let repeated = self.library.captures.first?.imageID == image.fingerprint
-                try await self.store.record(image: image, context: context, agent: self.preferences.agent, organize: self.preferences.autoOrganize)
+                try await self.store.record(image: image, context: context, agent: self.preferences.enabledAgent ?? .codex, organize: self.preferences.autoOrganize)
                 await self.refresh()
                 self.captureStatus = repeated ? "已记录本次出现，相同画面共用原图" : "已保存 \(context.appName) · \(context.date.formatted(date: .omitted, time: .standard))"
             } catch { self.captureStatus = "保存失败：\(error.localizedDescription)"; self.notice = error.localizedDescription }
         }
         captureService.onStatus = { [weak self] status in self?.captureStatus = status }
+        preferencesObservation = preferences.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
+        if preview { captureStatus = "界面预览 · 采集已停用" }
         refreshPermissions()
     }
 
     func start() {
+        guard worker == nil else { return }
+        if !preview, let agent = preferences.enabledAgent { connect(agent) }
         worker = Task { [weak self] in
             guard let self else { return }
             do {
                 try await store.recoverInterruptedJobs()
                 if preview { try await seedPreview() }
-                if !preview && preferences.captureWasEnabled {
-                    refreshPermissions()
-                    if screenPermission && accessibilityPermission { applyCaptureSettings(); capturing = captureService.start() }
-                    else { captureStatus = "采集未恢复：请在设置中允许屏幕录制和辅助功能" }
-                }
                 await refresh()
+                startTextRecognition()
                 #if DEBUG
                 if preview { try await previewPanelState() }
                 #endif
@@ -192,11 +200,37 @@ final class MyClipModel {
                 do { try await Task.sleep(for: .seconds(3)) } catch { break }
             }
         }
+        refreshPermissions()
+    }
+
+    private func startTextRecognition() {
+        textWorker?.cancel()
+        textWorker = Task { [weak self] in
+            var failed: Set<String> = []
+            while !Task.isCancelled {
+                guard let self else { return }
+                do {
+                    if let image = try await store.nextImageForTextIndex(excluding: failed) {
+                        do {
+                            _ = try await store.recognizeImageText(id: image.id)
+                            await refresh()
+                        } catch is CancellationError { return }
+                        catch { failed.insert(image.id) }
+                    } else {
+                        try await Task.sleep(for: .seconds(3))
+                    }
+                } catch is CancellationError { return }
+                catch { return }
+            }
+        }
     }
 
     func stop() {
-        captureService.stop()
         worker?.cancel()
+        worker = nil
+        captureService.stop()
+        capturing = false
+        textWorker?.cancel()
         searchTask?.cancel()
         taskDiscovery?.cancel()
         eventTasks.values.forEach { $0.cancel() }
@@ -218,9 +252,15 @@ final class MyClipModel {
     func refreshPermissions() {
         screenPermission = captureService.hasScreenPermission
         accessibilityPermission = captureService.hasAccessibilityPermission
-        if capturing && (!screenPermission || !accessibilityPermission) {
+        guard !preview, worker != nil else { return }
+        capturing = captureService.isRunning
+        if !screenPermission || !accessibilityPermission {
+            if capturing { captureService.stop() }
             capturing = false
-            captureService.stop()
+            captureStatus = "等待屏幕录制和辅助功能权限，授权后将自动开始采集"
+        } else if !capturing {
+            applyCaptureSettings()
+            capturing = captureService.start()
         }
     }
 
@@ -234,33 +274,19 @@ final class MyClipModel {
         captureService.configure(settings: preferences.captureSettings, excludedBundleIDs: excluded)
     }
 
-    func toggleCapture() {
-        if capturing {
-            captureService.stop()
-            capturing = false
-        } else if preview {
-            notice = "这是界面预览，采集和 Agent 调用已停用。"
-        } else {
-            refreshPermissions()
-            guard screenPermission, accessibilityPermission else { showPermissions = true; open(); return }
-            applyCaptureSettings()
-            capturing = captureService.start()
-        }
-        preferences.captureWasEnabled = capturing
-        onStatusChange?()
-    }
-
     func refresh() async {
         do {
+            if let agent = preferences.enabledAgent { try await store.reassignPendingCaptures(to: agent) }
             library = try await store.snapshot()
             proposals = try await store.proposals()
             statistics = try await store.statistics(since: analyticsDays == 0 ? .distantPast : Calendar.current.date(byAdding: .day, value: -analyticsDays, to: Date())!)
+            tokenUsage = try await store.tokenUsageStatistics()
             workTasks = try await store.workTasks()
-            taskStatistics = try await store.workTaskStatistics(days: analyticsDays)
+            workTaskEvents = try await store.workTaskEvents()
             let query = search
-            let found = query.isEmpty ? library : try await store.snapshot(query: query)
-            if search == query { results = found }
-            onStatusChange?()
+            let filter = captureFilter
+            let found = query.isEmpty && !filter.isActive ? library : try await store.snapshot(query: query, captureFilter: filter)
+            if search == query && captureFilter == filter { results = found }
         } catch { notice = error.localizedDescription }
     }
 
@@ -277,8 +303,37 @@ final class MyClipModel {
         updatingTaskIDs.insert(id)
         Task {
             defer { updatingTaskIDs.remove(id) }
-            do { try await store.setWorkTaskStatus(id, status: status); await refresh() }
+            do {
+                try await store.setWorkTaskStatus(id, status: status)
+                if lastTaskReview?.taskID == id { lastTaskReview = nil }
+                await refresh()
+            }
             catch { notice = error.localizedDescription }
+        }
+    }
+
+    func reviewTask(_ id: UUID, _ status: WorkTaskStatus) {
+        guard !updatingTaskIDs.contains(id) else { return }
+        updatingTaskIDs.insert(id)
+        Task {
+            defer { updatingTaskIDs.remove(id) }
+            do {
+                lastTaskReview = try await store.reviewWorkTask(id, status: status)
+                await refresh()
+            } catch { notice = error.localizedDescription }
+        }
+    }
+
+    func undoTaskReview() {
+        guard let review = lastTaskReview, !updatingTaskIDs.contains(review.taskID) else { return }
+        updatingTaskIDs.insert(review.taskID)
+        Task {
+            defer { updatingTaskIDs.remove(review.taskID) }
+            do {
+                try await store.undoWorkTaskReview(review)
+                if lastTaskReview?.taskID == review.taskID { lastTaskReview = nil }
+                await refresh()
+            } catch { notice = error.localizedDescription }
         }
     }
 
@@ -286,17 +341,17 @@ final class MyClipModel {
         let saved: UUID
         if let id { try await store.updateWorkTask(id, title: title, project: project, waitingReason: waitingReason); saved = id }
         else { saved = try await store.createWorkTask(title: title, project: project, waitingReason: waitingReason) }
+        if lastTaskReview?.taskID == saved { lastTaskReview = nil }
         await refresh()
         return saved
     }
 
     func discoverTasks() {
-        guard !preview, !dispatching, !discoveringTasks, currentJob == nil, !state(preferences.agent).busy else { return }
-        let agent = preferences.agent
+        guard canStartOrganization, let agent = preferences.enabledAgent else { return }
         discoveringTasks = true
         discoveryAgent = agent
         taskDiscoveryFailed = false
-        taskDiscoveryMessage = "正在从 Memory 识别任务…"
+        taskDiscoveryMessage = "AI 正在发现待办并更新任务进展…"
         taskDiscovery = Task {
             defer { discoveringTasks = false; discoveryAgent = nil; taskDiscovery = nil }
             do {
@@ -309,21 +364,23 @@ final class MyClipModel {
                 agents[agent]?.detail = "正在识别工作任务"
                 let session = try await session(for: agent, using: client)
                 let existing = try await store.workTasks()
-                let response = try await client.prompt(sessionID: session, text: TaskComposer.discoveryPrompt(memories: memories, tasks: existing), images: [])
+                let response = try await trackedPrompt(client, agent: agent, session: session,
+                    text: TaskComposer.discoveryPrompt(memories: memories, tasks: existing), images: [])
                 try Task.checkCancellation()
                 guard response.stopReason == "end_turn" else { throw LibraryError.invalidResult("任务识别未完成，请重试。") }
                 let count = try await store.ingestTaskSuggestions(TaskComposer.parse(response.text), allowedSourceIDs: [], allowedMemoryIDs: Set(memories.map(\.id)))
                 agents[agent]?.phase = .ready
-                agents[agent]?.detail = "已连接 · 持续会话"
-                taskDiscoveryMessage = count == 0 ? "已分析 \(memories.count) 篇 Memory，没有新的任务线索。" : "已分析 \(memories.count) 篇 Memory，新增或补充了 \(count) 项任务线索。"
+                agents[agent]?.detail = "已就绪 · 每批独立整理"
+                taskDiscoveryMessage = count == 0 ? "已分析 \(memories.count) 篇 Memory，没有新的任务进展。" : "已分析 \(memories.count) 篇 Memory，更新了 \(count) 项任务的线索或进展。"
             } catch {
                 if Task.isCancelled { taskDiscoveryMessage = "任务识别已取消。" }
                 else { taskDiscoveryMessage = "任务识别失败：\(error.localizedDescription)"; taskDiscoveryFailed = true }
                 if let client = clients[agent] { await client.close() }
-                clients[agent] = nil; sessions[agent] = nil
+                clients[agent] = nil; agents[agent]?.sessionID = nil
                 agents[agent]?.phase = .disconnected
                 agents[agent]?.detail = "尚未连接"
             }
+            await releaseSession(agent)
             await refresh()
         }
     }
@@ -332,17 +389,30 @@ final class MyClipModel {
         taskDiscovery?.cancel()
         guard let agent = discoveryAgent, let client = clients[agent] else { return }
         Task {
-            if let session = sessions[agent] { try? await client.cancel(sessionID: session) }
+            if let session = state(agent).sessionID { try? await client.cancel(sessionID: session) }
             await client.close()
         }
     }
 
     func connect(_ agent: ClipAgent) {
-        guard !state(agent).busy, !preview else { return }
+        guard !state(agent).busy, !state(agent).available, !preview else { return }
+        agents[agent]?.phase = .connecting
+        agents[agent]?.detail = "正在连接…"
         Task {
             do { _ = try await connectedClient(agent) }
             catch { setFailure(agent, error) }
         }
+    }
+
+    func enable(_ agent: ClipAgent) {
+        guard !preview, state(agent).available else { return }
+        preferences.enabledAgent = agent
+        Task { await refresh() }
+    }
+
+    func disableAgent() {
+        guard !preview else { return }
+        preferences.enabledAgent = nil
     }
 
     func copyClaudeLoginCommand() {
@@ -350,7 +420,16 @@ final class MyClipModel {
         let quotedPath = "'" + command.executable.path.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(quotedPath + " --cli auth login --claudeai", forType: .string)
-        notice = "登录命令已复制。请在终端运行并完成登录，然后回到 MyClip 连接 Claude。"
+        notice = "登录命令已复制。请在终端运行并完成登录，然后回到 MyClip 连接 Claude Code。"
+    }
+
+    func openClaudeDesktop() {
+        guard !preview else { return }
+        guard let application = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anthropic.claudefordesktop") else {
+            notice = "未找到 Claude Desktop，请先安装桌面端。"
+            return
+        }
+        if !NSWorkspace.shared.open(application) { notice = "无法打开 Claude Desktop，请尝试从“应用程序”中打开。" }
     }
 
     func install(_ agent: ClipAgent) {
@@ -376,7 +455,7 @@ final class MyClipModel {
                 try await client.authenticate(methodID: method.id)
                 _ = try await session(for: agent, using: client)
                 agents[agent]?.phase = .ready
-                agents[agent]?.detail = "已连接 · 持续会话"
+                agents[agent]?.detail = "已就绪 · 每批独立整理"
             } catch { setFailure(agent, error) }
         }
     }
@@ -389,10 +468,10 @@ final class MyClipModel {
         }
     }
 
-    func enqueue(_ capture: ClipCapture, agent: ClipAgent? = nil) {
+    func enqueue(_ capture: ClipCapture) {
+        guard !preview, let target = preferences.enabledAgent, state(target).available else { return }
         Task {
             do {
-                let target = agent ?? preferences.agent
                 let id = try await store.enqueue(sourceIDs: [capture.id], agent: target)
                 await refresh()
                 await processNext(immediately: true, jobID: id, agent: target)
@@ -407,9 +486,11 @@ final class MyClipModel {
         }
     }
 
+    func canRetry(_ job: ClipJob) -> Bool { canStartOrganization && preferences.enabledAgent == job.agent }
+
     func retry(_ job: ClipJob) {
         Task {
-            guard canStartOrganization else { return }
+            guard canRetry(job) else { return }
             dispatching = true
             do {
                 try await store.retryJob(id: job.id)
@@ -429,16 +510,19 @@ final class MyClipModel {
         let count = agent.map { library.queue.pendingCounts[$0, default: 0] } ?? library.queue.pendingCount
         if let job = currentJob {
             if agent == nil || job.agent == agent {
-                return "正在整理 \(job.sourceIDs.count) 张 · 另有 \(count) 张等待"
+                return "正在整理 \(job.sourceIDs.count) 条 · 另有 \(count) 条等待"
             }
-            return "\(count) 张等待 · 正在使用 \(job.agent.name)"
+            return "\(count) 条等待 · 正在使用 \(job.agent.name)"
         }
-        if processingPaused { return "整理已暂停 · \(count) 张等待" }
+        guard let enabled = preferences.enabledAgent else { return "等待启用 Agent · \(count) 条等待" }
+        if processingPaused { return "整理已暂停 · \(count) 条等待" }
+        guard state(enabled).available else { return "等待连接 \(enabled.name) · \(count) 条等待" }
         guard count > 0 else { return "等待新的截图" }
-        if discoveringTasks { return "\(count) 张等待 · 正在识别任务" }
-        if let agent, library.queue.nextAgent != agent { return "\(count) 张等待 · 前方还有其他 Agent 的截图" }
+        if discoveringTasks { return "\(count) 条等待 · 正在识别任务" }
+        if let next = library.queue.nextAgent, next != enabled { return "\(count) 条等待 · 请启用 \(next.name) 继续原任务" }
+        if let agent, library.queue.nextAgent != agent { return "\(count) 条等待 · 前方还有其他 Agent 的截图" }
         let seconds = max(0, Int(ceil((library.queue.readyAt ?? date).timeIntervalSince(date))))
-        return seconds == 0 ? "\(count) 张等待 · 即将整理" : "\(count) 张等待 · 约 \(seconds / 60) 分 \(seconds % 60) 秒后整理"
+        return seconds == 0 ? "\(count) 条等待 · 即将整理" : "\(count) 条等待 · 约 \(seconds / 60) 分 \(seconds % 60) 秒后整理"
     }
 
     func cancel(_ job: ClipJob) {
@@ -446,11 +530,11 @@ final class MyClipModel {
         Task {
             if currentJob?.id == job.id, let client = clients[job.agent] {
                 permissions.removeAll { $0.agent == job.agent }
-                if let session = sessions[job.agent] { try? await client.cancel(sessionID: session) }
-                // Closing also interrupts a pending initialize/session request.
-                await client.close()
-                clients[job.agent] = nil
-                sessions[job.agent] = nil
+                await client.cancelAndClose(sessionID: state(job.agent).sessionID)
+                if clients[job.agent] === client {
+                    clients[job.agent] = nil
+                    agents[job.agent]?.sessionID = nil
+                }
             }
             do { try await store.finishJob(id: job.id, state: .cancelled); await refresh() }
             catch { notice = error.localizedDescription }
@@ -485,11 +569,12 @@ final class MyClipModel {
 
     private func connectedClient(_ agent: ClipAgent) async throws -> ACPClient {
         if let client = clients[agent], state(agent).available { return client }
-        guard let command = runtime.command(for: agent, customPath: preferences.path(for: agent)) else {
+        guard let command = try runtime.organizationCommand(for: agent, customPath: preferences.path(for: agent)) else {
             throw ACPError.disconnected("请先在连接设置中安装组件。")
         }
         if let old = clients[agent] { await old.close() }
         eventTasks[agent]?.cancel()
+        agents[agent]?.sessionID = nil
         agents[agent]?.phase = .connecting
         agents[agent]?.detail = "正在连接…"
         let client = ACPClient()
@@ -505,8 +590,7 @@ final class MyClipModel {
         guard handshake.supportsImages else { throw ACPError.unsupportedImages }
         _ = try await session(for: agent, using: client)
         agents[agent]?.phase = .ready
-        agents[agent]?.detail = "已连接 · 持续会话"
-        onStatusChange?()
+        agents[agent]?.detail = "已就绪 · 每批独立整理"
         return client
     }
 
@@ -540,16 +624,6 @@ final class MyClipModel {
         }
     }
 
-    func copyMCPConfiguration() {
-        let command = memoryCommand
-        let config: [String: Any] = ["mcpServers": ["myclip": ["command": command.executable.path, "args": command.arguments]]]
-        if let data = try? JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys]), let text = String(data: data, encoding: .utf8) {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
-            notice = "MCP 配置已复制。MyClip 提供搜索、阅读、关联和来源查询；在客户端添加后即可使用。"
-        }
-    }
-
     func openMemoryLink(_ url: URL) {
         guard url.scheme == "myclip-memory" else { return }
         let target = String(url.path(percentEncoded: false).dropFirst())
@@ -569,40 +643,63 @@ final class MyClipModel {
     }
 
     private func session(for agent: ClipAgent, using client: ACPClient) async throws -> String {
-        let conversation = try await client.conversation(directory: try workspaceDirectory(), memoryServer: memoryCommand,
-            stateFile: store.root.appendingPathComponent("Sessions/\(agent.rawValue).json"))
-        if conversation.origin != .reused {
-            try await client.setMode(sessionID: conversation.id, modeID: agent == .codex ? "agent" : "acceptEdits")
-        }
-        sessions[agent] = conversation.id
-        if conversation.origin == .replaced { notice = "\(agent.name) 的旧会话无法恢复，已建立新会话继续整理。" }
-        return conversation.id
+        // A connection may prepare a blank session before activation. It is consumed by one batch only.
+        if let id = state(agent).sessionID { return id }
+        let id = try await client.newSession(directory: try workspaceDirectory(), memoryServer: memoryCommand, ephemeralFor: agent)
+        try await client.setMode(sessionID: id, modeID: agent == .codex ? "agent-full-access" : "bypassPermissions")
+        agents[agent]?.sessionID = id
+        agents[agent]?.sessionIsEphemeral = true
+        return id
+    }
+
+    private func releaseSession(_ agent: ClipAgent) async {
+        eventTasks[agent]?.cancel()
+        eventTasks[agent] = nil
+        let client = clients.removeValue(forKey: agent)
+        agents[agent]?.sessionID = nil
+        permissions.removeAll { $0.agent == agent }
+        await client?.close()
     }
 
     private func processNext(immediately: Bool = false, jobID: UUID? = nil, agent: ClipAgent? = nil) async {
-        guard canStartOrganization else { return }
+        guard canStartOrganization, let enabled = preferences.enabledAgent else { return }
         // Reserve dispatch before the first await so timer ticks and repeated clicks cannot race.
         dispatching = true
         defer { dispatching = false }
         do {
+            try await store.reassignPendingCaptures(to: enabled)
             let queue = try await store.organizationQueue()
-            guard let target = agent ?? queue.nextAgent, !state(target).busy,
+            guard let target = agent ?? queue.nextAgent, target == preferences.enabledAgent,
+                  state(target).available, !state(target).busy else { return }
+            if !immediately {
+                guard !queue.paused, let readyAt = queue.readyAt, Date() >= readyAt else { return }
+            }
+            if jobID == nil { try await store.prepareOrganizationText() }
+            guard target == preferences.enabledAgent, state(target).available, !state(target).busy,
                   let job = try await store.claimNextJob(immediately: immediately, jobID: jobID) else { return }
             currentJob = job
-            activityText = "准备读取 \(job.sourceIDs.count) 张截图"
+            currentJobStartedAt = Date()
+            activityText = "正在连接 \(job.agent.name) ACP…"
             await refresh()
             do {
                 let previousRevisions = try await store.beginMemoryEditing(jobID: job.id)
                 let client = try await connectedClient(job.agent)
                 if cancelledJobs.contains(job.id) { throw CancellationError() }
                 agents[job.agent]?.phase = .working
-                agents[job.agent]?.detail = "正在整理 \(job.sourceIDs.count) 张截图"
-                let inputs = try await store.captures(ids: job.sourceIDs)
-                let data = try await Task.detached(priority: .utility) { try inputs.map { try Data(contentsOf: $0.imageURL) } }.value
+                agents[job.agent]?.detail = "正在整理 \(job.sourceIDs.count) 条记录"
+                activityText = "正在读取 \(job.sourceIDs.count) 条记录…"
+                let inputs = try await store.organizationInputs(jobID: job.id)
+                let data = try await Task.detached(priority: .utility) {
+                    try inputs.filter(\.usesImage).map { try Data(contentsOf: $0.capture.imageURL) }
+                }.value
+                activityText = "正在准备 \(job.agent.name) 会话…"
                 let session = try await session(for: job.agent, using: client)
                 let existingTasks = try await store.workTasks()
                 let taskContext = TaskComposer.context(tasks: existingTasks)
-                let result = try await client.prompt(sessionID: session, text: KnowledgeComposer.filePrompt(captures: inputs) + "\n" + taskContext, images: data)
+                let handoff = try await store.organizationHandoff()
+                activityText = "已提交 \(data.count) 张图片、\(inputs.count - data.count) 条文本，等待 \(job.agent.name) 回复…"
+                let result = try await trackedPrompt(client, agent: job.agent, session: session,
+                    text: KnowledgeComposer.filePrompt(inputs: inputs, handoff: handoff) + "\n" + taskContext, images: data, jobID: job.id)
                 if cancelledJobs.contains(job.id) || result.stopReason == "cancelled" { throw CancellationError() }
                 guard result.stopReason == "end_turn" else { throw LibraryError.invalidResult("Agent 在完成前停止，请重试。") }
                 activityText = "正在同步 Memory 文件…"
@@ -628,20 +725,44 @@ final class MyClipModel {
                     setFailure(job.agent, error)
                 }
             }
+            await releaseSession(job.agent)
             cancelledJobs.remove(job.id)
             currentJob = nil
+            currentJobStartedAt = nil
             activityText = ""
             await refresh()
         } catch {
+            if let job = currentJob { await releaseSession(job.agent) }
             currentJob = nil
+            currentJobStartedAt = nil
             notice = error.localizedDescription
         }
     }
 
+    private func trackedPrompt(_ client: ACPClient, agent: ClipAgent, session: String, text: String,
+                               images: [Data], jobID: UUID? = nil) async throws -> ACPCompletion {
+        try await store.executePrompt(client, agent: agent, sessionID: session, text: text, images: images, jobID: jobID)
+    }
+
+    func organizationActivity(at date: Date) -> String {
+        guard let started = currentJobStartedAt else { return activityText }
+        let elapsed = max(0, Int(date.timeIntervalSince(started)))
+        let idle = max(0, Int(date.timeIntervalSince(lastActivityAt)))
+        let waiting = idle >= 30 ? " · 已有 \(idle) 秒未收到新进度" : ""
+        return "\(activityText) · 已用时 \(elapsed / 60) 分 \(elapsed % 60) 秒\(waiting)"
+    }
+
+    private func updateActivity(_ text: String, session: String, agent: ClipAgent) {
+        guard state(agent).sessionID == session else { return }
+        if currentJob?.agent == agent { activityText = text }
+        else if discoveryAgent == agent { taskDiscoveryMessage = text }
+    }
+
     private func handle(_ event: ACPEvent, agent: ClipAgent) {
         switch event {
-        case .message: activityText = "正在生成记忆…"
-        case .tool(_, let title, _): activityText = title
+        case .message(let session, _): updateActivity("\(agent.name) 正在生成结果…", session: session, agent: agent)
+        case .thinking(let session): updateActivity("\(agent.name) 正在思考…", session: session, agent: agent)
+        case .tool(let session, let title, _): updateActivity(title, session: session, agent: agent)
         case .permission(let request):
             permissions.removeAll { $0.agent == agent && $0.request.id == request.id }
             permissions.append(ClipPermission(agent: agent, request: request))
@@ -653,16 +774,15 @@ final class MyClipModel {
             agents[agent]?.detail = discoveryAgent == agent ? "正在识别工作任务" : currentJob?.agent == agent ? "正在整理" : "已连接"
         case .disconnected(let message):
             permissions.removeAll { $0.agent == agent }
+            agents[agent]?.sessionID = nil
             agents[agent]?.phase = .disconnected
             agents[agent]?.detail = message.isEmpty ? "连接已关闭" : message
         }
-        onStatusChange?()
     }
 
     private func setFailure(_ agent: ClipAgent, _ error: any Error) {
         agents[agent]?.phase = .failed
-        agents[agent]?.detail = error.localizedDescription
-        onStatusChange?()
+        agents[agent]?.detail = error.localizedDescription.components(separatedBy: "\n").first ?? error.localizedDescription
     }
 
     private func cleanupIfNeeded() async {
@@ -699,7 +819,13 @@ final class MyClipModel {
         ])
         try await store.ingestTaskSuggestions([
             WorkTaskDraft(title: "补充客户提到的导出格式", project: "客户协作", evidence: "示例线索：导出时是否可以保留来源？", sourceIDs: [context.id]),
-            WorkTaskDraft(title: "验证弱网下的资料同步", project: "MyClip", evidence: "示例线索：弱网场景尚未验证。", sourceIDs: [context.id])
+            WorkTaskDraft(title: "验证弱网下的资料同步", project: "MyClip", evidence: "示例线索：弱网场景尚未验证。", sourceIDs: [context.id]),
+            WorkTaskDraft(title: "为截图时间线添加触发方式图标", project: "MyClip", suggestedStatus: .doing, evidence: "示例线索：时间线正在接入触发图标，还需要区分鼠标与键盘事件。", sourceIDs: [context.id]),
+            WorkTaskDraft(title: "优化浮层磨砂与气泡对比度", project: "chat-bridge", suggestedStatus: .done, evidence: "示例线索：浮层背景与气泡对比度已调整，并已检查浅色与深色外观。", sourceIDs: [context.id]),
+            WorkTaskDraft(title: "配置完成后自动发送命令指南", project: "chat-bridge", suggestedStatus: .doing, evidence: "示例线索：正在添加首次连接后的命令指南。", sourceIDs: [context.id]),
+            WorkTaskDraft(title: "排查 iMessage 配对失败", project: "chat-bridge", evidence: "示例线索：配对后手机未收到消息，需要检查发送记录。", sourceIDs: [context.id]),
+            WorkTaskDraft(title: "修复微信端 session 与 agent 切换", project: "chat-bridge", evidence: "示例线索：会话与 agent 切换未生效，问题已记录。", sourceIDs: [context.id]),
+            WorkTaskDraft(title: "整理本周发布说明", project: "MyClip", evidence: "示例线索：需要汇总本周的界面与连接改动。", sourceIDs: [context.id])
         ], allowedSourceIDs: [context.id], allowedMemoryIDs: [])
         let examples: [(String, String, WorkTaskStatus, Int)] = [
             ("回归单击与双击的截图时机", "MyClip", .todo, 0),
@@ -724,6 +850,7 @@ final class MyClipModel {
         let value = String(argument.dropFirst("--panel-state=".count))
         agents[.codex]?.phase = .ready
         agents[.codex]?.detail = "已连接"
+        agents[.codex]?.sessionID = "00000000-0000-0000-0000-000000000001"
         if ["waiting", "paused", "working", "permission", "failed"].contains(value) {
             _ = try await store.enqueue(sourceIDs: [capture.id], agent: .codex)
         }

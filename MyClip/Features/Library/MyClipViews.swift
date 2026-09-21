@@ -4,10 +4,24 @@ import Charts
 import MyClipCore
 
 struct MyClipRootView: View {
-    @Bindable var model: MyClipModel
+    @ObservedObject var model: MyClipModel
     @FocusState private var searchFocused: Bool
 
     var body: some View {
+        Group {
+            if model.showPermissions { CaptureOnboardingView(model: model) }
+            else { libraryContent }
+        }
+        .alert("MyClip", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
+            Button("好", role: .cancel) { model.notice = nil }
+        } message: { Text(model.notice ?? "") }
+        .frame(minWidth: 840, minHeight: 580)
+        .onReceive(NotificationCenter.default.publisher(for: .init("MyClipFocusSearch"))) { _ in
+            if !model.showPermissions { searchFocused = true }
+        }
+    }
+
+    private var libraryContent: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
                 HStack(spacing: 7) {
@@ -27,9 +41,10 @@ struct MyClipRootView: View {
                 .padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 14)
                 List(selection: $model.page) {
                     Section("资料库") {
-                        sidebarRow(.captures)
                         sidebarRow(.memory)
+                        sidebarRow(.captures)
                         sidebarRow(.dashboard)
+                        sidebarRow(.agents)
                     }
                 }
                 .listStyle(.sidebar)
@@ -43,24 +58,6 @@ struct MyClipRootView: View {
                         Spacer()
                         Button { model.open(.settings) } label: { Image(systemName: "gearshape") }.buttonStyle(.plain).help("设置")
                     }
-                    Button { model.open(.agents) } label: {
-                        TimelineView(.periodic(from: .now, by: 1)) { context in
-                            Label(model.organizationStatus(at: context.date), systemImage: "tray")
-                                .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
-                        }
-                    }.buttonStyle(.plain).help("查看整理队列")
-                    HStack(spacing: 7) {
-                        Circle().fill(model.capturing ? .green : .secondary).frame(width: 6, height: 6)
-                        Text(model.captureStatus).font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Button(action: model.toggleCapture) { Image(systemName: model.capturing ? "pause.fill" : "play.fill") }
-                            .buttonStyle(.plain).help(model.capturing ? "暂停采集" : "开始采集")
-                    }
-                    Divider()
-                    Button("退出 MyClip", systemImage: "power") { NSApp.terminate(nil) }
-                        .buttonStyle(.plain).font(.callout).foregroundStyle(.secondary)
-                        .keyboardShortcut("q", modifiers: .command)
-                        .help("退出应用并停止截图采集（⌘Q）")
                     if model.preview { Text("界面预览 · 示例数据").font(.caption2).foregroundStyle(.orange) }
                 }.padding(18)
             }
@@ -77,21 +74,8 @@ struct MyClipRootView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .textBackgroundColor))
-            .navigationTitle(model.page?.title ?? "MyClip")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(action: model.toggleCapture) {
-                        Label(model.capturing ? "暂停采集" : "开始采集", systemImage: model.capturing ? "pause" : "record.circle")
-                    }.help(model.captureStatus)
-                }
-            }
+            .navigationTitle(model.page == .dashboard ? "" : model.page?.title ?? "MyClip")
         }
-        .sheet(isPresented: $model.showPermissions) { CapturePermissionView(model: model) }
-        .alert("MyClip", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
-            Button("好", role: .cancel) { model.notice = nil }
-        } message: { Text(model.notice ?? "") }
-        .frame(minWidth: 840, minHeight: 580)
-        .onReceive(NotificationCenter.default.publisher(for: .init("MyClipFocusSearch"))) { _ in searchFocused = true }
     }
 
     private func sidebarRow(_ page: LibraryPage) -> some View {
@@ -137,33 +121,27 @@ private enum MemoryPresentation {
 }
 
 private struct MemoryDirectoryView: View {
-    @Bindable var model: MyClipModel
+    @ObservedObject var model: MyClipModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button {
-                    model.search = ""; model.selectedEntry = nil; model.memoryFolder = ""
-                } label: {
-                    Label("Memory", systemImage: "folder").font(.headline)
-                }.buttonStyle(.plain).help("Memory 根目录")
-                Spacer()
-                Button("在 Finder 中打开", systemImage: "arrow.up.forward.square") {
-                    NSWorkspace.shared.open(model.store.root.appendingPathComponent("Memory"))
-                }.labelStyle(.iconOnly).buttonStyle(.borderless).foregroundStyle(.secondary)
-            }.padding(.horizontal, 16).frame(height: 52)
-            Divider()
-            List(selection: selection) {
-                OutlineGroup(MemoryFileNode.tree(model.library), children: \.children) { node in
-                    Label {
-                        Text(node.name).lineLimit(1)
-                    } icon: {
-                        Image(systemName: node.entry == nil ? "folder" : "doc.text")
-                            .foregroundStyle(node.entry == nil ? Color.blue : Color.secondary)
-                    }
-                    .padding(.vertical, 3).tag(node.selection).help(node.id)
+        List(selection: selection) {
+            OutlineGroup(MemoryFileNode.tree(model.library), id: \.selection, children: \.children) { node in
+                Label {
+                    Text(node.name).lineLimit(1)
+                } icon: {
+                    Image(systemName: node.entry == nil ? "folder" : "doc.text")
+                        .foregroundStyle(node.entry == nil ? Color.blue : Color.secondary)
                 }
-            }.listStyle(.sidebar).scrollContentBackground(.hidden)
+                .padding(.vertical, 3).tag(node.selection).help(node.id)
+            }
+        }.listStyle(.sidebar).scrollContentBackground(.hidden)
+        .contextMenu {
+            Button("Memory 根目录", systemImage: "folder") {
+                model.search = ""; model.selectedEntry = nil; model.memoryFolder = ""
+            }
+            Button("在 Finder 中打开", systemImage: "arrow.up.forward.square") {
+                NSWorkspace.shared.open(model.store.root.appendingPathComponent("Memory"))
+            }
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .frame(minWidth: 180, idealWidth: 220, maxWidth: 300, maxHeight: .infinity)
@@ -186,7 +164,7 @@ private struct MemoryDirectoryView: View {
 }
 
 private struct KnowledgeLibraryView: View {
-    @Bindable var model: MyClipModel
+    @ObservedObject var model: MyClipModel
     @State private var proposal: MemoryProposal?
 
     private var selected: KnowledgeEntry? {
@@ -226,7 +204,7 @@ private struct KnowledgeLibraryView: View {
             } else if let folder = model.memoryFolder {
                 MemoryFolderView(model: model, path: folder)
             } else {
-                ContentUnavailableView("选择一篇记忆", systemImage: "doc.text", description: Text("从边栏选择记忆，查看内容与来源。"))
+                LibraryUnavailableView("选择一篇记忆", systemImage: "doc.text", description: Text("从边栏选择记忆，查看内容与来源。"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -257,7 +235,7 @@ private struct MemoryFileNode: Identifiable {
 }
 
 private struct MemoryFolderView: View {
-    let model: MyClipModel
+    @ObservedObject var model: MyClipModel
     let path: String
 
     var body: some View {
@@ -273,7 +251,7 @@ private struct MemoryFolderView: View {
                 Text(MemoryPresentation.folder(path)).font(.system(size: 30, weight: .bold))
                 let items = MemoryFileNode.tree(model.library, at: path)
                 if items.isEmpty {
-                    ContentUnavailableView("文件夹为空", systemImage: "folder", description: Text("记忆保存到这里后，会显示在目录中。"))
+                    LibraryUnavailableView("文件夹为空", systemImage: "folder", description: Text("记忆保存到这里后，会显示在目录中。"))
                         .frame(maxWidth: .infinity).padding(.vertical, 40)
                 } else {
                     VStack(spacing: 0) {
@@ -300,7 +278,7 @@ private struct MemoryFolderView: View {
 }
 
 private struct MemoryCollectionView: View {
-    let model: MyClipModel
+    @ObservedObject var model: MyClipModel
     let title: String
     let entries: [KnowledgeEntry]
     var body: some View {
@@ -326,7 +304,7 @@ private struct MemoryCollectionView: View {
 }
 
 private struct MemoryEntryList: View {
-    let model: MyClipModel
+    @ObservedObject var model: MyClipModel
     let entries: [KnowledgeEntry]
     var body: some View {
         VStack(spacing: 0) {
@@ -339,7 +317,7 @@ private struct MemoryEntryList: View {
                             .font(.system(size: 20, weight: .light)).foregroundStyle(.blue).frame(width: 24).padding(.top, 2)
                         VStack(alignment: .leading, spacing: 6) {
                             Text(MemoryPresentation.title(entry)).font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary).lineLimit(2)
-                            let excerpt = entry.body.components(separatedBy: "\n").first { !$0.isEmpty && !$0.hasPrefix("#") } ?? ""
+                            let excerpt = entry.searchExcerpt(query: model.search).text
                             Text(excerpt).font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(2)
                             Text(entry.updatedAt, format: .dateTime.month().day()).font(.caption).foregroundStyle(.secondary)
                         }.frame(maxWidth: .infinity, alignment: .leading)
@@ -353,7 +331,7 @@ private struct MemoryEntryList: View {
 }
 
 private struct KnowledgeDetailView: View {
-    @Bindable var model: MyClipModel
+    @ObservedObject var model: MyClipModel
     @Environment(\.locale) private var locale
     let entry: KnowledgeEntry
     @State private var sources: [ClipCapture] = []
@@ -363,30 +341,24 @@ private struct KnowledgeDetailView: View {
     @State private var moving = false
     @State private var showingInfo = false
     @State private var relations: MemoryRelations?
-    @State private var scrollPosition: ScrollPosition
-
-    init(model: MyClipModel, entry: KnowledgeEntry) {
-        self.model = model
-        self.entry = entry
-        _scrollPosition = State(initialValue: ScrollPosition(y: model.memoryScrollOffsets[entry.id, default: 0]))
-    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    MemoryMarkdownView(markdown: entry.body, baseURL: entry.fileURL.deletingLastPathComponent(), openMemoryLink: model.openMemoryLink)
-                    references
-                }.padding(32).frame(maxWidth: 840).frame(maxWidth: .infinity, alignment: .top)
-            }
-            .scrollPosition($scrollPosition)
-            .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                max(0, geometry.contentOffset.y + geometry.contentInsets.top)
-            } action: { _, offset in
-                model.memoryScrollOffsets[entry.id] = offset
-            }
+        MemoryScrollView(initialOffset: model.memoryScrollOffsets[entry.id, default: 0], onScroll: { model.memoryScrollOffsets[entry.id] = $0 }) {
+            VStack(alignment: .leading, spacing: 28) {
+                if entry.relativePath == "Now.md" {
+                    if let observed = entry.observedAt {
+                        Text("内容依据截至 \(observed.formatted(.dateTime.year().month().day().hour().minute()))")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text("内容时间尚未确认，请结合来源判断当前状态。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                MemoryMarkdownView(markdown: entry.body, baseURL: entry.fileURL.deletingLastPathComponent(), openMemoryLink: model.openMemoryLink)
+                references
+            }.padding(32).frame(maxWidth: 840).frame(maxWidth: .infinity, alignment: .top)
+                .contentShape(Rectangle())
+                .contextMenu { actions }
         }
         .background(Color(nsColor: .textBackgroundColor))
         .task(id: "\(entry.id)-\(entry.revision)") {
@@ -396,43 +368,45 @@ private struct KnowledgeDetailView: View {
         .sheet(item: $source) { CaptureDetailView(model: model, capture: $0) }
         .sheet(isPresented: $editing) { EntryEditor(model: model, entry: entry) }
         .sheet(isPresented: $moving) { MemoryMoveSheet(model: model, entry: entry) }
+        .sheet(isPresented: $showingInfo) {
+            VStack(spacing: 0) {
+                information.environment(\.locale, locale)
+                Button("完成") { showingInfo = false }.keyboardShortcut(.cancelAction).padding(.bottom, 20)
+            }
+        }
         .confirmationDialog("删除“\(entry.title)”？", isPresented: $deleting, titleVisibility: .visible) {
             Button("删除条目及其版本", role: .destructive) { model.delete(entry) }
         } message: { Text("来源截图会保留。") }
     }
 
-    private var header: some View {
-        HStack(spacing: 14) {
-            Button {
+    private var actions: some View {
+        Group {
+            Button("返回文件夹", systemImage: "chevron.left") {
                 model.search = ""
                 model.selectedEntry = nil
                 model.memoryFolder = entry.relativePath.split(separator: "/").dropLast().joined(separator: "/")
-            } label: {
-                Image(systemName: "chevron.left")
-            }.help("返回文件夹")
-            Text(entry.fileURL.lastPathComponent).font(.callout.weight(.semibold)).lineLimit(1).help(entry.relativePath)
-            Spacer(minLength: 12)
-            Button("编辑", systemImage: "square.and.pencil") { editing = true }.labelStyle(.iconOnly).help("编辑 Markdown")
-            ShareLink(item: entry.fileURL) { Image(systemName: "square.and.arrow.up") }.help("导出 Markdown")
-            Button("文件信息", systemImage: "info.circle") { showingInfo.toggle() }.labelStyle(.iconOnly)
-                .popover(isPresented: $showingInfo) { information.environment(\.locale, locale) }
-            Menu {
-                Button("显示 Markdown 文件", systemImage: "doc.text") { NSWorkspace.shared.activateFileViewerSelecting([entry.fileURL]) }
-                Button("打开 Memory 文件夹", systemImage: "folder") { NSWorkspace.shared.open(model.store.root.appendingPathComponent("Memory")) }
-                Divider()
-                Button("移动或重命名…", systemImage: "folder") { moving = true }.disabled(entry.isRootDocument)
-                Button("删除条目", systemImage: "trash", role: .destructive) { deleting = true }.disabled(entry.isRootDocument)
-            } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).frame(width: 20)
+            }
+            Button("编辑 Markdown", systemImage: "square.and.pencil") { editing = true }
+            ShareLink(item: entry.fileURL) { Label("导出 Markdown", systemImage: "square.and.arrow.up") }
+            Button("文件信息", systemImage: "info.circle") { showingInfo = true }
+            Divider()
+            Button("显示 Markdown 文件", systemImage: "doc.text") { NSWorkspace.shared.activateFileViewerSelecting([entry.fileURL]) }
+            Button("打开 Memory 文件夹", systemImage: "folder") { NSWorkspace.shared.open(model.store.root.appendingPathComponent("Memory")) }
+            Divider()
+            Button("移动或重命名…", systemImage: "folder") { moving = true }.disabled(entry.isRootDocument)
+            Button("删除条目", systemImage: "trash", role: .destructive) { deleting = true }.disabled(entry.isRootDocument)
         }
-        .buttonStyle(.borderless).foregroundStyle(.secondary)
-        .padding(.horizontal, 24).frame(height: 52)
     }
 
     private var information: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("文件信息").font(.headline)
             Text(entry.relativePath).textSelection(.enabled)
-            LabeledContent("更新") { Text(entry.updatedAt, format: .dateTime.month().day().hour().minute()) }
+            LabeledContent("文件更新") { Text(entry.updatedAt, format: .dateTime.year().month().day().hour().minute()) }
+            if let observed = entry.observedAt {
+                LabeledContent("内容依据截至") { Text(observed, format: .dateTime.year().month().day().hour().minute()) }
+            }
+            if !entry.contextSourceIDs.isEmpty { LabeledContent("整理时参考", value: "\(entry.contextSourceIDs.count) 张截图；具体依据见正文引用") }
             LabeledContent("版本", value: "第 \(entry.revision) 版")
             if !entry.sourceIDs.isEmpty { LabeledContent("整理", value: entry.agent.name) }
             if let relations, !relations.incoming.isEmpty {
@@ -480,7 +454,7 @@ private struct KnowledgeDetailView: View {
 }
 
 private struct MemoryMoveSheet: View {
-    let model: MyClipModel
+    @ObservedObject var model: MyClipModel
     let entry: KnowledgeEntry
     @Environment(\.dismiss) private var dismiss
     @State private var path = ""
@@ -505,7 +479,7 @@ private struct MemoryMoveSheet: View {
 }
 
 private struct EntryEditor: View {
-    let model: MyClipModel
+    @ObservedObject var model: MyClipModel
     let entry: KnowledgeEntry
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
@@ -554,40 +528,38 @@ private struct EntryEditor: View {
 }
 
 private struct CaptureLibraryView: View {
-    @Bindable var model: MyClipModel
+    @ObservedObject var model: MyClipModel
+    @Environment(\.locale) private var locale
     @State private var source: ClipCapture?
-    @State private var appFilter = "全部应用"
-    var captures: [ClipCapture] { model.results.captures.filter { appFilter == "全部应用" || $0.appName == appFilter } }
+    @State private var showDateFilter = false
+    @State private var startDate = Calendar.current.startOfDay(for: Date())
+    @State private var endDate = Calendar.current.startOfDay(for: Date())
+    var captures: [ClipCapture] { model.results.captures }
     var days: [Date] { Array(Set(captures.map { Calendar.current.startOfDay(for: $0.date) })).sorted(by: >) }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                pageHeading("截图时间线", subtitle: "记录工作画面，随时回到信息的来源。")
+                pageHeading(LibraryPage.captures.title, subtitle: "记录工作画面，随时回到信息的来源。")
                 HStack(spacing: 10) {
                     Image(systemName: model.capturing ? "record.circle" : "pause.circle").foregroundStyle(model.capturing ? .green : .secondary)
                     Text(model.captureStatus).font(.subheadline)
                     Spacer()
                     Text(model.preferences.captureSettings.scope.label).font(.caption).foregroundStyle(.secondary)
                 }.padding(14).background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
-                HStack {
-                    Picker("应用", selection: $appFilter) {
-                        Text("全部应用").tag("全部应用")
-                        ForEach(Array(Set(model.library.captures.map(\.appName))).sorted(), id: \.self) { Text($0).tag($0) }
-                    }.labelsHidden().frame(width: 190)
-                    Spacer()
-                    Text(model.search.isEmpty && appFilter == "全部应用" ? "\(model.library.imageCount) 张独立图片" : "\(captures.count) 条结果 · 资料库共 \(model.library.imageCount) 张图片")
-                        .font(.caption).foregroundStyle(.secondary)
+                ViewThatFits(in: .horizontal) {
+                    HStack { resultSummary; Spacer(minLength: 20); filterControls }
+                    VStack(alignment: .leading, spacing: 12) {
+                        filterControls.frame(maxWidth: .infinity, alignment: .trailing)
+                        resultSummary
+                    }
                 }
                 if captures.isEmpty {
-                    if !model.search.isEmpty {
-                        LibraryEmptyView(symbol: "magnifyingglass", title: "没有找到相关截图", detail: appFilter == "全部应用" ? "试试其他关键词，或清除搜索查看全部截图。" : "当前应用中没有匹配结果。可以清除搜索，或切换到全部应用。", action: "清除搜索") { model.search = "" }
-                    } else if appFilter != "全部应用" {
-                        LibraryEmptyView(symbol: "line.3.horizontal.decrease", title: "此应用还没有截图", detail: "切换到全部应用，查看已经保存的内容。", action: "查看全部应用") { appFilter = "全部应用" }
+                    if model.captureFilter.isActive {
+                        LibraryEmptyView(symbol: "line.3.horizontal.decrease", title: "没有符合条件的截图", detail: "试试其他应用、日期或触发事件，或清除筛选条件。", action: "清除筛选") { model.captureFilter = CaptureFilter() }
+                    } else if !model.search.isEmpty {
+                        LibraryEmptyView(symbol: "magnifyingglass", title: "没有找到相关截图", detail: "试试其他关键词，或清除搜索查看全部截图。", action: "清除搜索") { model.search = "" }
                     } else {
-                        LibraryEmptyView(symbol: model.capturing ? "record.circle" : "macwindow", title: model.capturing ? "等待第一张截图" : "留住工作中的上下文", detail: model.preferences.captureSettings.description, action: model.capturing ? "查看采集设置" : "开始采集") {
-                            if model.capturing { model.open(.settings) }
-                            else { model.toggleCapture() }
-                        }
+                        LibraryEmptyView(symbol: model.capturing ? "record.circle" : "macwindow", title: model.capturing ? "等待第一张截图" : "等待自动采集", detail: model.preferences.captureSettings.description, action: "查看采集设置") { model.open(.settings) }
                     }
                 } else {
                     ForEach(days, id: \.self) { day in
@@ -603,7 +575,13 @@ private struct CaptureLibraryView: View {
                                         Text(capture.date, format: .dateTime.hour().minute()).font(.caption).foregroundStyle(.secondary)
                                     }
                                     Text(capture.windowTitle.isEmpty ? "未命名窗口" : capture.windowTitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                    Text(capture.date, format: .dateTime.month().day()).font(.caption2).foregroundStyle(.tertiary)
+                                    HStack {
+                                        Text(capture.date, format: .dateTime.month().day()).font(.caption2).foregroundStyle(.tertiary)
+                                        Spacer()
+                                        Label(capture.reason.label, systemImage: capture.reason.systemImage)
+                                            .labelStyle(.iconOnly).font(.caption).foregroundStyle(.secondary)
+                                            .help(capture.reason.label)
+                                    }
                                 }.contentShape(Rectangle())
                             }.buttonStyle(.plain)
                         }
@@ -613,6 +591,65 @@ private struct CaptureLibraryView: View {
             }.padding(36).frame(maxWidth: 1200).frame(maxWidth: .infinity)
         }
         .sheet(item: $source) { CaptureDetailView(model: model, capture: $0) }
+    }
+
+    private var resultSummary: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(model.search.isEmpty && !model.captureFilter.isActive ? "\(model.library.imageCount) 张独立图片" : "\(model.results.captureCount) 条结果")
+            if model.results.captureCount > captures.count { Text("显示最近 \(captures.count) 条记录") }
+        }.font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var filterControls: some View {
+        HStack(spacing: 8) {
+            Picker("应用", selection: $model.captureFilter.appName) {
+                Text("全部应用").tag(String?.none)
+                ForEach(model.library.captureAppNames, id: \.self) { Text($0).tag(Optional($0)) }
+            }.labelsHidden().frame(width: 150, alignment: .trailing).help("按应用筛选").accessibilityLabel("应用筛选")
+            Button {
+                startDate = model.captureFilter.dateRange?.lowerBound ?? Calendar.current.startOfDay(for: Date())
+                endDate = model.captureFilter.dateRange?.upperBound ?? startDate
+                showDateFilter = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar")
+                    Text(dateFilterLabel).lineLimit(1).truncationMode(.middle)
+                    Image(systemName: "chevron.down").font(.caption2)
+                }.frame(maxWidth: 170)
+            }
+            .help(model.captureFilter.dateRange.map { "\($0.lowerBound.formatted(.dateTime.year().month().day().locale(locale))) – \($0.upperBound.formatted(.dateTime.year().month().day().locale(locale)))" } ?? "按日期筛选")
+            .accessibilityLabel("日期筛选：\(dateFilterLabel)")
+            .popover(isPresented: $showDateFilter, arrowEdge: .bottom) { dateFilterEditor }
+            Picker("触发事件", selection: $model.captureFilter.event) {
+                ForEach(CaptureFilter.Event.allCases, id: \.self) { Text($0.label).tag($0) }
+            }.labelsHidden().frame(width: 100, alignment: .trailing).help("按触发事件筛选").accessibilityLabel("触发事件筛选")
+            if model.captureFilter.isActive {
+                Button { model.captureFilter = CaptureFilter() } label: { Image(systemName: "arrow.counterclockwise") }
+                    .buttonStyle(.borderless).help("清除筛选").accessibilityLabel("清除筛选")
+            }
+        }
+    }
+
+    private var dateFilterLabel: String {
+        guard let range = model.captureFilter.dateRange else { return "全部日期" }
+        let format: Date.FormatStyle = Calendar.current.isDate(range.lowerBound, equalTo: range.upperBound, toGranularity: .year)
+            ? .dateTime.month().day() : .dateTime.year().month().day()
+        let start = range.lowerBound.formatted(format.locale(locale))
+        return Calendar.current.isDate(range.lowerBound, inSameDayAs: range.upperBound) ? start : "\(start) – \(range.upperBound.formatted(format.locale(locale)))"
+    }
+
+    private var dateFilterEditor: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("日期范围").font(.headline)
+            DatePicker("开始日期", selection: $startDate, in: ...endDate, displayedComponents: .date)
+            DatePicker("结束日期", selection: $endDate, in: startDate..., displayedComponents: .date)
+            HStack {
+                Button("全部日期") { model.captureFilter.dateRange = nil; showDateFilter = false }
+                Spacer()
+                Button("应用") { model.captureFilter.dateRange = startDate...endDate; showDateFilter = false }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }.padding(20).frame(width: 300)
     }
 }
 
@@ -631,20 +668,13 @@ private struct CaptureThumbnail: View {
 }
 
 struct CaptureDetailView: View {
-    let model: MyClipModel
+    @ObservedObject var model: MyClipModel
     let capture: ClipCapture
     @Environment(\.dismiss) private var dismiss
-
-    private var triggerLabel: String {
-        switch capture.reason {
-        case .clickIdle: "移动后点击，停顿 2 秒"
-        case .clickAfterIdle: "移动并静止后点击"
-        case .scrollIdle: "上下滚动停止 2 秒"
-        case .enter: "回车触发"
-        case .pointerIdle: "活动停止 2 秒"
-        case .manual: "手动截图"
-        }
-    }
+    @State private var showText = false
+    @State private var extractedText: String?
+    @State private var textError: String?
+    @State private var recognizing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -664,41 +694,100 @@ struct CaptureDetailView: View {
                     }
                 }
             }
-            CaptureThumbnail(capture: capture).frame(maxWidth: .infinity, maxHeight: .infinity).clipShape(RoundedRectangle(cornerRadius: 12))
+            Picker("截图附件", selection: $showText) {
+                Text("截图").tag(false)
+                Text("OCR 文档").tag(true)
+            }.pickerStyle(.segmented).frame(width: 220)
+            if showText {
+                textDocument
+            } else {
+                CaptureThumbnail(capture: capture).frame(maxWidth: .infinity, maxHeight: .infinity).clipShape(RoundedRectangle(cornerRadius: 12))
+            }
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(capture.date, format: .dateTime.year().month().day().hour().minute().second())
-                    Text("\(capture.width) × \(capture.height) · \(triggerLabel)").foregroundStyle(.secondary)
+                    HStack(spacing: 5) {
+                        Text("\(capture.width) × \(capture.height) ·")
+                        Label(capture.reason.label, systemImage: capture.reason.systemImage)
+                    }.foregroundStyle(.secondary)
                 }.font(.caption)
                 Spacer()
                 Button("显示原图", systemImage: "folder") { NSWorkspace.shared.activateFileViewerSelecting([capture.imageURL]) }
                     .disabled(!FileManager.default.fileExists(atPath: capture.imageURL.path))
-                Menu("重新整理") {
-                    ForEach(ClipAgent.allCases) { agent in
-                        Button("使用 \(agent.name)") { model.enqueue(capture, agent: agent); dismiss() }
-                    }
-                }.disabled(model.preview || !FileManager.default.fileExists(atPath: capture.imageURL.path))
+                Button("按图片重新整理") { model.enqueue(capture); dismiss() }
+                    .help("将原图交给 Agent，适合图表、布局等 OCR 无法保留的内容")
+                    .disabled(!model.canStartOrganization || !FileManager.default.fileExists(atPath: capture.imageURL.path))
+                    .help(model.preferences.enabledAgent.map { "使用已启用的 \($0.name) 整理" } ?? "请先连接并启用 Agent")
             }
         }.padding(24).frame(minWidth: 640, idealWidth: 840, maxWidth: 1000, minHeight: 500, idealHeight: 680, maxHeight: 800)
+        .task(id: capture.imageID) { await recognizeText() }
+    }
+
+    private var textDocument: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("提取的文字", systemImage: "doc.text").font(.headline)
+                Spacer()
+                Button("复制文字", systemImage: "doc.on.doc") {
+                    guard let extractedText else { return }
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(extractedText, forType: .string)
+                }.disabled(extractedText?.isEmpty != false)
+                Button("打开文档", systemImage: "arrow.up.right.square") { NSWorkspace.shared.open(capture.textURL) }
+                    .disabled(extractedText == nil)
+            }
+            Divider()
+            if recognizing {
+                ProgressView("正在提取文字…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let textError {
+                VStack(spacing: 12) {
+                    Text(textError).foregroundStyle(.secondary)
+                    Button("重试") { Task { await recognizeText() } }
+                        .disabled(!FileManager.default.fileExists(atPath: capture.imageURL.path))
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let extractedText, !extractedText.isEmpty {
+                ScrollView {
+                    Text(verbatim: extractedText).font(.system(size: 14)).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                LibraryUnavailableView("未识别到文字", systemImage: "doc.text", description: Text("已为这张截图保存空白文档。"))
+            }
+            Text("文字在本机提取，与原图一同保存和到期清理。").font(.caption).foregroundStyle(.secondary)
+        }.padding(18).frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func recognizeText() async {
+        recognizing = true
+        textError = nil
+        extractedText = nil
+        defer { recognizing = false }
+        do { extractedText = try await model.store.recognizeImageText(id: capture.imageID) }
+        catch is CancellationError { return }
+        catch { textError = error.localizedDescription }
     }
 }
 
 private struct AgentLibraryView: View {
-    @Bindable var model: MyClipModel
+    @ObservedObject var model: MyClipModel
+    @State private var selectedJob: ClipJob?
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                pageHeading("熟悉的 Agent，接着工作。", subtitle: "连接 Codex / ChatGPT 和 Claude，整理你选择的截图。")
+                pageHeading("熟悉的 Agent，接着工作。", subtitle: "连接并启用一个 Agent，以 Full 权限自动整理，无需逐次授权。")
                 ScrollView(.horizontal) {
                     HStack(spacing: 16) {
                         ForEach(ClipAgent.allCases) { agent in agentCard(agent) }
+                        claudeDesktopCard
                         comingSoonCard("Cursor", symbol: "cursorarrow")
                         comingSoonCard("OpenCode", symbol: "terminal")
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    .containerRelativeFrame(.horizontal) { width, _ in max(width, 4 * 190 + 3 * 16) }
+                    .fillingHorizontalViewport(minWidth: 5 * 190 + 4 * 16)
                 }
                 ForEach(model.permissions) { permission in PermissionRequestView(model: model, permission: permission) }
+                tokenUsageSection
                 HStack {
                     Text("整理任务").font(.title2.bold())
                     Spacer()
@@ -708,7 +797,11 @@ private struct AgentLibraryView: View {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     Text(model.organizationStatus(at: context.date)).foregroundStyle(.secondary)
                 }
-                Text("每批最多 8 张，自动整理间隔至少 3 分钟。立即整理只提前执行一批。")
+                Text((model.preferences.enabledAgent.map { "当前启用 \($0.name)，切换后对等待中的截图生效；当前批次会先完成。" }
+                    ?? "尚未启用 Agent。截图会继续保存，连接并启用后开始整理。")
+                    + "\n按时间顺序，每批最多 8 张图片和 32 条 OCR 文本，文本合计最多 12,000 字符。自动整理间隔至少 3 分钟。"
+                    + "\n回车和手动截图使用图片；鼠标事件优先使用 OCR，文字不可用或过长时使用原图。每批独立整理，详情保存在执行记录中。"
+                    + "\n连续 5 分钟无新进度会停止等待；单批最长 15 分钟。")
                     .font(.caption).foregroundStyle(.secondary)
                 if let reason = model.library.queue.pauseReason {
                     Label(reason, systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(.orange).textSelection(.enabled)
@@ -720,15 +813,39 @@ private struct AgentLibraryView: View {
                     LazyVStack(spacing: 0) {
                         ForEach(model.library.jobs.prefix(30)) { job in
                             HStack(alignment: .top, spacing: 13) {
-                                AgentBrandIcon(agent: job.agent, size: 30)
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text("\(job.sourceIDs.count) 张截图 · \(jobLabel(job.state))").font(.subheadline.weight(.medium))
-                                    if let error = job.error { Text(error).font(.caption).foregroundStyle(.orange).textSelection(.enabled) }
-                                    else if job.state == .running { Text(model.activityText).font(.caption).foregroundStyle(.secondary) }
-                                    Text(job.createdAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.tertiary)
+                                Button { selectedJob = job } label: {
+                                    HStack(alignment: .top, spacing: 13) {
+                                        AgentBrandIcon(agent: job.agent, size: 30)
+                                        VStack(alignment: .leading, spacing: 5) {
+                                            Text("\(job.sourceIDs.count) 条记录 · \(jobLabel(job.state))").font(.subheadline.weight(.medium))
+                                            if let error = job.error { Text(error).font(.caption).foregroundStyle(.orange) }
+                                            else if job.state == .running {
+                                                TimelineView(.periodic(from: .now, by: 1)) { context in
+                                                    Text(model.organizationActivity(at: context.date)).font(.caption).foregroundStyle(.secondary)
+                                                }
+                                            }
+                                            if let usage = model.tokenUsage.jobs[job.id] {
+                                                Text("Token \(tokenCount(usage.totalTokens)) · \(usageDetails(usage))")
+                                                    .font(.caption).foregroundStyle(.secondary)
+                                                if usage.calls > usage.reportedCalls {
+                                                    Text("\(usage.calls - usage.reportedCalls) 次请求未回传用量")
+                                                        .font(.caption).foregroundStyle(.secondary)
+                                                }
+                                            } else {
+                                                Text(job.state == .running ? "Token：等待本次回传" : "Token：未记录")
+                                                    .font(.caption).foregroundStyle(.tertiary)
+                                            }
+                                            Text(job.createdAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.tertiary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                                    }.contentShape(Rectangle())
+                                }.buttonStyle(.plain).help("查看执行记录、工具调用与费用")
+                                    .accessibilityLabel("查看 \(job.sourceIDs.count) 条记录的执行详情，\(jobLabel(job.state))")
+                                if job.state == .failed || job.state == .cancelled {
+                                    Button("重试") { model.retry(job) }.disabled(!model.canRetry(job))
+                                        .help("请先连接并启用 \(job.agent.name)，重试会继续使用原 Agent")
                                 }
-                                Spacer()
-                                if job.state == .failed || job.state == .cancelled { Button("重试") { model.retry(job) }.disabled(!model.canStartOrganization) }
                                 if job.state == .running || job.state == .queued { Button("取消") { model.cancel(job) } }
                             }.padding(.vertical, 16).overlay(alignment: .bottom) { Divider().padding(.leading, 43) }
                         }
@@ -736,6 +853,42 @@ private struct AgentLibraryView: View {
                 }
             }.padding(36).frame(maxWidth: 950).frame(maxWidth: .infinity)
         }
+        .sheet(item: $selectedJob) { ExecutionDetailView(model: model, job: $0) }
+    }
+
+    private var tokenUsageSection: some View {
+        let usage = model.tokenUsage.total
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Token 用量").font(.title2.bold())
+                Spacer()
+                Text("累计已记录").font(.caption).foregroundStyle(.secondary)
+                Text(tokenCount(usage.totalTokens)).font(.title2.monospacedDigit().bold())
+            }
+            Text(usageDetails(usage)).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+            HStack(spacing: 28) {
+                ForEach(ClipAgent.allCases) { agent in
+                    HStack(spacing: 8) {
+                        AgentBrandIcon(agent: agent, size: 20)
+                        Text(agent.name)
+                        Text(tokenCount(model.tokenUsage.agents[agent]?.totalTokens)).monospacedDigit()
+                    }
+                }
+                Spacer(minLength: 0)
+                Text("\(usage.reportedCalls) / \(usage.calls) 次请求已回传").foregroundStyle(.secondary)
+            }.font(.caption)
+            Text("含截图整理、任务识别和重试；按 Agent 回传统计，任务结束后更新。旧任务和未回传的用量不计入。缓存明细为已回传部分。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 16)
+        .overlay(alignment: .top) { Divider() }
+        .overlay(alignment: .bottom) { Divider() }
+    }
+
+    private func tokenCount(_ value: Int?) -> String { value?.formatted() ?? "未记录" }
+
+    private func usageDetails(_ usage: TokenUsageSummary) -> String {
+        "输入 \(tokenCount(usage.inputTokens)) · 输出 \(tokenCount(usage.outputTokens)) · 缓存读取 \(tokenCount(usage.cachedReadTokens)) · 缓存写入 \(tokenCount(usage.cachedWriteTokens))"
     }
 
     private func agentCard(_ agent: ClipAgent) -> some View {
@@ -744,16 +897,19 @@ private struct AgentLibraryView: View {
             HStack {
                 AgentBrandIcon(agent: agent, size: 44)
                 Spacer(minLength: 0)
-                if model.preferences.agent == agent {
-                    Text("默认").font(.caption).foregroundStyle(.blue).padding(.horizontal, 7).padding(.vertical, 3).background(.blue.opacity(0.08), in: Capsule())
+                if model.preferences.enabledAgent == agent {
+                    Text("已启用").font(.caption).foregroundStyle(.blue).padding(.horizontal, 7).padding(.vertical, 3).background(.blue.opacity(0.08), in: Capsule())
                 }
             }
             VStack(alignment: .leading, spacing: 6) {
-                Text(agent == .codex ? "Codex / ChatGPT" : agent.name).font(.headline)
+                Text(agent == .codex ? "Codex / ChatGPT" : "Claude Code（命令行）").font(.headline)
                 Text(state.detail).font(.caption).foregroundStyle(state.phase == .failed ? .orange : .secondary).textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
+                Label("Full 权限 · 自动授权", systemImage: "checkmark.shield")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .help("默认允许 Agent 读取和修改文件、运行工具及访问网络，无需逐次确认。")
             }
-            Text(agent == .codex ? "使用 Codex 的现有登录" : "使用 Claude Code 的现有登录")
+            Text(agent == .codex ? "使用 Codex 的现有登录" : "使用 Claude Code 的现有登录和网络设置")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if agent == .claude, model.isInstalled(agent) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -772,21 +928,53 @@ private struct AgentLibraryView: View {
             Spacer(minLength: 0)
             HStack(spacing: 8) {
                 if state.busy { ProgressView().controlSize(.small) }
-                else if !model.isInstalled(agent) {
+                else if !state.available && !model.isInstalled(agent) {
                     Button("安装连接组件") { model.install(agent) }.buttonStyle(.borderedProminent).disabled(model.preview || model.agents.values.contains(where: { $0.phase == .installing }))
                 } else {
-                    Button(state.available ? "已连接" : "连接") { model.connect(agent) }.disabled(state.available || model.preview)
+                    Button(state.available ? "已就绪" : "连接") { model.connect(agent) }.disabled(state.available || model.preview)
                 }
                 Spacer(minLength: 0)
-                if model.preferences.agent != agent {
-                    Button("设为默认") { model.preferences.agent = agent }.buttonStyle(.borderless)
+                if model.preferences.enabledAgent == agent {
+                    Button("停用") { model.disableAgent() }.buttonStyle(.borderless).disabled(model.preview)
+                        .help("停止分配新任务，当前任务会继续完成")
+                } else {
+                    Button("启用") { model.enable(agent) }.buttonStyle(.borderedProminent)
+                        .disabled(model.preview || !state.available)
+                        .help(state.available ? "将后续任务切换到 \(agent.name)" : "请先连接，确认 Agent 可用")
                 }
             }.controlSize(.small)
         }
         .padding(18).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(.quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 16))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(agent == .codex ? "Codex / ChatGPT" : agent.name)
+        .accessibilityLabel(agent == .codex ? "Codex / ChatGPT" : "Claude Code（命令行）")
+    }
+
+    private var claudeDesktopCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            AgentBrandIcon(agent: .claude, size: 44)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Claude Desktop").font(.headline)
+                Text("桌面端 · MCP 记忆访问").font(.caption).foregroundStyle(.secondary)
+            }
+            Text("在 Chat 和本地 Code 会话中搜索、阅读 MyClip 记忆。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text("后台自动整理请启用 Claude Code（命令行）。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button("打开应用", systemImage: "arrow.up.right.square", action: model.openClaudeDesktop)
+                .buttonStyle(.borderless).disabled(model.preview)
+                .help("打开 Claude Desktop")
+            Button("配置 MCP") {
+                model.preferences.mcpClients.insert(.claudeDesktop)
+                model.open(.settings)
+            }.controlSize(.small)
+                .help("在设置中配置 Claude Desktop 的 MyClip 记忆访问")
+        }
+        .padding(18).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(.quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 16))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Claude Desktop（桌面端）")
     }
 
     private func comingSoonCard(_ name: String, symbol: String) -> some View {
@@ -806,7 +994,7 @@ private struct AgentLibraryView: View {
 }
 
 struct PermissionRequestView: View {
-    let model: MyClipModel
+    @ObservedObject var model: MyClipModel
     let permission: ClipPermission
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -814,19 +1002,19 @@ struct PermissionRequestView: View {
             Text(permission.request.title).font(.subheadline)
             ForEach(permission.request.options) { option in
                 Button(option.name) { model.resolve(permission, optionID: option.id) }.focusable()
-                    .onKeyPress(keys: [.space, .return]) { _ in model.resolve(permission, optionID: option.id); return .handled }
+                    .onActivationKey { model.resolve(permission, optionID: option.id) }
             }
             Button("取消此次请求", role: .cancel) { model.resolve(permission, optionID: nil) }.buttonStyle(.borderless).focusable()
-                .onKeyPress(keys: [.space, .return]) { _ in model.resolve(permission, optionID: nil); return .handled }
+                .onActivationKey { model.resolve(permission, optionID: nil) }
         }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
 private struct MyClipSettingsView: View {
-    @Bindable var model: MyClipModel
+    @ObservedObject var model: MyClipModel
     @State private var showMCPHelp = false
     var body: some View {
-        @Bindable var preferences = model.preferences
+        @ObservedObject var preferences = model.preferences
         Form {
             Section {
                 Picker("采集范围", selection: $preferences.captureSettings.scope) {
@@ -849,12 +1037,12 @@ private struct MyClipSettingsView: View {
                     ForEach(KeyboardCaptureMode.allCases) { Text($0.label).tag($0) }
                 }
             } header: { Text("截图") } footer: {
-                Text("全屏仅记录焦点窗口所在的显示器。鼠标两项可独立勾选；键盘忽略长按回车。MyClip、锁屏和排除的应用不会被记录。")
+                Text("应用打开后自动采集，退出应用后停止。全屏仅记录焦点窗口所在的显示器。鼠标两项可独立勾选；键盘忽略长按回车。MyClip、锁屏和排除的应用不会被记录。")
             }
-            .onChange(of: preferences.captureSettings) { model.applyCaptureSettings() }
+            .onChange(of: preferences.captureSettings) { _ in model.applyCaptureSettings() }
             Section("排除应用") {
                 TextEditor(text: $preferences.excludedApps).font(.system(.caption, design: .monospaced)).frame(height: 78)
-                    .onChange(of: preferences.excludedApps) { model.applyCaptureSettings() }
+                    .onChange(of: preferences.excludedApps) { _ in model.applyCaptureSettings() }
                 Text("每行一个应用的 Bundle ID。").font(.caption).foregroundStyle(.secondary)
                 Menu("添加正在运行的应用") {
                     ForEach(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular && $0.bundleIdentifier != nil }, id: \.processIdentifier) { app in
@@ -867,12 +1055,8 @@ private struct MyClipSettingsView: View {
             }
             Section {
                 Toggle("自动整理新截图", isOn: $preferences.autoOrganize)
-                Picker("默认 Agent", selection: $preferences.agent) { ForEach(ClipAgent.allCases) { Text($0.name).tag($0) } }
-                Toggle("暂停整理队列", isOn: $model.processingPaused)
-            } header: { Text("记忆整理") } footer: { Text("自动整理会把截图交给所选 Agent，并使用它的模型服务。暂停采集不会中断正在进行的整理。") }
-            Section("Agent 连接") {
-                Button("管理 Codex 和 Claude 连接", systemImage: "link") { model.open(.agents) }
-            }
+                LabeledContent("已启用 Agent", value: preferences.enabledAgent?.name ?? "未启用")
+            } header: { Text("记忆整理") }
             Section {
                 HStack {
                     VStack(alignment: .leading, spacing: 6) {
@@ -930,6 +1114,10 @@ private struct MyClipSettingsView: View {
                         }
                     }
                 }
+                if preferences.mcpClients.contains(.claudeDesktop) {
+                    Text("Claude Desktop 配置完成后，请完全退出并重新打开应用，在 Chat 或本地 Code 会话中使用 MyClip 记忆。")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
                 LabeledContent("MCP 已完成的查询", value: model.statistics.mcpReads.formatted())
             } header: { Text("MCP 记忆访问") } footer: {
                 Text(model.mcpEnabled ? "配置完成后，请重启客户端或新建会话。Agent 实际读取 Memory 后，查询次数才会增加。" : "MCP 已关闭，Agent 暂时无法通过 MCP 读取 Memory。已保存的连接配置会保留。")
@@ -939,25 +1127,17 @@ private struct MyClipSettingsView: View {
                     Text("7 天").tag(7); Text("30 天").tag(30); Text("90 天").tag(90); Text("一直保留").tag(0)
                 }
                 LabeledContent("位置") { Button("打开本地资料库", systemImage: "folder") { NSWorkspace.shared.open(model.store.root) } }
-                Button("重建搜索索引", systemImage: "arrow.trianglehead.2.clockwise.rotate.90") { model.rebuildIndex() }
+                Button("重建搜索索引", systemImage: "arrow.clockwise") { model.rebuildIndex() }
                 Text("Memory 和来源信息独立保存。原图和识别文本过期后，记忆仍然可用；等待整理的截图会继续保留。").font(.caption).foregroundStyle(.secondary)
             }
-            Section("权限") {
-                permissionRow("屏幕录制", allowed: model.screenPermission, action: model.requestScreenPermission)
-                permissionRow("辅助功能", allowed: model.accessibilityPermission, action: model.requestAccessibilityPermission)
-                if !model.screenPermission {
-                    Text("请在系统设置的“隐私与安全 → 录屏与系统录音”中开启 MyClip。如果开关已开启但此处仍未通过，请退出并重新打开 MyClip。").font(.caption).foregroundStyle(.secondary)
-                }
-                Button("刷新权限状态") { model.refreshPermissions() }.buttonStyle(.borderless)
-            }
-            Section {
-                Button("复制 MCP 连接配置", systemImage: "doc.on.doc") { model.copyMCPConfiguration() }
-                TextField("Codex ACP 路径", text: $preferences.codexPath, prompt: Text("自动查找"))
-                TextField("Claude ACP 路径", text: $preferences.claudePath, prompt: Text("自动查找"))
-                Text("填写 ACP 连接组件的可执行文件路径。留空时使用已安装的组件。").font(.caption).foregroundStyle(.secondary)
-            } header: { Text("高级连接设置") }
-            Section {
-                LabeledContent("MyClip", value: "截图，成为记忆。")
+            Section("关于 MyClip") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("截图，成为记忆。").font(.headline)
+                    Text("MyClip 根据你的操作自动截图，并交给已启用的 Agent 整理成可搜索的记忆。随时回顾工作内容，追溯信息来源。")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }.padding(.vertical, 4)
+                LabeledContent("版本", value: appVersion)
+                Button("退出 MyClip", systemImage: "power") { NSApp.terminate(nil) }
             }
         }.formStyle(.grouped).frame(maxWidth: 850).frame(maxWidth: .infinity)
     }
@@ -968,262 +1148,56 @@ private struct MyClipSettingsView: View {
         } icon: {
             switch client {
             case .codex: Image("CodexIcon").resizable().scaledToFit().frame(width: 16, height: 16)
-            case .claudeCode: Image("ClaudeIcon").resizable().scaledToFit().frame(width: 16, height: 16)
+            case .claudeCode, .claudeDesktop: Image("ClaudeIcon").resizable().scaledToFit().frame(width: 16, height: 16)
             case .cursor: Image(systemName: "cube.fill")
             case .openCode: Image(systemName: "terminal")
             }
         }
     }
 
-    private func permissionRow(_ title: String, allowed: Bool, action: @escaping () -> Void) -> some View {
-        LabeledContent(title) {
-            if allowed { Label("已允许", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
-            else { Button("允许", action: action).disabled(model.preview) }
-        }
+    private var appVersion: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        return "\(version) (\(build))"
     }
 }
 
-private struct CapturePermissionView: View {
-    @Bindable var model: MyClipModel
-    @Environment(\.dismiss) private var dismiss
+private struct CaptureOnboardingView: View {
+    @ObservedObject var model: MyClipModel
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Image(systemName: "macwindow").font(.system(size: 42, weight: .light)).foregroundStyle(.blue)
-            Text("开始记录工作画面").font(.title2.bold())
-            Text(model.preferences.captureSettings.description).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Text("MyClip 需要以下两项系统权限。").font(.subheadline)
-            permission("屏幕录制", detail: "读取\(model.preferences.captureSettings.scope.label)的画面", allowed: model.screenPermission, action: model.requestScreenPermission)
-            permission("辅助功能", detail: "识别焦点窗口和回车按键", allowed: model.accessibilityPermission, action: model.requestAccessibilityPermission)
-            if !model.screenPermission {
-                Text("请在系统设置的“隐私与安全 → 录屏与系统录音”中开启 MyClip。如果开关已开启但此处仍未通过，请退出并重新打开 MyClip。").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            if model.preferences.autoOrganize {
-                Text("自动整理已开启：新截图会交给 \(model.preferences.agent.name) 处理。你可以在设置中关闭。").font(.caption).foregroundStyle(.secondary)
-            }
-            HStack {
-                Button("稍后") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("刷新状态") { model.refreshPermissions() }
-                Spacer()
-                Button("开始采集") { dismiss(); model.toggleCapture() }.buttonStyle(.borderedProminent)
-                    .disabled(!model.screenPermission || !model.accessibilityPermission)
-            }
-        }.padding(30).frame(width: 470)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                Image(systemName: "macwindow").font(.system(size: 42, weight: .light)).foregroundStyle(.blue)
+                Text("欢迎使用 MyClip").font(.largeTitle.bold())
+                Text("截图，成为记忆。完成权限设置，开始记录工作画面。").font(.subheadline)
+                Text(model.preferences.captureSettings.description).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text("需要允许以下两项权限才能使用 MyClip。全部授权后会自动进入应用并开始采集。").font(.subheadline)
+                permission("屏幕录制", detail: "读取\(model.preferences.captureSettings.scope.label)的画面", allowed: model.screenPermission, action: model.requestScreenPermission)
+                permission("辅助功能", detail: "识别焦点窗口和回车按键", allowed: model.accessibilityPermission, action: model.requestAccessibilityPermission)
+                if !model.screenPermission {
+                    Text("请在系统设置的“隐私与安全 → 录屏与系统录音”中开启 MyClip。如果开关已开启但此处仍未通过，请退出并重新打开 MyClip。").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                if model.preferences.autoOrganize {
+                    Text(model.preferences.enabledAgent.map { "自动整理已开启：新截图会交给 \($0.name) 处理。你可以在设置中关闭。" }
+                        ?? "自动整理已开启：新截图先进入等待队列，连接并启用 Agent 后开始整理。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                HStack {
+                    Button("退出 MyClip") { NSApp.terminate(nil) }
+                    Spacer()
+                    Button("刷新权限状态") { model.refreshPermissions() }.buttonStyle(.borderedProminent)
+                }
+            }.padding(36).frame(maxWidth: 580).frame(maxWidth: .infinity)
+        }.frame(maxWidth: .infinity, maxHeight: .infinity).background(Color(nsColor: .textBackgroundColor))
     }
 
     private func permission(_ title: String, detail: String, allowed: Bool, action: @escaping () -> Void) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) { Text(title).font(.headline); Text(detail).font(.caption).foregroundStyle(.secondary) }
             Spacer()
-            if allowed { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.title3) }
-            else { Button("允许", action: action) }
+            if allowed { Label("已允许", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
+            else { Button("允许", action: action).accessibilityLabel("允许\(title)") }
         }.padding(15).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-struct AgentMenuPanel: View {
-    @Bindable var model: MyClipModel
-    let agent: ClipAgent
-    var dismiss: () -> Void
-    @FocusState private var primaryFocused: Bool
-    private enum Action { case connect, repair, retry, resume, organize, queue, memory }
-    private var state: ClipAgentState { model.state(agent) }
-    private var permission: ClipPermission? { model.permissions.first { $0.agent == agent } }
-    private var job: ClipJob? { model.currentJob.flatMap { $0.agent == agent ? $0 : nil } }
-    private var failedJob: ClipJob? {
-        guard !state.busy, state.phase == .failed || model.library.queue.pauseReason != nil,
-              let latest = model.library.jobs.filter({ $0.agent == agent }).max(by: { $0.createdAt < $1.createdAt }),
-              latest.state == .failed else { return nil }
-        return latest
-    }
-    private var latestMemory: KnowledgeEntry? {
-        model.library.entries.filter { $0.agent == agent && !$0.isRootDocument }.max { $0.updatedAt < $1.updatedAt }
-    }
-    private var heading: String {
-        if permission != nil || state.phase == .permission { return "需要你的确认" }
-        if failedJob != nil { return "上次整理未完成" }
-        switch state.phase {
-        case .disconnected: return "尚未连接"
-        case .connecting: return "正在连接…"
-        case .installing: return "正在准备连接组件…"
-        case .working: return job == nil ? "正在处理任务" : "正在整理截图"
-        case .failed: return "连接需要处理"
-        case .permission: return "需要你的确认"
-        case .ready:
-            if model.processingPaused { return "整理已暂停" }
-            if model.library.queue.pendingCounts[agent, default: 0] > 0 { return "等待整理" }
-            return state.lastCompleted == nil ? "准备好了" : "本批整理已完成"
-        }
-    }
-    private var action: Action {
-        if failedJob != nil { return .retry }
-        if state.phase == .failed { return .repair }
-        if state.phase == .disconnected { return .connect }
-        if model.library.queue.pauseReason != nil { return .queue }
-        if model.processingPaused { return .resume }
-        if model.library.queue.pendingCounts[agent, default: 0] > 0 {
-            return model.library.queue.nextAgent == agent && model.currentJob == nil && !model.discoveringTasks ? .organize : .queue
-        }
-        return .memory
-    }
-    private var actionTitle: String {
-        switch action {
-        case .connect: "连接 \(agent.name)"
-        case .repair: "查看连接问题"
-        case .retry: "重试这次整理"
-        case .resume: "恢复整理队列"
-        case .organize: "立即整理一批"
-        case .queue: "查看整理队列"
-        case .memory: "查看记忆"
-        }
-    }
-    private var actionDisabled: Bool {
-        switch action {
-        case .connect: model.preview
-        case .retry: !model.canStartOrganization
-        case .resume: model.preview
-        case .organize: !model.canOrganizeNow
-        default: false
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 12) {
-                AgentCharacterIcon(agent: agent, state: state, size: 56)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(agent == .codex ? "Codex · OpenAI" : agent.name).font(.headline)
-                    Text(model.preferences.agent == agent ? "默认整理助手" : "当前由 \(model.preferences.agent.name) 整理")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-                Label(model.capturing ? "采集中" : "采集暂停", systemImage: model.capturing ? "record.circle" : "pause.circle")
-                    .font(.caption2).foregroundStyle(.secondary).fixedSize()
-            }
-            VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 8) {
-                    if [.connecting, .installing, .working].contains(state.phase) { ProgressView().controlSize(.small) }
-                    if permission != nil || state.phase == .permission || state.phase == .failed || failedJob != nil {
-                        Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
-                    }
-                    Text(heading).font(.subheadline.weight(.semibold))
-                }
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(model.organizationStatus(at: context.date, agent: agent))
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                if !model.preferences.autoOrganize {
-                    Text("自动整理已关闭，新截图只保存到本地。").font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if state.phase == .failed || failedJob != nil {
-                    Text(failedJob?.error ?? state.detail).font(.caption).foregroundStyle(.secondary)
-                        .lineLimit(3).help(failedJob?.error ?? state.detail)
-                } else if state.phase == .ready, state.lastCompleted != nil, !model.processingPaused {
-                    Text(state.detail).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                }
-            }
-            if let permission {
-                PermissionRequestView(model: model, permission: permission)
-            } else if state.phase == .permission {
-                Button("查看待确认请求") { dismiss(); model.open(.agents) }
-                    .focusable().focused($primaryFocused)
-                    .onKeyPress(keys: [.space, .return]) { _ in dismiss(); model.open(.agents); return .handled }
-            }
-            Divider()
-            if let latestMemory {
-                Button { open(latestMemory) } label: {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text("最近记忆").font(.caption).foregroundStyle(.secondary)
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(latestMemory.title).font(.subheadline.weight(.medium)).lineLimit(2)
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
-                        }
-                        let excerpt = latestMemory.body.split(separator: "\n").first { !$0.hasPrefix("#") && !$0.hasPrefix("```") } ?? ""
-                        if !excerpt.isEmpty {
-                            let text = Wikilink.markdown(String(excerpt))
-                            let plain = (try? AttributedString(markdown: text)).map { String($0.characters) } ?? String(excerpt)
-                            Text(String(plain.prefix(200))).font(.caption).foregroundStyle(.secondary).lineLimit(3)
-                        }
-                        HStack(spacing: 5) {
-                            Text(latestMemory.updatedAt, format: .dateTime.month().day().hour().minute())
-                            Text("· \(latestMemory.sourceIDs.count) 张来源截图")
-                        }.font(.caption2).foregroundStyle(.secondary)
-                    }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
-                }.buttonStyle(.plain).focusable().help("打开这篇记忆及其来源")
-                    .onKeyPress(keys: [.space, .return]) { _ in open(latestMemory); return .handled }
-            } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("还没有整理好的记忆").font(.subheadline)
-                    Text("\(agent.name) 完成整理后，最近一篇会出现在这里。")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            if permission == nil && state.phase != .permission {
-                if let job {
-                    Button("取消本次整理") { model.cancel(job) }.buttonStyle(.bordered)
-                        .disabled(model.preview).focusable(!model.preview).focused($primaryFocused)
-                        .onKeyPress(keys: [.space, .return]) { _ in
-                            guard !model.preview else { return .ignored }
-                            model.cancel(job); return .handled
-                        }
-                } else if !state.busy {
-                    Button(action: performAction) { Text(actionTitle).frame(maxWidth: .infinity) }
-                        .buttonStyle(.borderedProminent).controlSize(.large)
-                        .disabled(actionDisabled).focusable(!actionDisabled).focused($primaryFocused)
-                        .onKeyPress(keys: [.space, .return]) { _ in
-                            guard !actionDisabled else { return .ignored }
-                            performAction(); return .handled
-                        }
-                }
-            }
-            HStack {
-                if action != .memory || state.busy {
-                    Button("查看记忆", systemImage: "arrow.up.right") { dismiss(); model.open(.memory) }.buttonStyle(.borderless).focusable()
-                        .onKeyPress(keys: [.space, .return]) { _ in dismiss(); model.open(.memory); return .handled }
-                }
-                Spacer()
-                Menu {
-                    if model.preferences.agent != agent { Button("设为默认 Agent") { model.preferences.agent = agent } }
-                    Button(model.capturing ? "暂停截图采集" : "开始截图采集", action: model.toggleCapture)
-                    Button(model.processingPaused ? "恢复记忆整理" : "暂停记忆整理") { model.processingPaused.toggle() }
-                    Divider()
-                    Button("截图时间线") { dismiss(); model.open(.captures) }
-                    Button("连接与任务") { dismiss(); model.open(.agents) }
-                    Button("设置") { dismiss(); model.open(.settings) }
-                    Divider()
-                    Button("退出 MyClip") { NSApp.terminate(nil) }
-                } label: { Text("更多").foregroundStyle(.secondary) }.menuStyle(.borderlessButton).fixedSize()
-            }
-            if model.preview { Text("界面预览 · 示例数据").font(.caption2).foregroundStyle(.secondary) }
-        }.padding(20).frame(width: 350)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear {
-            DispatchQueue.main.async {
-                primaryFocused = permission == nil && (state.phase == .permission || (job != nil ? !model.preview : !state.busy && !actionDisabled))
-            }
-        }
-    }
-
-    private func open(_ entry: KnowledgeEntry) {
-        model.search = ""
-        model.memoryFolder = nil
-        model.selectedEntry = entry.id
-        dismiss(); model.open(.memory)
-    }
-
-    private func performAction() {
-        switch action {
-        case .connect:
-            if model.isInstalled(agent) { model.connect(agent) }
-            else { dismiss(); model.open(.agents) }
-        case .repair, .queue: dismiss(); model.open(.agents)
-        case .retry: if let failedJob { model.retry(failedJob) }
-        case .resume: model.processingPaused = false
-        case .organize: model.organizeNow()
-        case .memory: dismiss(); model.open(.memory)
-        }
     }
 }
 
