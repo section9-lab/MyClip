@@ -12,9 +12,10 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/myclip-demo.gif" alt="MyClip running locally: onboarding with default Agent selection and permissions, Memory file navigation, Timeline screenshot browsing, filtering and OCR, independently scrolling Kanban columns, and daily, weekly, and monthly reports" width="1000">
+  <a href="https://section9-lab.github.io/MyClip/demo/"><img src="docs/images/myclip-demo.gif" alt="MyClip desktop demo: onboarding, Memory, Timeline, Kanban, Reports, Backstage, Settings, and memory recall in Codex and Claude" width="1000"></a>
 </p>
-<p align="center"><sub>Recorded in the native MyClip macOS app · Local library · Chinese interface.</sub></p>
+<p align="center"><a href="https://section9-lab.github.io/MyClip/demo/">Watch HD video</a> · <a href="docs/images/myclip-demo.mp4">Download MP4</a></p>
+<p align="center"><sub>45-second HTML demo · Sample data · Chinese interface.</sub></p>
 
 ## What you can do
 

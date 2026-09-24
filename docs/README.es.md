@@ -8,8 +8,11 @@
   <a href="../README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <strong>Español</strong> · <a href="README.fr.md">Français</a> · <a href="README.de.md">Deutsch</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a>
 </p>
 
-<p align="center"><img src="images/myclip-demo.gif" alt="MyClip local: configuración inicial con selección del agente predeterminado y permisos, navegación por archivos de Memory, exploración y filtrado de capturas con OCR en Timeline, columnas Kanban con desplazamiento independiente e informes diarios, semanales y mensuales" width="1000"></p>
-<p align="center"><sub>Grabado en la aplicación nativa MyClip para macOS · Biblioteca local · Interfaz en chino.</sub></p>
+<p align="center">
+  <a href="https://section9-lab.github.io/MyClip/demo/"><img src="images/myclip-demo.gif" alt="Demo de MyClip: configuración inicial, Memory, Timeline, Kanban, Reports, Backstage, ajustes y recuperación de recuerdos con Codex y Claude" width="1000"></a>
+</p>
+<p align="center"><a href="https://section9-lab.github.io/MyClip/demo/">Ver en alta definición</a> · <a href="images/myclip-demo.mp4">Descargar MP4</a></p>
+<p align="center"><sub>Demo HTML de 45 segundos · Datos de ejemplo · Interfaz en chino.</sub></p>
 
 ## Qué puedes hacer
 

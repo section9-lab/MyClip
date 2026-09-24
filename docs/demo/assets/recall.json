@@ -1,0 +1,222 @@
+{
+  "fixture": "app-data.js fictional notes",
+  "executable_sha256": "7d56d5d0a7dd5cdc1356f8a18d76a42af78d77b032c2869acb85afd4dece4d8f",
+  "requests": [
+    {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "method": "tools/call",
+      "params": {
+        "name": "memory_search",
+        "arguments": {
+          "query": "演示",
+          "limit": 5
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "method": "tools/call",
+      "params": {
+        "name": "memory_get",
+        "arguments": {
+          "path": "Memory.md#最近的决定"
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "method": "tools/call",
+      "params": {
+        "name": "memory_get",
+        "arguments": {
+          "path": "Now.md"
+        }
+      }
+    }
+  ],
+  "replies": [
+    {
+      "id": 2,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "{\"results\":[{\"path\":\"Daily/2026-09-24.md\",\"snippet\":\"演示使用完整的 macOS 软件桌面。启动后先设置权限，再选择 Agent。\\n…\\n检查每个页面的交互，并在 Codex 和 Claude 中演示记忆召回。\",\"sourceIDs\":[],\"time\":null,\"title\":\"2026-09-24\"},{\"path\":\"Wiki/MyClip.md\",\"snippet\":\"把工作中的截图整理成可以搜索和关联的 Markdown 记忆。\",\"sourceIDs\":[],\"time\":null,\"title\":\"MyClip\"},{\"path\":\"Now.md\",\"snippet\":\"完成 README 使用演示。\",\"sourceIDs\":[],\"time\":null,\"title\":\"Now\"},{\"links\":[\"Now.md\",\"Wiki/MyClip.md\"],\"path\":\"Memory.md\",\"snippet\":\"- 完成 MyClip 的使用演示，从首次启动到记忆召回。\\n- 在 Now.md 中跟进今天的工作。\\n- 将项目背景整理到 MyClip.md。\",\"sourceIDs\":[],\"time\":null,\"title\":\"Memory\"}]}",
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "structuredContent": {
+          "results": [
+            {
+              "path": "Daily/2026-09-24.md",
+              "snippet": "演示使用完整的 macOS 软件桌面。启动后先设置权限，再选择 Agent。\n…\n检查每个页面的交互，并在 Codex 和 Claude 中演示记忆召回。",
+              "sourceIDs": [],
+              "time": null,
+              "title": "2026-09-24"
+            },
+            {
+              "path": "Wiki/MyClip.md",
+              "snippet": "把工作中的截图整理成可以搜索和关联的 Markdown 记忆。",
+              "sourceIDs": [],
+              "time": null,
+              "title": "MyClip"
+            },
+            {
+              "path": "Now.md",
+              "snippet": "完成 README 使用演示。",
+              "sourceIDs": [],
+              "time": null,
+              "title": "Now"
+            },
+            {
+              "links": [
+                "Now.md",
+                "Wiki/MyClip.md"
+              ],
+              "path": "Memory.md",
+              "snippet": "- 完成 MyClip 的使用演示，从首次启动到记忆召回。\n- 在 Now.md 中跟进今天的工作。\n- 将项目背景整理到 MyClip.md。",
+              "sourceIDs": [],
+              "time": null,
+              "title": "Memory"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 3,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "{\"backlinks\":[{\"fact\":\"Memory.md · MyClip.md\",\"page\":\"Now.md\",\"section\":\"相关记忆\",\"title\":\"Now\"},{\"fact\":\"Memory.md · Now.md\",\"page\":\"Wiki/MyClip.md\",\"section\":\"相关记录\",\"title\":\"MyClip\"}],\"content\":\"## 最近的决定\\n\\n保留真实的应用窗口，让安装后的每一步都清楚可见。\\n\",\"from\":1,\"links\":[{\"links\":[{\"fact\":\"在 Now.md 中跟进今天的工作。\",\"page\":\"Now.md\",\"section\":\"正在推进\",\"title\":\"Now\"},{\"fact\":\"将项目背景整理到 MyClip.md。\",\"page\":\"Wiki/MyClip.md\",\"section\":\"正在推进\",\"title\":\"MyClip\"}],\"section\":\"正在推进\"}],\"nextFrom\":null,\"observedAt\":null,\"path\":\"Memory.md\",\"sources\":{\"apps\":[],\"count\":0,\"earliest\":null,\"latest\":null},\"title\":\"Memory\",\"totalLines\":4,\"updatedAt\":\"2026-09-24T14:40:55Z\"}",
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "structuredContent": {
+          "backlinks": [
+            {
+              "fact": "Memory.md · MyClip.md",
+              "page": "Now.md",
+              "section": "相关记忆",
+              "title": "Now"
+            },
+            {
+              "fact": "Memory.md · Now.md",
+              "page": "Wiki/MyClip.md",
+              "section": "相关记录",
+              "title": "MyClip"
+            }
+          ],
+          "content": "## 最近的决定\n\n保留真实的应用窗口，让安装后的每一步都清楚可见。\n",
+          "from": 1,
+          "links": [
+            {
+              "links": [
+                {
+                  "fact": "在 Now.md 中跟进今天的工作。",
+                  "page": "Now.md",
+                  "section": "正在推进",
+                  "title": "Now"
+                },
+                {
+                  "fact": "将项目背景整理到 MyClip.md。",
+                  "page": "Wiki/MyClip.md",
+                  "section": "正在推进",
+                  "title": "MyClip"
+                }
+              ],
+              "section": "正在推进"
+            }
+          ],
+          "nextFrom": null,
+          "observedAt": null,
+          "path": "Memory.md",
+          "sources": {
+            "apps": [],
+            "count": 0,
+            "earliest": null,
+            "latest": null
+          },
+          "title": "Memory",
+          "totalLines": 4,
+          "updatedAt": "2026-09-24T14:40:55Z"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "{\"backlinks\":[{\"date\":\"2026-09-24\",\"fact\":\"MyClip.md · Now.md\",\"page\":\"Daily/2026-09-24.md\",\"section\":\"下一步\",\"title\":\"2026-09-24\"},{\"fact\":\"在 Now.md 中跟进今天的工作。\",\"page\":\"Memory.md\",\"section\":\"正在推进\",\"title\":\"Memory\"},{\"fact\":\"Memory.md · Now.md\",\"page\":\"Wiki/MyClip.md\",\"section\":\"相关记录\",\"title\":\"MyClip\"}],\"content\":\"# Now\\n\\n## 当前关注\\n\\n完成 README 使用演示。\\n\\n## 下一步\\n\\n- 检查首次使用与权限引导。\\n- 复核截图、记忆和待办之间的来源关系。\\n- 整理日报，准备与团队同步进展。\\n\\n## 相关记忆\\n\\n[[Memory.md]] · [[Wiki/MyClip.md]]\",\"from\":1,\"links\":[{\"links\":[{\"fact\":\"Memory.md · MyClip.md\",\"page\":\"Memory.md\",\"section\":\"相关记忆\",\"title\":\"Memory\"},{\"fact\":\"Memory.md · MyClip.md\",\"page\":\"Wiki/MyClip.md\",\"section\":\"相关记忆\",\"title\":\"MyClip\"}],\"section\":\"相关记忆\"}],\"nextFrom\":null,\"observedAt\":null,\"path\":\"Now.md\",\"sources\":{\"apps\":[],\"count\":0,\"earliest\":null,\"latest\":null},\"title\":\"Now\",\"totalLines\":15,\"updatedAt\":\"2026-09-24T14:40:55Z\"}",
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "structuredContent": {
+          "backlinks": [
+            {
+              "date": "2026-09-24",
+              "fact": "MyClip.md · Now.md",
+              "page": "Daily/2026-09-24.md",
+              "section": "下一步",
+              "title": "2026-09-24"
+            },
+            {
+              "fact": "在 Now.md 中跟进今天的工作。",
+              "page": "Memory.md",
+              "section": "正在推进",
+              "title": "Memory"
+            },
+            {
+              "fact": "Memory.md · Now.md",
+              "page": "Wiki/MyClip.md",
+              "section": "相关记录",
+              "title": "MyClip"
+            }
+          ],
+          "content": "# Now\n\n## 当前关注\n\n完成 README 使用演示。\n\n## 下一步\n\n- 检查首次使用与权限引导。\n- 复核截图、记忆和待办之间的来源关系。\n- 整理日报，准备与团队同步进展。\n\n## 相关记忆\n\n[[Memory.md]] · [[Wiki/MyClip.md]]",
+          "from": 1,
+          "links": [
+            {
+              "links": [
+                {
+                  "fact": "Memory.md · MyClip.md",
+                  "page": "Memory.md",
+                  "section": "相关记忆",
+                  "title": "Memory"
+                },
+                {
+                  "fact": "Memory.md · MyClip.md",
+                  "page": "Wiki/MyClip.md",
+                  "section": "相关记忆",
+                  "title": "MyClip"
+                }
+              ],
+              "section": "相关记忆"
+            }
+          ],
+          "nextFrom": null,
+          "observedAt": null,
+          "path": "Now.md",
+          "sources": {
+            "apps": [],
+            "count": 0,
+            "earliest": null,
+            "latest": null
+          },
+          "title": "Now",
+          "totalLines": 15,
+          "updatedAt": "2026-09-24T14:40:55Z"
+        }
+      }
+    }
+  ]
+}

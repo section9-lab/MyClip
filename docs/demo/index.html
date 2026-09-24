@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MyClip — Desktop demo</title>
+    <link rel="stylesheet" href="desktop.css">
+    <link rel="stylesheet" href="macos.css">
+    <link rel="stylesheet" href="recall.css">
+    <script src="assets/vendor/gsap.min.js"></script>
+    <script src="scenes.js"></script>
+    <script src="assets/recall-data.js"></script>
+    <script src="app-data.js"></script>
+    <script src="app-views.js"></script>
+    <script src="desktop.js"></script>
+    <script src="recall.js"></script>
+    <script src="macos.js"></script>
+  </head>
+  <body>
+    <div data-hf-id="hf-ur1k" id="myclip-app" data-composition-id="myclip-app" data-width="1600" data-height="1000" data-duration="45">
+      <main data-hf-id="hf-s9ok" id="macos-desktop" class="clip" data-start="0" data-duration="45" data-track-index="0">
+        <img data-hf-id="hf-115j" class="wallpaper" src="assets/macos/wallpaper.jpg" alt="macOS Sonoma 壁纸">
+        <header data-hf-id="hf-f2wy" class="menubar" aria-label="macOS 菜单栏">
+          <div data-hf-id="hf-bh4x" class="menu-left">
+            <img data-hf-id="hf-dx4j" class="apple-logo" src="assets/macos/apple.logo.png" alt="Apple">
+            <strong data-hf-id="hf-wppb" id="active-app">Finder</strong>
+            <span data-hf-id="hf-925o">文件</span><span data-hf-id="hf-awy4">编辑</span><span data-hf-id="hf-lqz9">显示</span><span data-hf-id="hf-kib7">窗口</span><span data-hf-id="hf-jhlo">帮助</span>
+          </div>
+          <div data-hf-id="hf-coks" class="menu-right">
+            <img data-hf-id="hf-fx6b" id="menu-myclip" src="assets/macos/paperclip.png" alt="MyClip">
+            <img data-hf-id="hf-k9qp" src="assets/macos/battery.100.png" class="battery" alt="电量充足">
+            <img data-hf-id="hf-4xse" src="assets/macos/wifi.png" alt="Wi-Fi">
+            <img data-hf-id="hf-vlns" src="assets/macos/magnifyingglass.png" alt="聚焦">
+            <img data-hf-id="hf-t74i" src="assets/macos/switch.2.png" alt="控制中心">
+            <span data-hf-id="hf-hmmd">9月24日 周四 10:24</span>
+          </div>
+        </header>
+        <div data-hf-id="hf-gqx5" id="myclip-window" class="app-window">
+          <section data-hf-id="hf-21qa" id="myclip-ui" aria-label="MyClip HTML 演示"></section>
+        </div>
+        <section data-hf-id="hf-0wb5" id="codex-window" class="app-window recall-window codex" aria-label="Codex 桌面端交互示意"></section>
+        <section data-hf-id="hf-fjp6" id="claude-window" class="app-window recall-window claude" aria-label="Claude 桌面端交互示意"></section>
+        <nav data-hf-id="hf-s8tf" id="dock" aria-label="macOS Dock">
+          <div data-hf-id="hf-2zcy" class="dock-item running">
+            <img data-hf-id="hf-ok71" src="assets/macos/finder.png" alt="Finder">
+          </div>
+          <div data-hf-id="hf-cykv" class="dock-item">
+            <img data-hf-id="hf-0kk9" src="assets/macos/safari.png" alt="Safari">
+          </div>
+          <div data-hf-id="hf-r0a7" class="dock-item">
+            <img data-hf-id="hf-p0fe" src="assets/macos/notes.png" alt="备忘录">
+          </div>
+          <button data-hf-id="hf-3k5z" id="dock-myclip" class="dock-item" aria-label="从 Dock 启动 MyClip">
+            <img data-hf-id="hf-83pj" src="assets/myclip.png" alt=""><span data-hf-id="hf-y1at" class="dock-label">MyClip</span>
+          </button>
+          <button data-hf-id="hf-id1f" id="dock-codex" class="dock-item" aria-label="从 Dock 打开 Codex">
+            <img data-hf-id="hf-eik0" src="assets/macos/codex.png" alt=""><span data-hf-id="hf-8vok" class="dock-label">Codex</span>
+          </button>
+          <button data-hf-id="hf-x1eb" id="dock-claude" class="dock-item" aria-label="从 Dock 打开 Claude">
+            <img data-hf-id="hf-b1o7" src="assets/macos/claude.png" alt=""><span data-hf-id="hf-134n" class="dock-label">Claude</span>
+          </button>
+          <div data-hf-id="hf-qlz6" class="dock-item">
+            <img data-hf-id="hf-3ohc" src="assets/macos/settings.png" alt="系统设置">
+          </div>
+          <div data-hf-id="hf-rr6z" class="dock-separator"></div>
+          <div data-hf-id="hf-sgjl" class="dock-item trash">
+            <img data-hf-id="hf-68zx" src="assets/macos/trash.png" alt="废纸篓">
+          </div>
+        </nav>
+        <div data-hf-id="hf-kj8f" id="demo-pointer" aria-hidden="true">
+          <svg data-hf-id="hf-ulu9" viewBox="0 0 24 24">
+            <path data-hf-id="hf-fueh" d="M5 3 L5 19 L9 15 L12 22 L15 20.5 L11.5 14 L18 14 Z" />
+          </svg>
+        </div>
+      </main>
+    </div>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const timeline = gsap.timeline({ paused: true });
+        window.buildDesktopMotion(timeline);
+        timeline.set("#demo-pointer", { autoAlpha: 0 }, window.MYCLIP_DEMO.duration);
+        timeline.eventCallback("onUpdate", () =>
+          window.renderDemo(timeline.time()),
+        );
+        window.__timelines = window.__timelines || {};
+        window.__timelines["myclip-app"] = timeline;
+        window.seekDemo = (time) => {
+          timeline.time(time, false);
+          window.renderDemo(time);
+        };
+        window.renderDemo(0);
+        window.demoReady = true;
+      });
+    </script>
+  </body>
+</html>

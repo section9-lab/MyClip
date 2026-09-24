@@ -1,0 +1,161 @@
+#macos-desktop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: #181818;
+}
+.wallpaper {
+  position: absolute;
+  inset: 0;
+  width: 1600px;
+  height: 1000px;
+  object-fit: cover;
+}
+.menubar {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 30px;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 22px;
+  background: #edf1ff40;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 0.5px #ffffff24;
+  font-size: 14px;
+}
+.menu-left,
+.menu-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.menu-right {
+  gap: 20px;
+  font-size: 13px;
+}
+.menubar img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+.menubar .apple-logo {
+  width: 17px;
+  height: 19px;
+  margin-right: 2px;
+}
+.menubar .battery {
+  width: 27px;
+  height: 27px;
+}
+.menu-left strong {
+  font-weight: 650;
+  min-width: 45px;
+}
+.app-window {
+  position: absolute;
+  left: 180px;
+  top: 66px;
+  width: 1240px;
+  height: 820px;
+  border-radius: 15px;
+  box-shadow:
+    0 28px 70px #00000055,
+    0 0 0 1px #00000025,
+    inset 0 0 0 1px #ffffff75;
+  opacity: 0;
+  visibility: hidden;
+  transform-origin: 50% 100%;
+}
+#dock {
+  position: absolute;
+  left: 486px;
+  bottom: 14px;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px 13px;
+  border: 1px solid #ffffff75;
+  border-radius: 23px;
+  background: #e6edf275;
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  box-shadow:
+    0 7px 28px #00000024,
+    inset 0 0 0 1px #ffffff25;
+}
+.dock-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+button.dock-item {
+  cursor: pointer;
+}
+.dock-item > img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+.dock-item.running::after {
+  content: "";
+  position: absolute;
+  bottom: -7px;
+  left: 30px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #172433;
+}
+.dock-separator {
+  width: 1px;
+  height: 52px;
+  background: #4853633d;
+  margin: 0 4px;
+}
+.trash img {
+  width: 58px;
+  height: 58px;
+}
+.dock-label {
+  position: absolute;
+  bottom: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #efeff3ed;
+  border-radius: 6px;
+  padding: 5px 11px;
+  box-shadow: 0 2px 8px #00000026;
+  font:
+    13px -apple-system,
+    sans-serif;
+  visibility: hidden;
+}
+.dock-item:hover .dock-label,
+.dock-item:focus-visible .dock-label {
+  visibility: visible;
+}
+#demo-pointer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 27px;
+  height: 27px;
+  pointer-events: none;
+  z-index: 20;
+  transform-origin: 21% 14%;
+  filter: drop-shadow(0 1px 1px #00000070);
+}
+#demo-pointer svg {
+  width: 100%;
+  height: 100%;
+  fill: #161616;
+  stroke: white;
+  stroke-width: 1.25;
+}

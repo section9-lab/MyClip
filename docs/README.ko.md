@@ -8,8 +8,11 @@
   <a href="../README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.de.md">Deutsch</a> · <a href="README.ja.md">日本語</a> · <strong>한국어</strong>
 </p>
 
-<p align="center"><img src="images/myclip-demo.gif" alt="로컬 MyClip 녹화: 온보딩에서 기본 Agent 선택과 권한 설정, Memory 파일 탐색, Timeline 스크린샷 탐색과 필터링 및 OCR 문서 보기, Kanban 열별 독립 스크롤, 일간·주간·월간 보고서 전환" width="1000"></p>
-<p align="center"><sub>MyClip macOS 네이티브 앱에서 녹화 · 로컬 라이브러리 · 중국어 UI.</sub></p>
+<p align="center">
+  <a href="https://section9-lab.github.io/MyClip/demo/"><img src="images/myclip-demo.gif" alt="MyClip 데스크톱 데모: 온보딩, Memory, Timeline, Kanban, Reports, Backstage, 설정 및 Codex와 Claude의 메모리 검색" width="1000"></a>
+</p>
+<p align="center"><a href="https://section9-lab.github.io/MyClip/demo/">HD 영상 보기</a> · <a href="images/myclip-demo.mp4">MP4 다운로드</a></p>
+<p align="center"><sub>45초 HTML 데모 · 샘플 데이터 · 중국어 UI.</sub></p>
 
 ## 할 수 있는 일
 

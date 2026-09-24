@@ -1,0 +1,254 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  color: #242528;
+  background: #f6f6f7;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+select {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 3px solid #007aff80;
+  outline-offset: 4px;
+}
+main {
+  width: min(1320px, calc(100% - 72px));
+  margin: 0 auto;
+  padding: 22px 0 24px;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 38px;
+  margin-bottom: 24px;
+}
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+.identity img {
+  width: 30px;
+  height: 30px;
+}
+.identity strong {
+  font-size: 16px;
+  letter-spacing: -0.35px;
+}
+.identity span {
+  color: #74767b;
+  padding-left: 2px;
+}
+.identity small {
+  margin-left: 4px;
+  color: #7d7f85;
+  border: 1px solid #dedee2;
+  padding: 4px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+}
+#fullscreen {
+  border: 0;
+  background: transparent;
+  font-size: 26px;
+  color: #73757a;
+  padding: 0 6px;
+}
+.presentation {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  padding: 0;
+}
+.window-viewport {
+  width: 100%;
+  aspect-ratio: 1600 / 1000;
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: white;
+  outline: 1px solid #00000014;
+  box-shadow:
+    0 18px 48px -18px #25293632,
+    0 3px 12px -5px #00000020;
+}
+iframe {
+  border: 0;
+  width: 1600px;
+  height: 1000px;
+  transform-origin: top left;
+  display: block;
+}
+.transport {
+  margin-top: 26px;
+}
+.transport-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  height: 38px;
+}
+.play-controls {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.play-controls button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 7px;
+  border: 0;
+  background: transparent;
+  font-size: 25px;
+}
+.play-controls .play {
+  background: #292b30;
+  color: white;
+  border-radius: 50%;
+}
+.play svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.time {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: #666970;
+  padding-left: 5px;
+}
+.divider {
+  color: #b7b8bd;
+  padding: 0 7px;
+}
+#scene-picker {
+  font-size: 13px;
+  font-weight: 500;
+  max-width: 240px;
+  padding: 5px;
+}
+.transport label {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  align-items: center;
+  color: #7a7c82;
+}
+select {
+  font-size: 12px;
+  border: none;
+  background: transparent;
+}
+input[type="range"] {
+  width: 100%;
+  height: 3px;
+  margin: 16px 0 20px;
+  display: block;
+  accent-color: #333940;
+  cursor: pointer;
+}
+nav {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+nav button {
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 10px 11px;
+  background: transparent;
+  color: #7e8087;
+  font-size: 12px;
+  white-space: nowrap;
+}
+nav button span {
+  color: #a8a9ad;
+  font-size: 10px;
+  margin-right: 8px;
+  font-variant-numeric: tabular-nums;
+}
+nav button:hover {
+  background: #ececef;
+}
+nav button.active {
+  background: white;
+  border-color: #dedee4;
+  color: #282b30;
+  box-shadow: 0 1px 3px #00000004;
+}
+nav button.active span {
+  color: #007aff;
+}
+footer {
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 16px;
+  font-size: 11px;
+  color: #94969d;
+}
+footer p {
+  margin: 0;
+  max-width: 830px;
+  color: #73767d;
+  line-height: 1.7;
+}
+footer span {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.presentation:fullscreen {
+  background: #f6f6f7;
+  padding: 28px;
+}
+.presentation:fullscreen .window-viewport {
+  width: min(100%, calc((100vh - 56px) * 1600 / 1000));
+}
+@media (min-width: 1450px) {
+  main {
+    width: min(1360px, calc((100vh - 288px) * 1600 / 1000));
+    min-width: 920px;
+  }
+}
+@media (max-width: 900px) {
+  main {
+    width: calc(100% - 32px);
+    padding-top: 16px;
+  }
+  header {
+    margin-bottom: 18px;
+  }
+  nav {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  footer {
+    display: block;
+  }
+  footer span {
+    display: block;
+    margin-top: 8px;
+  }
+  .identity span {
+    display: none;
+  }
+}

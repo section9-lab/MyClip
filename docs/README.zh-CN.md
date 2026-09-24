@@ -8,8 +8,11 @@
   <a href="../README.md">English</a> · <strong>简体中文</strong> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.de.md">Deutsch</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a>
 </p>
 
-<p align="center"><img src="images/myclip-demo.gif" alt="MyClip 本地应用实录：新手引导中的默认 Agent 选择与权限设置、Memory 文件导航、Timeline 截图浏览、筛选与 OCR 文档、Kanban 各列独立滚动，以及日报、周报、月报切换" width="1000"></p>
-<p align="center"><sub>录制自本机运行的 MyClip macOS 应用 · 本地资料库 · 中文界面。</sub></p>
+<p align="center">
+  <a href="https://section9-lab.github.io/MyClip/demo/"><img src="images/myclip-demo.gif" alt="MyClip 桌面演示：首次使用、Memory、Timeline、Kanban、Reports、Backstage、设置，以及 Codex 和 Claude 记忆召回" width="1000"></a>
+</p>
+<p align="center"><a href="https://section9-lab.github.io/MyClip/demo/">观看高清版</a> · <a href="images/myclip-demo.mp4">下载 MP4</a></p>
+<p align="center"><sub>45 秒 HTML 演示 · 示例数据 · 中文界面。</sub></p>
 
 ## 你可以做什么
 

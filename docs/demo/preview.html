@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MyClip · 桌面使用演示</title>
+    <link rel="icon" href="assets/myclip.png" />
+    <link rel="stylesheet" href="preview.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="identity">
+          <img src="assets/myclip.png" alt="" /><strong>MyClip</strong
+          ><span>桌面使用演示</span><small>HTML 预览</small>
+        </div>
+        <button id="fullscreen" aria-label="全屏预览">⤢</button>
+      </header>
+      <section
+        class="presentation"
+        id="presentation"
+        aria-label="macOS 桌面与 MyClip 使用演示"
+      >
+        <div class="window-viewport" id="window-viewport">
+          <iframe
+            id="demo-frame"
+            src="index.html"
+            title="从 Dock 启动 MyClip，再通过 Codex 和 Claude 召回记忆"
+            scrolling="no"
+          ></iframe>
+        </div>
+      </section>
+      <section class="transport" aria-label="演示播放控制">
+        <div class="transport-row">
+          <div class="play-controls">
+            <button id="play" class="play" aria-label="播放">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path id="play-shape" d="M8 5l12 7-12 7z" />
+              </svg></button
+            ><button id="restart" aria-label="从头播放">↺</button
+            ><span class="time"
+              ><span id="elapsed">0:00</span><span class="divider">/</span
+              ><span id="duration"></span
+            ></span>
+          </div>
+          <select id="scene-picker" aria-label="查看具体界面"></select>
+          <label
+            >速度
+            <select id="speed" aria-label="播放速度">
+              <option value="1">1×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+              <option value="3">3×</option>
+            </select></label
+          >
+        </div>
+        <input
+          id="progress"
+          aria-label="演示进度"
+          type="range"
+          min="0"
+          step="0.01"
+          value="0"
+        />
+        <nav id="chapters" aria-label="演示章节"></nav>
+      </section>
+      <footer>
+        <p id="description"></p>
+        <span>纯 HTML 交互演示 · 参照真实 MyClip · 示例记忆</span>
+      </footer>
+    </main>
+    <script src="scenes.js"></script>
+    <script src="preview.js"></script>
+  </body>
+</html>
