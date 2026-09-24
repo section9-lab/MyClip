@@ -1,6 +1,6 @@
 # Memory 召回评测复跑（2026-09-21）
 
-评测日期：2026-09-21。对象：本日检索层改造后的 `myclip-mcp`（release 构建），见 [改造说明](memory-retrieval-design-2026-09-21.md)。数据、指标定义与流程与 [评测协议](memory-benchmark-protocol.md) 完全一致，基线是 [2026-09-20 报告](memory-benchmark-2026-09-20.md)。
+评测日期：2026-09-21。对象：本日检索层改造后的 `myclip-mcp`（release 构建），见 [改造说明](../../docs/memory-retrieval-design-2026-09-21.md)。数据、指标定义与流程与 [评测协议](memory-benchmark-protocol.md) 完全一致，基线是 [2026-09-20 报告](memory-benchmark-2026-09-20.md)。
 
 ## 口径
 
@@ -51,6 +51,6 @@
 
 ## 产物
 
-- [LoCoMo 汇总](../build/memory-benchmark/locomo-2026-09-21/summary.json) · [逐题](../build/memory-benchmark/locomo-2026-09-21/queries.jsonl)
-- [LongMemEval 汇总](../build/memory-benchmark/longmemeval-2026-09-21/summary.json) · [逐题](../build/memory-benchmark/longmemeval-2026-09-21/queries.jsonl)
+- [LoCoMo 汇总](../runs/2026-09-21/locomo-2026-09-21/summary.json) · [逐题](../runs/2026-09-21/locomo-2026-09-21/queries.jsonl)
+- [LongMemEval 汇总](../runs/2026-09-21/longmemeval-2026-09-21/summary.json) · [逐题](../runs/2026-09-21/longmemeval-2026-09-21/queries.jsonl)
 - 被测二进制：`.build/release/myclip-mcp`，SHA-256 记录在两个 `metadata.json` 中。

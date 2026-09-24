@@ -106,6 +106,50 @@ def retrieval_metrics(ranked, gold, cutoffs=CUTOFFS):
     return metrics
 
 
+LINKED_EPISODE = re.compile(r"\[\[(Daily/[^\]|#]+)")
+STOP_WORDS = set("""the a an and or to of in on for with at by from is was are were be been it its his her their he she they i you we
+my me our your this that these those as but so if not no do did does have has had just about into than then there here what when
+where who how which after before also very really""".split())
+
+
+def content_words(text):
+    # Retrieval tags (#word) are the organizer's labels, not a restatement of the evidence.
+    text = re.sub(r"#[\w-]+", " ", text)
+    return {word for word in re.findall(r"[a-z]+", text.lower()) if len(word) > 2 and word not in STOP_WORDS}
+
+
+def delivered_documents(hit, turns_by_path):
+    """Files whose evidence reached the reader: the hit itself, plus episodes it links to whose evidence a shown snippet
+    line restates (shares at least two content words with their gold turns). A link no shown line restates is not credited;
+    without this check about 40% of link-only credit on LoCoMo multi-hop was incidental.
+
+    Binaries from 2026-09-24 on show links as labels and list their targets in `links`; for older snippets the targets are
+    read from the raw Wikilinks. Both are scored the same way, so runs of either kind compare directly. (Until 2026-09-24
+    only the line holding the link could restate it; on the r300 Track B runs that rule scored 0.4–0.7 points lower.)"""
+    lines = [line for match in hit.get("matches", []) for line in match["text"].split("\n")]
+    links = hit["links"] if "links" in hit else [target + ".md" for line in lines for target in LINKED_EPISODE.findall(line)]
+    result = {hit["path"]}
+    for path in {link.split("#")[0] for link in links}:
+        if path in turns_by_path and any(len(content_words(line) & content_words(turns_by_path[path])) >= 2 for line in lines):
+            result.add(path)
+    return result
+
+
+def evidence_metrics(hits, gold, gold_turns, cutoffs=CUTOFFS):
+    gold = set(gold)
+    if not gold:
+        return {}
+    turns_by_path = collections.defaultdict(str)
+    for turn in gold_turns.values():
+        turns_by_path[turn["path"]] += " " + turn["text"]
+    metrics = {}
+    for k in cutoffs:
+        delivered = set().union(*(delivered_documents(hit, turns_by_path) for hit in hits[:k])) if hits[:k] else set()
+        count = len(delivered & gold)
+        metrics.update({f"evidence_recall@{k}": count / len(gold), f"evidence_all@{k}": int(count == len(gold))})
+    return metrics
+
+
 def normalized(text):
     return " ".join(unicodedata.normalize("NFC", text).split())
 
@@ -127,6 +171,8 @@ class MCP:
         self.sequence = 0
         self.call("initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
                                  "clientInfo": {"name": "myclip-retrieval-benchmark", "version": "1"}})
+        # Binaries before 2026-09-24 expose `search_memories`; comparing dated versions runs them unchanged.
+        self.tools = {tool["name"] for tool in self.call("tools/list", {})["tools"]}
 
     def call(self, method, params):
         self.sequence += 1
@@ -146,8 +192,13 @@ class MCP:
             raise RuntimeError(str(result))
         return result
 
-    def search(self, query):
-        return self.call("tools/call", {"name": "search_memories", "arguments": {"query": query, "limit": 20, "expand": False}})["structuredContent"]["memories"]
+    def search(self, query, limit=20):
+        if "memory_search" not in self.tools:
+            memories = self.call("tools/call", {"name": "search_memories", "arguments": {"query": query, "limit": limit, "expand": False}})
+            return memories["structuredContent"]["memories"]
+        results = self.call("tools/call", {"name": "memory_search", "arguments": {"query": query, "limit": limit}})["structuredContent"]["results"]
+        # A snippet holds up to two passages joined by an ellipsis line; scoring reads them as separate matches.
+        return [{**result, "matches": [{"text": text} for text in result.get("snippet", "").split("\n…\n") if text]} for result in results]
 
     def close(self):
         self.process.stdin.close()
@@ -165,8 +216,9 @@ def write_library(root, corpus):
         destination = root / "Memory" / path
         destination.parent.mkdir(parents=True, exist_ok=True)
         identity = uuid.uuid5(uuid.NAMESPACE_URL, corpus["key"] + "/" + path)
+        aliases = f"aliases: {json.dumps(document['aliases'], ensure_ascii=False)}\n" if document.get("aliases") else ""
         metadata = (f"---\nid: {identity}\nkind: memory\ntitle: {json.dumps(document['title'])}\n"
-                    "revision: 1\nagent: codex\nupdated_at: 2000-01-01T00:00:00Z\nsource_ids: []\n---\n")
+                    f"revision: 1\nagent: codex\nupdated_at: 2000-01-01T00:00:00Z\nsource_ids: []\n{aliases}---\n")
         destination.write_text(metadata + document["body"], encoding="utf-8")
 
 
@@ -192,6 +244,7 @@ def run_corpus(binary, corpus, output):
                 metrics = None
                 if question["skip_reason"] is None:
                     metrics = retrieval_metrics([h["path"] for h in hits], question["gold_documents"])
+                    metrics.update(evidence_metrics(hits, question["gold_documents"], question["gold_turns"]))
                     for k in CUTOFFS:
                         if question["gold_turns"]:
                             covered = covered_turns(hits[:k], question["gold_turns"])
@@ -243,17 +296,27 @@ def main():
     parser.add_argument("--binary", type=pathlib.Path, default=pathlib.Path(".build/release/myclip-mcp"))
     parser.add_argument("--output", type=pathlib.Path, required=True)
     parser.add_argument("--max-corpora", type=int, help="Smoke test only; omit for the full dataset")
+    parser.add_argument("--corpora", help="Half-open index range such as 0:5 (development split) or 5:10 (test split)")
+    parser.add_argument("--organized", type=pathlib.Path, help="Directory from organize.py (LoCoMo track B)")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     binary = args.binary.resolve(strict=True)
     samples = json.loads(args.data.read_text(encoding="utf-8"))
+    first = 0
+    if args.corpora:
+        first, last = (int(part) for part in args.corpora.split(":"))
+        samples = samples[first:last]
     if args.max_corpora is not None:
         samples = samples[:args.max_corpora]
     adapter = locomo_corpus if args.dataset == "locomo" else longmemeval_corpus
+    if args.organized:
+        # Track B: the prebuilt corpus replaces the raw adapter; the conversation index selects its file.
+        adapter = lambda sample, index: json.loads((args.organized / f"locomo-{index:02d}.json").read_text(encoding="utf-8"))
     metadata = {"dataset": args.dataset, "data_sha256": sha256(args.data), "binary_sha256": sha256(binary),
         "harness_sha256": sha256(pathlib.Path(__file__)), "platform": platform.platform(),
-        "python": platform.python_version(), "corpora_requested": len(samples),
-        "protocol": "raw session Markdown; unmodified question; one real MCP search; limit=20; no LLM",
+        "python": platform.python_version(), "corpora_requested": len(samples), "corpora_range": args.corpora,
+        "organized_corpus": str(args.organized) if args.organized else None,
+        "protocol": "raw session Markdown; unmodified question; one real memory_search call; limit=20; no LLM",
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     (args.output / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
     rows, imports, failures = [], [], []
@@ -261,7 +324,7 @@ def main():
     with (args.output / "queries.jsonl").open("w", encoding="utf-8") as output:
         for index, sample in enumerate(samples):
             try:
-                corpus = adapter(sample, index)
+                corpus = adapter(sample, first + index)
                 results, ingestion = run_corpus(binary, corpus, output)
                 rows.extend(results)
                 imports.append({"corpus": corpus["key"], "seconds": ingestion,

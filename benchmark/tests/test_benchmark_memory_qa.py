@@ -1,4 +1,3 @@
-import importlib.util
 import json
 import pathlib
 import subprocess
@@ -6,13 +5,12 @@ import sys
 import tempfile
 import unittest
 
+from benchmark import qa
+
 
 class MemoryQABenchmarkTests(unittest.TestCase):
     def setUp(self):
-        path = pathlib.Path(__file__).with_name("benchmark_memory_qa.py")
-        spec = importlib.util.spec_from_file_location("benchmark_memory_qa", path)
-        self.qa = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(self.qa)
+        self.qa = qa
 
     def test_locomo_normalization_and_f1_follow_the_official_rules(self):
         self.assertEqual(self.qa.normalize_answer("The Cat, and a dog!"), "cat dog")
@@ -59,7 +57,7 @@ class MemoryQABenchmarkTests(unittest.TestCase):
             data = pathlib.Path(directory) / "data.json"
             data.write_text(json.dumps([sample]))
             out = pathlib.Path(directory) / "out"
-            result = subprocess.run([sys.executable, str(pathlib.Path(__file__).with_name("benchmark_memory_qa.py")), "--dataset", "longmemeval",
+            result = subprocess.run([sys.executable, "-m", "benchmark.qa", "--dataset", "longmemeval",
                                      "--data", str(data), "--binary", str(binary), "--output", str(out), "--dry-run", "--concurrency", "1"],
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

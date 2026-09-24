@@ -1,16 +1,13 @@
-import importlib.util
 import io
 import pathlib
 import unittest
 
+from benchmark import retrieval
+
 
 class MemoryBenchmarkTests(unittest.TestCase):
     def setUp(self):
-        path = pathlib.Path(__file__).with_name("benchmark_memory.py")
-        self.assertTrue(path.exists(), "The retrieval benchmark harness is not implemented")
-        spec = importlib.util.spec_from_file_location("benchmark_memory", path)
-        self.bench = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(self.bench)
+        self.bench = retrieval
 
     def test_locomo_import_does_not_include_gold_or_generated_summaries(self):
         sample = {
@@ -82,10 +79,23 @@ class MemoryBenchmarkTests(unittest.TestCase):
         ]}]
         self.assertEqual(self.bench.covered_turns(hits, gold), ["turn-1"])
 
+    def test_linked_episode_counts_only_when_a_shown_line_restates_its_evidence(self):
+        turns = {"t1": {"path": "Daily/2023-05-08.md", "text": "Caroline adopted a rescue puppy named Oscar."},
+                 "t2": {"path": "Daily/2023-06-01.md", "text": "Melanie painted a lake sunrise."}}
+        gold = ["Daily/2023-05-08.md", "Daily/2023-06-01.md"]
+        raw = {"path": "Wiki/People/Caroline.md", "matches": [{"text":
+            "- Adopted rescue puppy Oscar [[Daily/2023-05-08|5/8]]\n- Went hiking [[Daily/2023-06-01|6/1]]"}]}
+        self.assertEqual(self.bench.delivered_documents(raw, {t["path"]: t["text"] for t in turns.values()}),
+                         {"Wiki/People/Caroline.md", "Daily/2023-05-08.md"}, "Older snippets carry the raw Wikilinks")
+        shown = {"path": "Wiki/People/Caroline.md", "links": ["Daily/2023-05-08.md#Puppy", "Daily/2023-06-01.md", "Wiki/People/Melanie.md"],
+                 "matches": [{"text": "- Adopted rescue puppy Oscar 5/8\n- Went hiking 6/1"}]}
+        metrics = self.bench.evidence_metrics([shown], gold, turns, cutoffs=(1,))
+        self.assertEqual(metrics, {"evidence_recall@1": 0.5, "evidence_all@1": 0})
+
     def test_real_import_validation_preserves_carriage_returns(self):
-        binary = pathlib.Path(__file__).resolve().parents[1] / ".build/release/myclip-mcp"
+        binary = pathlib.Path(__file__).resolve().parents[2] / ".build/debug/myclip-mcp"
         if not binary.exists():
-            self.skipTest("Build myclip-mcp in release mode for the integration test")
+            self.skipTest("Build myclip-mcp for the integration test")
         path, body = "Wiki/session-0001.md", "First line.\r\nCobalt calibration facts.\r\n"
         corpus = {"key": "line-ending-test", "documents": {path: {"title": "Conversation", "body": body}},
             "questions": [{"id": "q1", "question": "cobalt", "category": "test", "skip_reason": None,

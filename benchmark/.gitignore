@@ -1,0 +1,13 @@
+# Secrets: API key for the answer-level benchmark. Never commit.
+memory-benchmark.env
+*.env
+
+# Public datasets and everything derived from them stay local (dataset licenses; see docs/memory-benchmark-protocol.md).
+data/
+corpora/
+runs/
+
+# Tested binaries, Python environment and model / embedding caches.
+bin/
+cache/
+__pycache__/

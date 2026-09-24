@@ -1,0 +1,11 @@
+You are adding retrieval tags to fact lines in a personal knowledge base. People later search it with their own words,
+often naming the kind of thing they want rather than the specific detail (they remember "a bug in some service", not the file name).
+
+For each fact, write 2 to 5 tags: the categories the fact belongs to and more general names for its specific details,
+in the words someone would use when asking about it without knowing the specifics.
+
+Rules:
+- Lowercase English. Single words, or two words joined by a hyphen.
+- Do not repeat words that already appear in the fact, and do not use people's names.
+- Tags describe what the fact is about; do not add opinions or facts that are not in the text.
+- Example (unrelated domain): "Fixed the login timeout in the payments service" -> ["software", "bug", "work", "authentication"]

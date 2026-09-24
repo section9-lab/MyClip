@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """End-to-end QA benchmark: MyClip retrieval, then a reader model answers, then a judge scores.
 
-Retrieval reuses benchmark_memory.py (raw session Markdown, real MCP). Prompts and scoring follow the
+Retrieval reuses retrieval.py (raw session Markdown, real MCP). Prompts and scoring follow the
 official LoCoMo (token F1 with Porter stemming, category rules) and LongMemEval (per-type judge templates)
-code that is vendored under build/memory-benchmark/data. The LoCoMo LLM-judge accuracy is an additional,
+code that is vendored under benchmark/data. The LoCoMo LLM-judge accuracy is an additional,
 non-official metric reported separately for comparison with vendor self-reports.
 """
 
 import argparse
 import collections
 import concurrent.futures
-import importlib.util
 import json
-import os
 import pathlib
 import platform
 import re
@@ -21,77 +19,12 @@ import string
 import tempfile
 import threading
 import time
-import urllib.error
-import urllib.request
 
-HERE = pathlib.Path(__file__).resolve().parent
-ENV_FILE = pathlib.Path.home() / ".config/myclip/memory-benchmark.env"
-CATEGORY_NUMBERS = {"multi-hop": 1, "temporal": 2, "open-domain": 3, "single-hop": 4, "adversarial": 5}
-
-LOCOMO_HEADER = ("Below are excerpts from conversations between two people, {} and {}. The conversations take place over "
-                 "multiple days and the date of each conversation is written at the beginning of each excerpt.\n\n")
-LOCOMO_QA = ("\nBased on the above context, write an answer in the form of a short phrase for the following question. "
-             "Answer with exact words from the context whenever possible.\n\nQuestion: {} Short answer:\n")
-LOCOMO_QA_CAT5 = ("\nBased on the above context, answer the following question. If the information is not available in the "
-                  "context, answer 'No information available'.\n\nQuestion: {} Short answer:\n")
-LOCOMO_TEMPORAL_SUFFIX = " Use DATE of CONVERSATION to answer with an approximate date."
-LOCOMO_JUDGE = ("I will give you a question, a correct answer, and a response from a model. Please answer yes if the response "
-                "contains the correct answer or is semantically equivalent to it. Minor wording differences, extra context, or "
-                "approximate dates within the same week are fine. If the response contradicts the correct answer or only contains "
-                "part of the information required, answer no.\n\nQuestion: {}\n\nCorrect Answer: {}\n\nModel Response: {}\n\n"
-                "Is the model response correct? Answer yes or no only.")
-
-LME_READER = ("I will give you several history chats between you and a user. Please answer the question based on the relevant "
-              "chat history.\n\n\nHistory Chats:\n\n{}\n\nCurrent Date: {}\nQuestion: {}\nAnswer:")
-LME_JUDGE_DEFAULT = ("I will give you a question, a correct answer, and a response from a model. Please answer yes if the response "
-                     "contains the correct answer. Otherwise, answer no. If the response is equivalent to the correct answer or "
-                     "contains all the intermediate steps to get the correct answer, you should also answer yes. If the response "
-                     "only contains a subset of the information required by the answer, answer no. \n\nQuestion: {}\n\nCorrect "
-                     "Answer: {}\n\nModel Response: {}\n\nIs the model response correct? Answer yes or no only.")
-LME_JUDGE = {
-    "single-session-user": LME_JUDGE_DEFAULT, "single-session-assistant": LME_JUDGE_DEFAULT, "multi-session": LME_JUDGE_DEFAULT,
-    "temporal-reasoning": LME_JUDGE_DEFAULT.replace(
-        "answer no. \n\nQuestion",
-        "answer no. In addition, do not penalize off-by-one errors for the number of days. If the question asks for the number of "
-        "days/weeks/months, etc., and the model makes off-by-one errors (e.g., predicting 19 days when the answer is 18), the "
-        "model's response is still correct. \n\nQuestion"),
-    "knowledge-update": ("I will give you a question, a correct answer, and a response from a model. Please answer yes if the response "
-                         "contains the correct answer. Otherwise, answer no. If the response contains some previous information along "
-                         "with an updated answer, the response should be considered as correct as long as the updated answer is the "
-                         "required answer.\n\nQuestion: {}\n\nCorrect Answer: {}\n\nModel Response: {}\n\nIs the model response "
-                         "correct? Answer yes or no only."),
-    "single-session-preference": ("I will give you a question, a rubric for desired personalized response, and a response from a "
-                                  "model. Please answer yes if the response satisfies the desired response. Otherwise, answer no. The "
-                                  "model does not need to reflect all the points in the rubric. The response is correct as long as it "
-                                  "recalls and utilizes the user's personal information correctly.\n\nQuestion: {}\n\nRubric: {}\n\n"
-                                  "Model Response: {}\n\nIs the model response correct? Answer yes or no only."),
-}
-LME_JUDGE_ABSTENTION = ("I will give you an unanswerable question, an explanation, and a response from a model. Please answer yes if "
-                        "the model correctly identifies the question as unanswerable. The model could say that the information is "
-                        "incomplete, or some other information is given but the asked information is not.\n\nQuestion: {}\n\n"
-                        "Explanation: {}\n\nModel Response: {}\n\nDoes the model correctly identify the question as unanswerable? "
-                        "Answer yes or no only.")
-
-
-def load_module(name):
-    spec = importlib.util.spec_from_file_location(name, HERE / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-BENCH = load_module("benchmark_memory")
-
-
-def load_env(path=ENV_FILE):
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+from . import retrieval as BENCH
+from . import model
+from .model import ChatModel, load_env
+from .prompts import qa as qa_prompts
+from .prompts.qa import CATEGORY_NUMBERS, reader_prompt, judge_prompt
 
 
 try:
@@ -182,62 +115,6 @@ def build_context(hits, budget):
     return "\n\n".join(blocks), used
 
 
-def reader_prompt(dataset, question, context, speakers=None):
-    if dataset == "locomo":
-        category = CATEGORY_NUMBERS[question["category"]]
-        text = question["question"] + (LOCOMO_TEMPORAL_SUFFIX if category == 2 else "")
-        return LOCOMO_HEADER.format(*speakers) + context + (LOCOMO_QA_CAT5 if category == 5 else LOCOMO_QA).format(text)
-    return LME_READER.format(context, question.get("question_date") or "unknown", question["question"])
-
-
-def judge_prompt(dataset, question, response):
-    if dataset == "locomo":
-        return LOCOMO_JUDGE.format(question["question"], question["answer"], response)
-    if question["id"].endswith("_abs"):
-        return LME_JUDGE_ABSTENTION.format(question["question"], question["answer"], response)
-    return LME_JUDGE[question["category"]].format(question["question"], question["answer"], response)
-
-
-class ChatModel:
-    def __init__(self, model, base_url=None, api_key=None, mock=False, timeout=180, retries=6):
-        self.model, self.mock, self.timeout, self.retries = model, mock, timeout, retries
-        self.base_url = (base_url or os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")).rstrip("/")
-        self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
-        self.usage = collections.Counter()
-        self.lock = threading.Lock()
-        if not mock and not self.api_key:
-            raise SystemExit(f"OPENAI_API_KEY is not set; fill it in {ENV_FILE} (never paste it into chat).")
-
-    def complete(self, prompt, max_tokens):
-        if self.mock:
-            return "No information available" if max_tokens > 8 else "no"
-        body = json.dumps({"model": self.model, "temperature": 0, "max_tokens": max_tokens,
-                           "messages": [{"role": "user", "content": prompt}]}).encode()
-        request = urllib.request.Request(self.base_url + "/chat/completions", data=body, method="POST",
-                                         headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"})
-        delay = 2
-        for attempt in range(self.retries):
-            try:
-                with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                    payload = json.loads(response.read().decode())
-                usage = payload.get("usage") or {}
-                with self.lock:
-                    self.usage["prompt_tokens"] += usage.get("prompt_tokens", 0)
-                    self.usage["completion_tokens"] += usage.get("completion_tokens", 0)
-                    self.usage["requests"] += 1
-                return (payload["choices"][0]["message"]["content"] or "").strip()
-            except urllib.error.HTTPError as error:
-                detail = error.read().decode(errors="replace")[:300]
-                if error.code in (400, 401, 403, 404):
-                    raise RuntimeError(f"{self.model}: HTTP {error.code} {detail}") from None
-                last = f"HTTP {error.code} {detail}"
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, KeyError) as error:
-                last = repr(error)
-            time.sleep(delay)
-            delay = min(delay * 2, 60)
-        raise RuntimeError(f"{self.model}: gave up after {self.retries} attempts: {last}")
-
-
 def verdict(text):
     return 1 if text.strip().lower().startswith("yes") else 0
 
@@ -266,15 +143,9 @@ def run_corpus(args, corpus, reader, judge, executor, emit, done):
                 if question["id"] in done:
                     continue
                 started = time.perf_counter()
-                hits = client.call("tools/call", {"name": "search_memories", "arguments": {
-                    "query": question["question"], "limit": args.top_k, "expand": args.expand}})["structuredContent"]
+                hits = client.search(question["question"], limit=args.top_k)
                 latency = time.perf_counter() - started
-                context, used = build_context(hits["memories"], args.context_chars)
-                if args.expand:
-                    related = "\n\n".join(f"[Related: {r.get('title', '')}]\n" + "\n".join(v.get("passage", "") for v in r.get("via", []))
-                                          for r in hits.get("related", []))
-                    if related and len(context) + len(related) <= args.context_chars * 1.25:
-                        context += "\n\n" + related
+                context, used = build_context(hits, args.context_chars)
                 futures.append(executor.submit(score_question, args, question, corpus["key"], context, used, latency, reader, judge, emit))
         finally:
             client.close()
@@ -331,9 +202,8 @@ def main():
     parser.add_argument("--output", type=pathlib.Path, required=True)
     parser.add_argument("--reader", default="gpt-4.1-mini")
     parser.add_argument("--judge", default="gpt-4o")
-    parser.add_argument("--top-k", type=int, default=10, help="Memories requested from search_memories")
+    parser.add_argument("--top-k", type=int, default=10, help="Results requested from memory_search")
     parser.add_argument("--context-chars", type=int, default=12_000)
-    parser.add_argument("--expand", action="store_true", help="Also feed one-hop related passages to the reader")
     parser.add_argument("--reader-max-tokens", type=int, default=200)
     parser.add_argument("--concurrency", type=int, default=6)
     parser.add_argument("--max-corpora", type=int)
@@ -350,10 +220,11 @@ def main():
         samples = samples[:args.max_corpora]
     adapter = BENCH.locomo_corpus if args.dataset == "locomo" else BENCH.longmemeval_corpus
     metadata = {"dataset": args.dataset, "data_sha256": BENCH.sha256(args.data), "binary_sha256": BENCH.sha256(args.binary),
-                "harness_sha256": BENCH.sha256(pathlib.Path(__file__)), "retrieval_harness_sha256": BENCH.sha256(HERE / "benchmark_memory.py"),
-                "reader": args.reader, "judge": args.judge, "top_k": args.top_k, "context_chars": args.context_chars, "expand": args.expand,
+                "harness_sha256": BENCH.sha256(pathlib.Path(__file__)), "retrieval_harness_sha256": BENCH.sha256(pathlib.Path(BENCH.__file__)),
+                "prompts_sha256": BENCH.sha256(pathlib.Path(qa_prompts.__file__)), "model_client_sha256": BENCH.sha256(pathlib.Path(model.__file__)),
+                "reader": args.reader, "judge": args.judge, "top_k": args.top_k, "context_chars": args.context_chars,
                 "stemming": STEMMING, "dry_run": args.dry_run, "platform": platform.platform(), "python": platform.python_version(),
-                "protocol": "question as query; one search_memories call; passages of top-k memories in rank order; official LoCoMo/LongMemEval prompts and scoring",
+                "protocol": "question as query; one memory_search call; passages of top-k memories in rank order; official LoCoMo/LongMemEval prompts and scoring",
                 "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     (args.output / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
     output_path = args.output / "queries.jsonl"

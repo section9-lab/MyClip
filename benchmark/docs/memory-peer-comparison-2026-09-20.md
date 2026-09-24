@@ -59,7 +59,7 @@ Sibyl 公开了 500 题的各类别 Recall@5，因此可以与 MyClip 的同范�
 
 ## 可复核产物
 
-- [MyClip 500 题重计汇总](../build/memory-benchmark/peer-comparison-2026-09-20/myclip-500-summary.json)
-- [MyClip 500 题重计明细](../build/memory-benchmark/peer-comparison-2026-09-20/myclip-500-per-question.jsonl)
-- [公开来源固定版本、文件与校验值](../build/memory-benchmark/peer-comparison-2026-09-20/sources.json)
+- [MyClip 500 题重计汇总](../runs/2026-09-20/peer-comparison-2026-09-20/myclip-500-summary.json)
+- [MyClip 500 题重计明细](../runs/2026-09-20/peer-comparison-2026-09-20/myclip-500-per-question.jsonl)
+- [公开来源固定版本、文件与校验值](../runs/2026-09-20/peer-comparison-2026-09-20/sources.json)
 - [原始 470 题评分报告](memory-benchmark-2026-09-20.md)

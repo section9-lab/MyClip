@@ -100,9 +100,9 @@ LoCoMo 每个对话只有 19–32 个会话文件，LongMemEval 每题有 38–6
 - 片段评分已验证允许同一证据跨多个返回段落；最终分数由保存的实际搜索输出重新计分，未调整检索实现、查询或证据标签。
 - 核心代码和被测二进制已保存快照与校验值；工作区本来存在未提交修改，因此仅凭 Git HEAD 不能复现本次实现。
 
-[LoCoMo 汇总](../build/memory-benchmark/locomo-final/summary.json) · [逐题结果](../build/memory-benchmark/locomo-final/queries.jsonl)  
-[LongMemEval 汇总](../build/memory-benchmark/longmemeval-final/summary.json) · [逐题结果](../build/memory-benchmark/longmemeval-final/queries.jsonl)  
-[数据版本](../build/memory-benchmark/data/manifest.json) · [源码校验](../build/memory-benchmark/source-manifest.json) · [脚本](../Scripts/benchmark_memory.py)
+[LoCoMo 汇总](../runs/2026-09-20/locomo-final/summary.json) · [逐题结果](../runs/2026-09-20/locomo-final/queries.jsonl)\
+[LongMemEval 汇总](../runs/2026-09-20/longmemeval-final/summary.json) · [逐题结果](../runs/2026-09-20/longmemeval-final/queries.jsonl)\
+[数据版本](../data/manifest.json) · [源码校验](../runs/2026-09-20/source-manifest.json) · [脚本](../scripts/benchmark_memory.py)
 
 
 ## 如何理解与业界的差距
