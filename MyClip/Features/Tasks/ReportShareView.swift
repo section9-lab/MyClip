@@ -2,44 +2,67 @@ import AppKit
 import SwiftUI
 import MyClipCore
 
-/// The share popover of a work report: a preview of what leaves MyClip, the apps it can go to, and the system share
+/// The share card of a work report: a preview of what leaves MyClip, the apps it can go to, and the system share
 /// menu for everything else (Mail, Messages, Notes, AirDrop).
 struct ReportSharePanel: View {
     let document: WorkTaskReportDocument
     let shared: () -> Void
     @State private var apps: [ReportShareDestination: URL] = ReportSharing.installedApps()
     @State private var moreAnchor = ViewAnchor()
-    private let columns = Array(repeating: GridItem(.fixed(72), spacing: 16), count: 4)
+    @State private var copied = false
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
     private var installed: Set<String> { Set(apps.keys.compactMap(\.bundleID)) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("分享报告").font(.title3.weight(.semibold))
-            preview
-            VStack(alignment: .leading, spacing: 12) {
-                Text("分享到").font(.callout.weight(.medium)).foregroundStyle(.secondary)
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-                    ForEach(ReportShareDestination.available { installed.contains($0) }) { destination in
-                        ShareTile(title: destination.name, help: help(destination)) {
-                            DestinationIcon(destination: destination, app: apps[destination])
-                        } action: {
-                            ReportSharing.share(document, to: destination, app: apps[destination])
-                            shared()
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("分享报告").font(.system(size: 17, weight: .semibold))
+                Spacer()
+                Button(action: shared) {
+                    Image(systemName: "xmark").font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary).frame(width: 24, height: 24).contentShape(Circle())
+                }
+                .buttonStyle(.plain).accessibilityLabel(String(localized: "关闭"))
+                .keyboardShortcut(.cancelAction).help(String(localized: "关闭"))
+            }
+            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 8)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    preview
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("分享到").font(.callout.weight(.medium))
+                        LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
+                            ShareTile(title: copied ? String(localized: "已复制") : String(localized: "复制"), help: String(localized: "复制报告")) {
+                                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                    .font(.system(size: 22, weight: .regular))
+                                    .foregroundStyle(copied ? Color.accentColor : Color.primary)
+                            } action: {
+                                copied = ReportSharing.copy(document)
+                            }
+                            ForEach(ReportShareDestination.available { installed.contains($0) }) { destination in
+                                ShareTile(title: destination.name, help: help(destination)) {
+                                    DestinationIcon(destination: destination, app: apps[destination])
+                                } action: {
+                                    ReportSharing.share(document, to: destination, app: apps[destination])
+                                    shared()
+                                }
+                            }
+                            ShareTile(title: String(localized: "更多"), help: String(localized: "通过邮件、信息、备忘录或隔空投送分享")) {
+                                Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(.secondary)
+                            } action: {
+                                guard let view = moreAnchor.view else { return }
+                                ReportSharingPicker.show(document, from: view, chosen: shared)
+                            }
+                            .background(ViewAnchorView(anchor: moreAnchor))
                         }
                     }
-                    ShareTile(title: String(localized: "更多"), help: String(localized: "通过邮件、信息、备忘录或隔空投送分享")) {
-                        Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(.secondary)
-                    } action: {
-                        guard let view = moreAnchor.view else { return }
-                        ReportSharingPicker.show(document, from: view, chosen: shared)
-                    }
-                    .background(ViewAnchorView(anchor: moreAnchor))
-                }
+                    Text("报告会带格式复制并打开所选应用，在会话、邮件或文档中粘贴（⌘V）即可。")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }.padding(.horizontal, 20).padding(.bottom, 20)
             }
-            Text("报告会带格式复制并打开所选应用，在会话、邮件或文档中粘贴（⌘V）即可。")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
-        .padding(22).frame(width: 380)
+        .background(Color(nsColor: .textBackgroundColor))
+        .onChange(of: document) { _ in copied = false }
     }
 
     private func help(_ destination: ReportShareDestination) -> String {
@@ -50,30 +73,36 @@ struct ReportSharePanel: View {
     }
 
     private var preview: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(document.title).font(.system(size: 14, weight: .semibold))
-            Text(document.dateTitle).font(.system(size: 10)).foregroundStyle(.secondary)
-            Divider().padding(.vertical, 3)
+        VStack(alignment: .leading, spacing: 10) {
+            Text(document.title).font(.system(size: 18, weight: .semibold))
+            Text(document.dateTitle).font(.system(size: 11)).foregroundStyle(.secondary)
+            Divider().padding(.vertical, 4)
             ForEach(Array(previewRows.enumerated()), id: \.offset) { _, row in
                 switch row {
                 case .section(let title):
-                    Text(title).font(.system(size: 11, weight: .semibold)).padding(.top, 2)
+                    Text(title).font(.system(size: 12, weight: .medium)).padding(.top, 2)
                 case .item(let item):
-                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Image(systemName: item.status == .done ? "checkmark.circle.fill" : item.status == .doing ? "circle.lefthalf.filled" : "circle")
-                            .font(.system(size: 9)).foregroundStyle(item.status.tint)
-                        Text(item.title).font(.system(size: 10.5)).lineLimit(1)
+                            .font(.system(size: 10)).foregroundStyle(item.status.tint)
+                        Text(item.title).font(.system(size: 12)).foregroundStyle(.secondary)
+                            .lineLimit(2).lineSpacing(3)
                     }
                 }
             }
         }
-        .padding(16).frame(width: 248, height: 156, alignment: .topLeading)
-        .mask(LinearGradient(stops: [.init(color: .black, location: 0.62), .init(color: .clear, location: 0.97)], startPoint: .top, endPoint: .bottom))
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .textBackgroundColor))
-            .shadow(color: .black.opacity(0.12), radius: 10, y: 4))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08)))
-        .frame(maxWidth: .infinity).padding(.vertical, 20)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.04)))
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(18).frame(width: 224, height: 200, alignment: .topLeading)
+        .mask(LinearGradient(stops: [.init(color: .black, location: 0.55), .init(color: .clear, location: 0.97)], startPoint: .top, endPoint: .bottom))
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .textBackgroundColor))
+            .shadow(color: .black.opacity(0.06), radius: 14, y: 6))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.1)))
+        .overlay(alignment: .topLeading) {
+            Image(systemName: "paperclip").font(.system(size: 26, weight: .light))
+                .foregroundStyle(.tertiary).rotationEffect(.degrees(-20))
+                .offset(x: 9, y: -10).accessibilityHidden(true)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 10)
         .accessibilityElement(children: .combine)
     }
 
@@ -100,13 +129,14 @@ private struct ShareTile<Icon: View>: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 7) {
+            VStack(spacing: 8) {
                 icon()
-                    .frame(width: 58, height: 58)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(hovering ? 0.1 : 0.05)))
-                Text(title).font(.caption).foregroundStyle(.primary).lineLimit(1)
+                    .accessibilityHidden(true)
+                    .frame(width: 48, height: 48)
+                    .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Color.primary.opacity(hovering ? 0.08 : 0.035)))
+                Text(title).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
             }
-            .frame(width: 72).contentShape(Rectangle())
+            .frame(maxWidth: .infinity).contentShape(Rectangle())
         }
         .buttonStyle(.plain).help(help)
         .onHover { hovering = $0 }
@@ -119,9 +149,9 @@ private struct DestinationIcon: View {
 
     var body: some View {
         if let app {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: app.path)).resizable().frame(width: 40, height: 40)
+            Image(nsImage: NSWorkspace.shared.icon(forFile: app.path)).resizable().frame(width: 32, height: 32)
         } else if destination == .gmail {
-            GmailMark().frame(width: 30, height: 23)
+            GmailMark().frame(width: 26, height: 20)
         } else {
             // Web-only destinations get a monogram in the product's colour rather than a copy of its artwork.
             let (letter, color): (String, Color) = switch destination {
@@ -136,6 +166,7 @@ private struct DestinationIcon: View {
             }
             RoundedRectangle(cornerRadius: 8).fill(color).frame(width: 32, height: 32)
                 .overlay(Text(letter).font(.system(size: 17, weight: .bold, design: destination == .notion ? .serif : .default)).foregroundStyle(.white))
+                .drawingGroup()
         }
     }
 }
@@ -210,7 +241,8 @@ enum ReportSharing {
 
     /// Puts HTML for web-based apps (Slack, Notion, Feishu, DingTalk, Gmail), RTF for native text views and plain text
     /// for everything else on the pasteboard, so each app pastes the richest form it understands.
-    static func copy(_ document: WorkTaskReportDocument, to pasteboard: NSPasteboard = .general) {
+    @discardableResult
+    static func copy(_ document: WorkTaskReportDocument, to pasteboard: NSPasteboard = .general) -> Bool {
         let item = NSPasteboardItem()
         item.setString(document.html, forType: .html)
         if let rich = richText(document),
@@ -219,7 +251,7 @@ enum ReportSharing {
         }
         item.setString(document.plainText, forType: .string)
         pasteboard.clearContents()
-        pasteboard.writeObjects([item])
+        return pasteboard.writeObjects([item])
     }
 
     static func richText(_ document: WorkTaskReportDocument) -> NSAttributedString? {

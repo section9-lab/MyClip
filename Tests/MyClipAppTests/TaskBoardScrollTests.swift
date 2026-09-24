@@ -114,6 +114,26 @@ struct TaskBoardScrollTests {
         model.showingTaskReports = false
         try await settle()
         check(columns().count == 3, "Returning from reports restores the three independently scrollable columns")
+
+        let report = WorkTaskReport(period: .day, containing: Date(), tasks: model.workTasks, events: model.workTaskEvents)
+        for height in [360.0, 520.0] {
+            let share = NSHostingView(rootView: ReportSharePanel(document: report.document, shared: {}))
+            window.contentView = share
+            window.setContentSize(NSSize(width: 360, height: height))
+            try await settle()
+            let scrolls = scrollViews(in: share)
+            check(scrolls.count == 1, "Share actions remain scrollable in a short window")
+            if let scroll = scrolls.first, let content = scroll.documentView {
+                check(share.bounds.insetBy(dx: -1, dy: -1).contains(scroll.convert(scroll.bounds, to: share)),
+                      "Share actions stay inside a 360 × \(Int(height)) viewport")
+                check(content.bounds.width <= scroll.contentSize.width + 1, "Share content fits without horizontal scrolling")
+                scroll.contentView.scroll(to: NSPoint(x: 0, y: max(0, content.bounds.height - scroll.contentSize.height)))
+                scroll.reflectScrolledClipView(scroll.contentView)
+                try await settle()
+                check(abs(scroll.documentVisibleRect.maxY - content.bounds.maxY) < 2,
+                      "The last share action is reachable at height \(Int(height))")
+            }
+        }
         print("Task board scrolling checks: \(failures) failure(s)")
         if failures > 0 { exit(1) }
     }
