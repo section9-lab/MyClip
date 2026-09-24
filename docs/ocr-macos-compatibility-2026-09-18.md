@@ -23,7 +23,7 @@ Host: macOS 27.0 (26A428), Xcode 26.0 (17A324), macOS 26 SDK.
 
 - The five document-persistence regression tests failed before implementation and passed afterward.
 - `swift test`: 177 tests, zero failures, six existing opt-in external integration tests skipped. Includes Chinese/English OCR, concurrent requests, document persistence, blank images, corrupt-image retry, search, and expiration.
-- `bash Scripts/test_screenshot_documents.sh`: all seven checks passed. Compiles the real app model and capture service for macOS 13; checks background backfill while AI organization is off/paused, corrupt-image isolation and retry, no capture in preview, and nested preference notifications.
+- `bash Scripts/test.sh app ScreenshotDocumentTests`: all seven checks passed. Compiles the real app model and capture service for macOS 13; checks background backfill while AI organization is off/paused, corrupt-image isolation and retry, no capture in preview, and nested preference notifications.
 - Capture lifecycle checks compiled with a macOS 13 target: zero failures.
 - Debug and universal Release app builds succeeded. Both arm64 and x86_64 executable slices report `LC_BUILD_VERSION minos 13.0`; the app's `LSMinimumSystemVersion` is `13.0`.
 - On macOS 27, preview UI verification confirmed OCR text, immediate cached reopening, and opening the matching `.txt` in TextEdit. Memory headings, tables, long-document scrolling, and saved scroll position were also checked with temporary preview data.

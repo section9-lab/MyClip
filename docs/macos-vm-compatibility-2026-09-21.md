@@ -77,7 +77,7 @@ An additional `CaptureAPISmoke` executable links the production `WindowImageCapt
 
 The file-row failure occurred in two sessions separated by a full guest restart. On macOS 14.8.7, clicking both `Now.md` and `Profile.md` selected the expected document immediately; clicking `Profile.md` also worked on macOS 26.6.2. Opening a file through its folder's content area remains a usable workaround on macOS 13.
 
-The relevant UI is `MemoryDirectoryView` in `MyClip/Features/Library/MyClipViews.swift`, where an `OutlineGroup` supplies tags to a selection-bound `List`. Existing `MemoryScrollTests` cover the document reader, not directory row selection, so their passing result did not cover this failure.
+The relevant UI is `MemoryDirectoryView` in `MyClip/Features/Memory/KnowledgeLibraryView.swift`, where an `OutlineGroup` supplies tags to a selection-bound `List`. Existing `MemoryScrollTests` cover the document reader, not directory row selection, so their passing result did not cover this failure.
 
 ## Follow-up: Memory directory selection fix
 
@@ -85,7 +85,7 @@ The original outline identified nodes by their string paths, while the list sele
 
 The production change is one line: explicitly give `OutlineGroup` the identifier key path `id: \.selection`. Row identity now matches the selection value. The existing binding, folder navigation, document renderer, and list styling remain in place.
 
-`Scripts/test_memory_directory.sh` compiles the production views and model into a native AppKit/SwiftUI harness. It uses a temporary library and preview-mode model without starting capture or AI agents. The test selects real outline rows and checks document selection, row highlighting, empty folders, selection while searching, nested files, and folder expansion/collapse. It exercises native selection callbacks, not synthesized mouse events.
+`Scripts/test.sh app MemoryDirectoryTests` compiles the production views and model into a native AppKit/SwiftUI harness. It uses a temporary library and preview-mode model without starting capture or AI agents. The test selects real outline rows and checks document selection, row highlighting, empty folders, selection while searching, nested files, and folder expansion/collapse. It exercises native selection callbacks, not synthesized mouse events.
 
 | Check | Before the fix | After the fix |
 | --- | --- | --- |
@@ -100,8 +100,8 @@ The signed Release build succeeded and remains universal, with executable SHA-25
 Follow-up logs, the before/after source comparison, test executables, and the fixed app are retained under `build/memory-directory-fix/`. Run the focused checks from the repository root with:
 
 ```sh
-bash Scripts/test_memory_directory.sh
-bash Scripts/test_memory_scrolling.sh
+bash Scripts/test.sh app MemoryDirectoryTests
+bash Scripts/test.sh app MemoryScrollTests
 ```
 
 ## Limits
@@ -123,11 +123,11 @@ Tart was run from the isolated executable `build/macos-vm-compat-20260921/runtim
 The host harnesses are reproducible with:
 
 ```sh
-bash Scripts/test_capture_lifecycle.sh
-bash Scripts/test_screenshot_documents.sh
-bash Scripts/test_capture_filters.sh
-bash Scripts/test_memory_scrolling.sh
-bash Scripts/test_task_board_scrolling.sh
+bash Scripts/test.sh app CaptureLifecycleTests
+bash Scripts/test.sh app ScreenshotDocumentTests
+bash Scripts/test.sh app CaptureFilterModelTests
+bash Scripts/test.sh app MemoryScrollTests
+bash Scripts/test.sh app TaskBoardScrollTests
 ```
 
 The artifact directory includes `CompatibilityFixture.swift`, and its `payload` contains `run-guest-checks.sh`. Mount `payload` read-only and a separate `results` directory read-write, then execute from the repository root:

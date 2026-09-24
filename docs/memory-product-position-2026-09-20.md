@@ -28,7 +28,7 @@ MyClip 在 LoCoMo 内部按第一项指标排序：
 
 这是不同题型的实测表现排序，并非等难度能力测验；时间相关题的召回率也不是时间推理正确率。
 
-原始汇总：[LoCoMo](../build/memory-benchmark/locomo-final/summary.json)、[LongMemEval](../build/memory-benchmark/longmemeval-final/summary.json)。完整方法、排除规则与局限见 [本地评测报告](memory-benchmark-2026-09-20.md) 和 [评测协议](memory-benchmark-protocol.md)。
+原始汇总：[LoCoMo](../benchmark/runs/2026-09-20/locomo-final/summary.json)、[LongMemEval](../benchmark/runs/2026-09-20/longmemeval-final/summary.json)。完整方法、排除规则与局限见 [本地评测报告](../benchmark/docs/memory-benchmark-2026-09-20.md) 和 [评测协议](../benchmark/docs/memory-benchmark-protocol.md)。
 
 ## 外部参考排名：同一个 MemEval 评测套件
 

@@ -1,6 +1,6 @@
 # Memory 检索与链接图改造（2026-09-21）
 
-本文记录 2026-09-21 对 MyClip 记忆检索层的一次结构性修改：让检索器感知 Wikilink 图、缩小 MCP 载荷、把 Agent 协议改为搜索优先、并给写入规则加上可执行的检查。配套评测口径见 [评测协议](memory-benchmark-protocol.md)，此前定位出的短板见 [本地评测报告](memory-benchmark-2026-09-20.md)。
+本文记录 2026-09-21 对 MyClip 记忆检索层的一次结构性修改：让检索器感知 Wikilink 图、缩小 MCP 载荷、把 Agent 协议改为搜索优先、并给写入规则加上可执行的检查。配套评测口径见 [评测协议](../benchmark/docs/memory-benchmark-protocol.md)，此前定位出的短板见 [本地评测报告](../benchmark/docs/memory-benchmark-2026-09-20.md)。
 
 ## 起因
 
@@ -36,7 +36,7 @@
 
 多查询 `["JEV", "TypeSafe", "路由"]` 下，Daily 2026-09-20 与 chat-bridge 页同时命中三个子查询并排在前两位。
 
-这些是单次本机观测，不是评测分数；LoCoMo 与 LongMemEval 基线在协议里显式传 `expand: false`，保持与 9 月 20 日结果可比。链接扩展的收益需要在带链接的语料上另行评测。 改造后按原协议复跑的结果见 [2026-09-21 复跑报告](memory-benchmark-2026-09-21.md)：LoCoMo all@5 77.5% → 78.9%，多跳 26.9% → 34.1%；LongMemEval-S all@5 83.4% → 84.5%，跨会话 66.1% → 69.4%。这部分提升来自词干归一化，单跳与开放域有小幅边界抖动。
+这些是单次本机观测，不是评测分数；LoCoMo 与 LongMemEval 基线在协议里显式传 `expand: false`，保持与 9 月 20 日结果可比。链接扩展的收益需要在带链接的语料上另行评测。 改造后按原协议复跑的结果见 [2026-09-21 复跑报告](../benchmark/docs/memory-benchmark-2026-09-21.md)：LoCoMo all@5 77.5% → 78.9%，多跳 26.9% → 34.1%；LongMemEval-S all@5 83.4% → 84.5%，跨会话 66.1% → 69.4%。这部分提升来自词干归一化，单跳与开放域有小幅边界抖动。
 
 ## 邻居评分规则
 
