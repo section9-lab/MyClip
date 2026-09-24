@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Watch MyClip's 45-second desktop demo in HD, from onboarding to memory recall in Codex and Claude.">
+    <title>MyClip · HD demo</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #151619; color: #f4f4f5; font: 15px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+      main { width: min(1600px, calc(100% - 48px), calc((100svh - 180px) * 1.6)); margin: 32px auto; }
+      header, footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+      header { margin-bottom: 20px; }
+      h1 { font-size: 22px; margin: 0; letter-spacing: -.5px; }
+      p { margin: 4px 0 0; color: #b4b5ba; }
+      a { color: inherit; text-underline-offset: 4px; }
+      a:focus-visible { outline: 2px solid #83b6ff; outline-offset: 5px; }
+      .download { border: 1px solid #45464c; border-radius: 8px; padding: 8px 14px; text-decoration: none; white-space: nowrap; }
+      .download:hover { background: #25262c; }
+      video { display: block; width: 100%; aspect-ratio: 8 / 5; border-radius: 12px; background: #08090b; }
+      footer { margin-top: 18px; color: #b4b5ba; font-size: 13px; }
+      @media (max-width: 600px) { main { width: calc(100% - 24px); margin: 20px auto; } header, footer { align-items: flex-start; flex-wrap: wrap; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div><h1>MyClip</h1><p>Desktop demo · 45 seconds · 1600 × 1000 · 30 fps</p></div>
+        <a class="download" href="../images/myclip-demo.mp4" download>Download MP4</a>
+      </header>
+      <video controls autoplay muted playsinline preload="metadata" poster="../images/myclip-demo-poster.jpg" aria-label="MyClip desktop demo in HD">
+        <source src="../images/myclip-demo.mp4" type="video/mp4">
+        <p><a href="../images/myclip-demo.mp4">Download the MP4 video.</a></p>
+      </video>
+      <footer>
+        <span>HTML reconstruction · Sample data · Chinese interface</span>
+        <a href="https://github.com/section9-lab/MyClip">View MyClip on GitHub</a>
+      </footer>
+    </main>
+  </body>
+</html>
