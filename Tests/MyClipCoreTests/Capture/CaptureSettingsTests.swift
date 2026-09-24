@@ -6,7 +6,7 @@ final class CaptureSettingsTests: XCTestCase {
         let settings = CaptureSettings(scope: .focusedDisplay, mouseTriggers: [.scroll], keyboard: .afterLetters)
         let explanation = String(describing: settings)
         XCTAssertTrue(explanation.contains("焦点窗口所在的显示器"))
-        XCTAssertTrue(explanation.contains("上下滚动停止 2 秒"))
+        XCTAssertTrue(explanation.contains("scroll向下滚动后静止3秒"))
         XCTAssertTrue(explanation.contains("字母键后再回车"))
         XCTAssertFalse(explanation.contains("点击"))
         XCTAssertFalse(explanation.contains("只记录"))

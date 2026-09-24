@@ -3514,42 +3514,42 @@
         }
       }
     },
-    "MyClip 将应用窗口中的信息，整理为有来源的本地知识。\n\n## 从一张截图开始\n\n鼠标移动后静止一秒，再点击或双击；上下滚动停止两秒；或按下回车，记录当前应用的焦点窗口。重复画面共享一份图片，每次出现的时间仍被保留。\n\n## 从记录到理解\n\nCodex 或 Claude 通过 ACP 读取截图，整理 Memory。点击下方来源，可以回到知识产生的那一刻。\n\n这是用于验证界面的示例内容。": {
+    "MyClip 将应用窗口中的信息，整理为有来源的本地知识。\n\n## 从一张截图开始\n\n鼠标移动后五秒内点击或双击；向下滚动后静止三秒；或按下回车，记录当前应用的焦点窗口。重复画面共享一份图片，每次出现的时间仍被保留。\n\n## 从记录到理解\n\nCodex 或 Claude 通过 ACP 读取截图，整理 Memory。点击下方来源，可以回到知识产生的那一刻。\n\n这是用于验证界面的示例内容。": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyClip organisiert die Informationen aus App-Fenstern zu lokalem Wissen mit Quellenangaben.\n\n## Mit einem Bildschirmfoto beginnen\n\nBewege die Maus, halte sie eine Sekunde still und klicke oder doppelklicke; höre zwei Sekunden lang auf zu scrollen; oder drücke den Zeilenschalter, um das aktive Fenster der aktuellen App aufzunehmen. Wiederholte Bilder teilen sich eine Bilddatei, der Zeitpunkt jedes Vorkommens bleibt erhalten.\n\n## Von der Aufzeichnung zum Verständnis\n\nCodex oder Claude lesen die Bildschirmfotos über ACP und organisieren Memory. Klicke unten auf eine Quelle, um zu dem Moment zurückzukehren, in dem das Wissen entstanden ist.\n\nDies ist Beispielinhalt zur Überprüfung der Oberfläche."
+            "value": "MyClip organisiert die Informationen aus App-Fenstern zu lokalem Wissen mit Quellenangaben.\n\n## Mit einem Bildschirmfoto beginnen\n\nKlicke oder doppelklicke innerhalb von fünf Sekunden nach einer Mausbewegung; scrolle nach unten und pausiere drei Sekunden; oder drücke den Zeilenschalter, um das aktive Fenster der aktuellen App aufzunehmen. Wiederholte Bilder teilen sich eine Bilddatei, der Zeitpunkt jedes Vorkommens bleibt erhalten.\n\n## Von der Aufzeichnung zum Verständnis\n\nCodex oder Claude lesen die Bildschirmfotos über ACP und organisieren Memory. Klicke unten auf eine Quelle, um zu dem Moment zurückzukehren, in dem das Wissen entstanden ist.\n\nDies ist Beispielinhalt zur Überprüfung der Oberfläche."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyClip turns the information in your app windows into local knowledge with sources.\n\n## Start with a Screenshot\n\nMove the mouse, pause for one second, then click or double-click; stop scrolling for two seconds; or press Return to record the focused window of the current app. Repeated frames share one image, while the time of each occurrence is still kept.\n\n## From Records to Understanding\n\nCodex or Claude reads the screenshots through ACP and organizes Memory. Click a source below to return to the moment the knowledge was created.\n\nThis is sample content for verifying the interface."
+            "value": "MyClip turns the information in your app windows into local knowledge with sources.\n\n## Start with a Screenshot\n\nClick or double-click within five seconds of moving the mouse; scroll down and stop for three seconds; or press Return to record the focused window of the current app. Repeated frames share one image, while the time of each occurrence is still kept.\n\n## From Records to Understanding\n\nCodex or Claude reads the screenshots through ACP and organizes Memory. Click a source below to return to the moment the knowledge was created.\n\nThis is sample content for verifying the interface."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyClip convierte la información de las ventanas de tus apps en conocimiento local con fuentes.\n\n## Empieza con una captura de pantalla\n\nMueve el ratón, déjalo quieto un segundo y luego haz clic o doble clic; desplázate y detente dos segundos; o pulsa Retorno para registrar la ventana con el foco de la app actual. Las imágenes repetidas comparten un solo archivo, pero se conserva la hora de cada aparición.\n\n## Del registro a la comprensión\n\nCodex o Claude leen las capturas mediante ACP y organizan Memory. Haz clic en una fuente más abajo para volver al momento en que surgió ese conocimiento.\n\nEste es un contenido de ejemplo para validar la interfaz."
+            "value": "MyClip convierte la información de las ventanas de tus apps en conocimiento local con fuentes.\n\n## Empieza con una captura de pantalla\n\nHaz clic o doble clic dentro de los cinco segundos después de mover el ratón; desplázate hacia abajo y detente tres segundos; o pulsa Retorno para registrar la ventana con el foco de la app actual. Las imágenes repetidas comparten un solo archivo, pero se conserva la hora de cada aparición.\n\n## Del registro a la comprensión\n\nCodex o Claude leen las capturas mediante ACP y organizan Memory. Haz clic en una fuente más abajo para volver al momento en que surgió ese conocimiento.\n\nEste es un contenido de ejemplo para validar la interfaz."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyClip transforme les informations affichées dans vos fenêtres en connaissances locales accompagnées de leurs sources.\n\n## Tout commence par une capture d'écran\n\nDéplacez la souris, laissez-la immobile une seconde, puis cliquez ou double-cliquez ; faites défiler puis arrêtez-vous deux secondes ; ou appuyez sur Retour : la fenêtre au premier plan de l'app active est enregistrée. Les images identiques partagent un seul fichier, mais l'heure de chaque occurrence est conservée.\n\n## De l'enregistrement à la compréhension\n\nCodex ou Claude lit les captures via ACP et organise Memory. Cliquez sur une source ci-dessous pour revenir à l'instant où la connaissance est née.\n\nCeci est un exemple de contenu destiné à vérifier l'interface."
+            "value": "MyClip transforme les informations affichées dans vos fenêtres en connaissances locales accompagnées de leurs sources.\n\n## Tout commence par une capture d'écran\n\nCliquez ou double-cliquez dans les cinq secondes après avoir déplacé la souris ; faites défiler vers le bas puis arrêtez-vous trois secondes ; ou appuyez sur Retour : la fenêtre au premier plan de l'app active est enregistrée. Les images identiques partagent un seul fichier, mais l'heure de chaque occurrence est conservée.\n\n## De l'enregistrement à la compréhension\n\nCodex ou Claude lit les captures via ACP et organise Memory. Cliquez sur une source ci-dessous pour revenir à l'instant où la connaissance est née.\n\nCeci est un exemple de contenu destiné à vérifier l'interface."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyClip はアプリのウインドウに表示された情報を、出典付きのローカルナレッジとして整理します。\n\n## 1 枚のスクリーンショットから\n\nマウスを動かして 1 秒静止した後にクリックまたはダブルクリック、上下スクロールを 2 秒停止、または Return キーを押すと、現在のアプリのフォーカスウインドウを記録します。同じ画面は 1 枚の画像を共有し、それぞれの出現時刻は保持されます。\n\n## 記録から理解へ\n\nCodex または Claude が ACP 経由でスクリーンショットを読み取り、Memory を整理します。下のソースをクリックすると、その知識が生まれた瞬間に戻れます。\n\nこれはインターフェイス確認用のサンプルコンテンツです。"
+            "value": "MyClip はアプリのウインドウに表示された情報を、出典付きのローカルナレッジとして整理します。\n\n## 1 枚のスクリーンショットから\n\nマウスを動かしてから5秒以内にクリックまたはダブルクリック、下にスクロールしてから3秒静止、または Return キーを押すと、現在のアプリのフォーカスウインドウを記録します。同じ画面は 1 枚の画像を共有し、それぞれの出現時刻は保持されます。\n\n## 記録から理解へ\n\nCodex または Claude が ACP 経由でスクリーンショットを読み取り、Memory を整理します。下のソースをクリックすると、その知識が生まれた瞬間に戻れます。\n\nこれはインターフェイス確認用のサンプルコンテンツです。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyClip은 앱 윈도우의 정보를 출처가 있는 로컬 지식으로 정리합니다.\n\n## 한 장의 스크린샷에서 시작\n\n마우스를 움직인 뒤 1초간 멈추고 클릭 또는 이중 클릭하거나, 위아래로 스크롤한 뒤 2초간 멈추거나, Return 키를 누르면 현재 앱의 포커스 윈도우를 기록합니다. 반복되는 화면은 이미지 한 장을 공유하며, 매번 등장한 시간은 그대로 보존됩니다.\n\n## 기록에서 이해로\n\nCodex 또는 Claude가 ACP를 통해 스크린샷을 읽고 Memory를 정리합니다. 아래의 출처를 클릭하면 지식이 만들어진 그 순간으로 돌아갈 수 있습니다.\n\n이 내용은 인터페이스 확인용 예시입니다."
+            "value": "MyClip은 앱 윈도우의 정보를 출처가 있는 로컬 지식으로 정리합니다.\n\n## 한 장의 스크린샷에서 시작\n\n마우스를 움직인 뒤 5초 이내에 클릭 또는 이중 클릭하거나, 아래로 스크롤한 뒤 3초간 멈추거나, Return 키를 누르면 현재 앱의 포커스 윈도우를 기록합니다. 반복되는 화면은 이미지 한 장을 공유하며, 매번 등장한 시간은 그대로 보존됩니다.\n\n## 기록에서 이해로\n\nCodex 또는 Claude가 ACP를 통해 스크린샷을 읽고 Memory를 정리합니다. 아래의 출처를 클릭하면 지식이 만들어진 그 순간으로 돌아갈 수 있습니다.\n\n이 내용은 인터페이스 확인용 예시입니다."
           }
         }
       }
@@ -4486,42 +4486,42 @@
         }
       }
     },
-    "上下滚动停止 2 秒": {
+    "scroll向下滚动后静止3秒": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "2 Sekunden nach dem Scrollen"
+            "value": "Nach unten scrollen, dann 3 Sekunden pausieren"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scrolling stops for 2 seconds"
+            "value": "Scroll down, then pause for 3 seconds"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Desplazamiento detenido 2 s"
+            "value": "Desplazarse hacia abajo y detenerse 3 s"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Arrêt du défilement pendant 2 s"
+            "value": "Faire défiler vers le bas, puis s’arrêter 3 s"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "上下スクロール停止 2 秒"
+            "value": "下にスクロールしてから3秒静止"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "위아래 스크롤 후 2초 정지"
+            "value": "아래로 스크롤한 후 3초간 정지"
           }
         }
       }
@@ -7326,42 +7326,42 @@
         }
       }
     },
-    "停止滚动": {
+    "向下滚动": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scroll-Ende"
+            "value": "Nach unten scrollen"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scroll Stops"
+            "value": "Scroll Down"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Detener el desplazamiento"
+            "value": "Desplazar hacia abajo"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Arrêt du défilement"
+            "value": "Défilement vers le bas"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "スクロール停止"
+            "value": "下にスクロール"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "스크롤 정지"
+            "value": "아래로 스크롤"
           }
         }
       }
@@ -8846,7 +8846,7 @@
         }
       }
     },
-    "前台焦点应用窗口": {
+    "焦点应用窗口": {
       "localizations": {
         "de": {
           "stringUnit": {
@@ -12726,42 +12726,42 @@
         }
       }
     },
-    "已检测到上下滚动，停止 2 秒后截图": {
+    "已检测到向下滚动，静止 3 秒后截图": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scrollen erkannt, Aufnahme 2 Sekunden nach dem Anhalten"
+            "value": "Abwärtsscrollen erkannt. Aufnahme nach 3 Sekunden Pause"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scrolling detected; capturing 2 seconds after it stops"
+            "value": "Downward scrolling detected; capture after a 3-second pause"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Desplazamiento detectado; se capturará 2 s después de detenerse"
+            "value": "Desplazamiento hacia abajo detectado; captura tras una pausa de 3 s"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Défilement détecté, capture 2 s après l'arrêt"
+            "value": "Défilement vers le bas détecté ; capture après une pause de 3 s"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "上下スクロールを検出。停止 2 秒後に撮影します"
+            "value": "下へのスクロールを検出。3秒静止後に撮影します"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "위아래 스크롤 감지됨, 2초 정지 후 스크린샷"
+            "value": "아래로 스크롤 감지, 3초간 정지 후 캡처"
           }
         }
       }
@@ -12806,42 +12806,42 @@
         }
       }
     },
-    "已检测到静止 1 秒后的点击，等待单击或双击结束后截图": {
+    "已检测到鼠标移动后 5 秒内的点击，等待单击或双击结束后截图": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Klick nach 1 Sekunde Stillstand erkannt, Aufnahme nach Abschluss des Klicks oder Doppelklicks"
+            "value": "Klick innerhalb von 5 Sekunden nach Mausbewegung erkannt. Aufnahme nach Ende des Einzel- oder Doppelklicks"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Click after 1 second idle detected; capturing when the single or double click ends"
+            "value": "Click detected within 5 seconds of mouse movement; waiting for the click or double-click to finish before capture"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Clic detectado tras 1 s de reposo; se capturará al terminar el clic o doble clic"
+            "value": "Clic detectado dentro de los 5 s tras mover el ratón; se espera a que termine el clic o doble clic para capturar"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Clic après 1 s d'immobilité détecté, capture à la fin du clic ou du double-clic"
+            "value": "Clic détecté dans les 5 s après déplacement de la souris ; attente de la fin du clic ou double-clic avant la capture"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "1 秒静止後のクリックを検出。シングルクリックまたはダブルクリックの完了後に撮影します"
+            "value": "マウス移動後5秒以内のクリックを検出。クリックまたはダブルクリックの終了後に撮影します"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "1초 정지 후 클릭 감지됨, 클릭 또는 이중 클릭이 끝나면 스크린샷"
+            "value": "마우스 이동 후 5초 이내 클릭 감지, 클릭 또는 이중 클릭이 끝난 후 캡처"
           }
         }
       }
@@ -23286,82 +23286,42 @@
         }
       }
     },
-    "移动后静止 1 秒，再点击或双击": {
+    "鼠标移动后5秒内点击": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "1 Sekunde Stillstand nach Bewegung, dann Klick oder Doppelklick"
+            "value": "Innerhalb von 5 Sekunden nach einer Mausbewegung klicken"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Move, pause 1 second, then click or double-click"
+            "value": "Click within 5 seconds of moving the mouse"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mover, 1 s de reposo y clic o doble clic"
+            "value": "Clic dentro de los 5 s después de mover el ratón"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Immobilité de 1 s après déplacement, puis clic ou double-clic"
+            "value": "Cliquer dans les 5 s après avoir déplacé la souris"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "移動後 1 秒静止し、クリックまたはダブルクリック"
+            "value": "マウスを動かしてから5秒以内にクリック"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이동 후 1초 정지, 그다음 클릭 또는 이중 클릭"
-          }
-        }
-      }
-    },
-    "移动并静止后点击": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Klick nach Bewegung und Stillstand"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Click after moving and pausing"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Clic tras mover y detenerse"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Clic après déplacement et immobilité"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "移動して静止後にクリック"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "이동 후 정지한 뒤 클릭"
+            "value": "마우스를 움직인 후 5초 이내에 클릭"
           }
         }
       }
@@ -29646,42 +29606,42 @@
         }
       }
     },
-    "静止后点击": {
+    "移动后点击": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Klick nach Stillstand"
+            "value": "Klick nach Bewegung"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Click After Idle"
+            "value": "Click After Moving"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Clic tras reposo"
+            "value": "Clic después de mover"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Clic après immobilité"
+            "value": "Clic après déplacement"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "静止後にクリック"
+            "value": "移動後にクリック"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "정지 후 클릭"
+            "value": "이동 후 클릭"
           }
         }
       }

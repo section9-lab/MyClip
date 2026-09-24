@@ -3,14 +3,14 @@ import Foundation
 public enum CaptureScope: String, CaseIterable, Sendable, Identifiable {
     case focusedWindow, focusedDisplay
     public var id: String { rawValue }
-    public var label: String { self == .focusedWindow ? String(localized: "前台焦点应用窗口") : String(localized: "焦点显示器全屏") }
+    public var label: String { self == .focusedWindow ? String(localized: "焦点应用窗口") : String(localized: "焦点显示器全屏") }
 }
 
 public enum MouseCaptureTrigger: String, CaseIterable, Sendable, Identifiable {
     case click, scroll
     public var id: String { rawValue }
-    public var label: String { self == .click ? String(localized: "移动后静止 1 秒，再点击或双击") : String(localized: "上下滚动停止 2 秒") }
-    public var shortLabel: String { self == .click ? String(localized: "静止后点击") : String(localized: "停止滚动") }
+    public var label: String { self == .click ? String(localized: "鼠标移动后5秒内点击") : String(localized: "scroll向下滚动后静止3秒") }
+    public var shortLabel: String { self == .click ? String(localized: "移动后点击") : String(localized: "向下滚动") }
 }
 
 public enum KeyboardCaptureMode: String, CaseIterable, Sendable, Identifiable {

@@ -30,7 +30,7 @@ Requires **macOS 13 or later** and a **Codex or Claude account**. Installing the
 
 1. Open MyClip and choose a default Agent in onboarding. MyClip detects available local agents and saves your selection after a successful connection. You can change it later in **Backstage**; multiple agents can be connected, but only one is enabled at a time.
 2. Grant **Screen Recording** and **Accessibility** permissions. Capture starts automatically whenever MyClip is open, including after permissions are granted.
-3. Work as usual. By default, MyClip captures the focused window after a click following one second of pointer stillness, after two seconds without vertical scrolling, or after a letter key followed by Return. Automatic organization turns new screenshots into Memory.
+3. Work as usual. By default, MyClip captures the focused window after a click within five seconds of mouse movement, after three seconds without scrolling following a downward scroll, or after a letter key followed by Return. Automatic organization turns new screenshots into Memory.
 4. Explore **Memory** for notes, **Timeline** for screenshots, and **Kanban** for suggested work.
 
 To use your memory in an AI tool, enable **MyClip MCP** in Settings, select your clients, and apply the configuration. Restart the client or start a new session afterward.
@@ -88,7 +88,7 @@ Click an organization record in **Backstage** to inspect each request, including
 
 ## Privacy and control
 
-- **Choose what to capture.** Settings groups capture into three controls: scope (focused window by default, or the display containing it), independent mouse triggers (idle-then-click and scroll-then-pause), and keyboard trigger (letters then Return by default, or every Return). Capture runs automatically while MyClip is open; quit the app to stop it. You can exclude specific apps; full-display capture also filters excluded apps.
+- **Choose what to capture.** Settings groups capture into three controls: scope (focused window by default, or the display containing it), independent mouse triggers (click within 5 seconds of mouse movement and pause for 3 seconds after scrolling down), and keyboard trigger (letters then Return by default, or every Return). Capture runs automatically while MyClip is open; quit the app to stop it. You can exclude specific apps; full-display capture also filters excluded apps.
 - **Keep your library locally.** Screenshots and notes are stored on your Mac. Original screenshots expire after 30 days by default; saved notes remain. You can change the retention period in Settings.
 - **Decide when to use AI.** Organization uses your selected agent's model service, which may process screenshots and notes in the cloud. Turn off automatic organization to keep new captures local until you choose to process them.
 

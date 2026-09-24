@@ -27,7 +27,7 @@ Nécessite **macOS 13 ou une version ultérieure** et un **compte Codex ou Claud
 
 1. Ouvrez MyClip et accédez à **Backstage** dans la barre latérale. Installez un connecteur, connectez-vous à votre compte, puis cliquez sur **Connect** pour vérifier sa disponibilité. Cliquez ensuite sur **Enable** pour utiliser cet agent pour l’organisation. La connexion seule ne lance aucune tâche ; plusieurs agents peuvent être connectés, mais un seul peut être activé à la fois.
 2. Accordez les autorisations d’**enregistrement de l’écran** et d’**accessibilité**. La capture démarre automatiquement lorsque MyClip est ouvert, y compris après l’octroi des autorisations.
-3. Travaillez normalement. Par défaut, MyClip capture la fenêtre active après un clic suivant une seconde d’immobilité du pointeur, après deux secondes sans défilement vertical, ou après une lettre suivie d’Entrée. L’organisation automatique transforme les nouvelles captures en Memory.
+3. Travaillez normalement. Par défaut, MyClip capture la fenêtre active après un clic dans les cinq secondes suivant un déplacement de la souris, après une pause de trois secondes suivant un défilement vers le bas, ou après une lettre suivie d’Entrée. L’organisation automatique transforme les nouvelles captures en Memory.
 4. Consultez les notes dans **Memory**, les captures dans **Timeline** et les tâches proposées dans **Kanban**.
 
 Pour utiliser votre mémoire dans un outil d’IA, activez **MyClip MCP** dans les réglages, choisissez vos clients et appliquez la configuration. Redémarrez ensuite le client ou ouvrez une nouvelle session.
@@ -85,7 +85,7 @@ Dans **Backstage**, cliquez sur un enregistrement d’organisation pour consulte
 
 ## Confidentialité et contrôle
 
-- **Choisissez ce qui est capturé.** Les réglages regroupent trois contrôles : la portée (fenêtre active par défaut ou écran qui la contient), les déclencheurs indépendants de la souris (immobilité puis clic, défilement puis pause) et le déclencheur clavier (lettres puis Entrée par défaut, ou chaque Entrée). La capture fonctionne tant que MyClip est ouvert ; quittez l’application pour l’arrêter. Vous pouvez exclure certaines applications, y compris lors de la capture de l’écran entier.
+- **Choisissez ce qui est capturé.** Les réglages regroupent trois contrôles : la portée (fenêtre active par défaut ou écran qui la contient), les déclencheurs indépendants de la souris (clic dans les 5 s après déplacement de la souris, pause de 3 s après défilement vers le bas) et le déclencheur clavier (lettres puis Entrée par défaut, ou chaque Entrée). La capture fonctionne tant que MyClip est ouvert ; quittez l’application pour l’arrêter. Vous pouvez exclure certaines applications, y compris lors de la capture de l’écran entier.
 - **Gardez votre bibliothèque en local.** Captures et notes sont stockées sur votre Mac. Les captures originales expirent après 30 jours par défaut ; les notes enregistrées restent disponibles. Vous pouvez modifier cette durée dans les réglages.
 - **Décidez quand utiliser l’IA.** L’organisation utilise le service du modèle de l’agent choisi, qui peut traiter captures et notes dans le cloud. Désactivez l’organisation automatique pour garder les nouvelles captures en local jusqu’au moment où vous décidez de les traiter.
 

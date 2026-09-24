@@ -27,7 +27,7 @@ Voraussetzungen sind **macOS 13 oder neuer** und ein **Codex- oder Claude-Konto*
 
 1. Öffne MyClip und gehe in der Seitenleiste zu **Backstage**. Installiere einen Connector, melde dich an und prüfe mit **Connect**, ob er verfügbar ist. Klicke anschließend auf **Enable**, um diesen Agent für die Aufbereitung zu aktivieren. Das Verbinden allein startet keine Aufgaben. Mehrere Agents können verbunden sein, aber nur einer kann gleichzeitig aktiviert werden.
 2. Erteile die Berechtigungen für **Bildschirmaufnahme** und **Bedienungshilfen**. Die Erfassung startet automatisch, solange MyClip geöffnet ist, auch direkt nach Erteilung der Berechtigungen.
-3. Arbeite wie gewohnt. Standardmäßig erfasst MyClip das aktive Fenster nach einem Klick, wenn der Zeiger zuvor eine Sekunde stillstand, nach zwei Sekunden ohne vertikales Scrollen oder nach einer Buchstabentaste gefolgt von der Eingabetaste. Die automatische Aufbereitung überführt neue Aufnahmen in Memory.
+3. Arbeite wie gewohnt. Standardmäßig erfasst MyClip das aktive Fenster nach einem Klick innerhalb von fünf Sekunden nach einer Mausbewegung, nach drei Sekunden Pause nach dem Scrollen nach unten oder nach einer Buchstabentaste gefolgt von der Eingabetaste. Die automatische Aufbereitung überführt neue Aufnahmen in Memory.
 4. Öffne **Memory** für Notizen, **Timeline** für Aufnahmen und **Kanban** für vorgeschlagene Aufgaben.
 
 Um die Erinnerungen in einem KI-Werkzeug zu verwenden, aktiviere **MyClip MCP** in den Einstellungen, wähle die Clients und übernimm die Konfiguration. Starte danach den Client neu oder beginne eine neue Sitzung.
@@ -85,7 +85,7 @@ Klicke in **Backstage** auf einen Aufbereitungseintrag, um jede Anfrage einschli
 
 ## Datenschutz und Kontrolle
 
-- **Wähle, was erfasst wird.** Die Einstellungen enthalten drei Bereiche: Umfang (standardmäßig das aktive Fenster oder dessen Bildschirm), unabhängige Maus-Auslöser (Stillstand und anschließender Klick sowie Scrollen und anschließende Pause) und Tastatur-Auslöser (standardmäßig Buchstaben gefolgt von Eingabe oder jede Eingabetaste). Die Erfassung läuft, solange MyClip geöffnet ist; beende die App, um sie zu stoppen. Bestimmte Apps können ausgeschlossen werden, auch bei Aufnahmen des gesamten Bildschirms.
+- **Wähle, was erfasst wird.** Die Einstellungen enthalten drei Bereiche: Umfang (standardmäßig das aktive Fenster oder dessen Bildschirm), unabhängige Maus-Auslöser (Klick innerhalb von 5 Sekunden nach Mausbewegung sowie 3 Sekunden Pause nach dem Scrollen nach unten) und Tastatur-Auslöser (standardmäßig Buchstaben gefolgt von Eingabe oder jede Eingabetaste). Die Erfassung läuft, solange MyClip geöffnet ist; beende die App, um sie zu stoppen. Bestimmte Apps können ausgeschlossen werden, auch bei Aufnahmen des gesamten Bildschirms.
 - **Behalte deine Bibliothek lokal.** Aufnahmen und Notizen liegen auf deinem Mac. Originalaufnahmen laufen standardmäßig nach 30 Tagen ab, gespeicherte Notizen bleiben erhalten. Die Aufbewahrungsdauer lässt sich in den Einstellungen ändern.
 - **Entscheide, wann KI verwendet wird.** Die Aufbereitung nutzt den Modelldienst des ausgewählten Agents, der Aufnahmen und Notizen möglicherweise in der Cloud verarbeitet. Deaktiviere die automatische Aufbereitung, damit neue Aufnahmen lokal bleiben, bis du ihre Verarbeitung auswählst.
 

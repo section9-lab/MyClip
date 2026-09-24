@@ -16,41 +16,43 @@ final class CaptureTriggerTests: XCTestCase {
         XCTAssertNil(trigger.poll(at: 102))
     }
 
-    func testClickBeforeOneSecondOfPointerStillnessDoesNotTriggerCapture() {
+    func testClickImmediatelyAfterPointerMovementTriggersCapture() {
         var trigger = CaptureTrigger()
         trigger.activity(at: 10)
-        XCTAssertFalse(trigger.press(at: 10.999))
-        XCTAssertFalse(trigger.click(at: 11.25))
+        XCTAssertTrue(trigger.press(at: 10))
+        XCTAssertTrue(trigger.click(at: 10.25))
+        XCTAssertNil(trigger.poll(at: 10.749))
+        XCTAssertEqual(trigger.poll(at: 10.75), .clickAfterIdle)
         XCTAssertNil(trigger.poll(at: 20))
     }
 
-    func testHoldingAnEarlyClickDoesNotSatisfyTheStillnessRequirement() {
+    func testHoldingAnExpiredClickDoesNotTriggerCapture() {
         var trigger = CaptureTrigger()
         trigger.activity(at: 10)
-        XCTAssertFalse(trigger.press(at: 10.5))
-        XCTAssertFalse(trigger.click(at: 15))
+        XCTAssertFalse(trigger.press(at: 15.001))
+        XCTAssertFalse(trigger.click(at: 16))
         XCTAssertNil(trigger.poll(at: 20))
     }
 
-    func testClickAtOneSecondBoundaryCapturesAfterDoubleClickWindow() {
+    func testClickAtFiveSecondBoundaryCapturesAfterDoubleClickWindow() {
         var trigger = CaptureTrigger()
         trigger.activity(at: 10)
-        XCTAssertTrue(trigger.press(at: 11))
-        XCTAssertTrue(trigger.click(at: 11.25))
-        XCTAssertNil(trigger.poll(at: 11.749))
-        XCTAssertEqual(trigger.poll(at: 11.75), .clickAfterIdle)
+        XCTAssertTrue(trigger.press(at: 15))
+        XCTAssertTrue(trigger.click(at: 15.25))
+        XCTAssertNil(trigger.poll(at: 15.749))
+        XCTAssertEqual(trigger.poll(at: 15.75), .clickAfterIdle)
         XCTAssertNil(trigger.poll(at: 20))
     }
 
-    func testNewMovementRestartsThePreClickStillnessRequirement() {
+    func testNewMovementRestartsTheFiveSecondClickWindow() {
         var trigger = CaptureTrigger()
         trigger.activity(at: 10)
-        trigger.activity(at: 11)
-        XCTAssertFalse(trigger.press(at: 11.5))
-        XCTAssertFalse(trigger.click(at: 11.75))
-        XCTAssertTrue(trigger.press(at: 12))
-        XCTAssertTrue(trigger.click(at: 12.25))
-        XCTAssertEqual(trigger.poll(at: 12.75), .clickAfterIdle)
+        XCTAssertFalse(trigger.press(at: 15.001))
+        XCTAssertFalse(trigger.click(at: 15.25))
+        trigger.activity(at: 16)
+        XCTAssertTrue(trigger.press(at: 16.5))
+        XCTAssertTrue(trigger.click(at: 16.75))
+        XCTAssertEqual(trigger.poll(at: 17.25), .clickAfterIdle)
     }
 
     func testDoubleClickProducesOneCaptureAfterTheLastRelease() {
@@ -65,13 +67,25 @@ final class CaptureTriggerTests: XCTestCase {
         XCTAssertNil(trigger.poll(at: 20))
     }
 
-    func testDoubleClickDoesNotBypassTheInitialStillnessRequirement() {
+    func testDoubleClickDoesNotBypassAnExpiredMovement() {
         var trigger = CaptureTrigger()
         trigger.activity(at: 10)
-        XCTAssertFalse(trigger.press(at: 10.25))
-        XCTAssertFalse(trigger.click(at: 10.5))
-        XCTAssertFalse(trigger.press(at: 10.625, clickCount: 2))
-        XCTAssertFalse(trigger.click(at: 10.75))
+        XCTAssertFalse(trigger.press(at: 15.25))
+        XCTAssertFalse(trigger.click(at: 15.5))
+        XCTAssertFalse(trigger.press(at: 15.625, clickCount: 2))
+        XCTAssertFalse(trigger.click(at: 15.75))
+        XCTAssertNil(trigger.poll(at: 20))
+    }
+
+    func testDoubleClickCanFinishAfterTheFiveSecondMovementWindow() {
+        var trigger = CaptureTrigger()
+        trigger.activity(at: 10)
+        XCTAssertTrue(trigger.press(at: 15))
+        XCTAssertTrue(trigger.click(at: 15.25))
+        XCTAssertTrue(trigger.press(at: 15.5, clickCount: 2))
+        XCTAssertTrue(trigger.click(at: 15.625))
+        XCTAssertNil(trigger.poll(at: 15.75))
+        XCTAssertEqual(trigger.poll(at: 16.125), .clickAfterIdle)
         XCTAssertNil(trigger.poll(at: 20))
     }
 
@@ -136,35 +150,75 @@ final class CaptureTriggerTests: XCTestCase {
         XCTAssertNil(trigger.poll(at: 20))
     }
 
-    func testScrollingFiresOnceWithoutPointerMovementOrClick() {
+    func testDownwardScrollingFiresOnceAfterThreeSecondsWithoutPointerMovementOrClick() {
         var trigger = CaptureTrigger()
-        trigger.scroll(at: 100)
-        XCTAssertNil(trigger.poll(at: 101.999))
-        XCTAssertEqual(trigger.poll(at: 102), .scrollIdle)
+        trigger.scroll(at: 100, deltaY: -1)
+        XCTAssertNil(trigger.poll(at: 102.999))
+        XCTAssertEqual(trigger.poll(at: 103), .scrollIdle)
         XCTAssertNil(trigger.poll(at: 200))
     }
 
     func testContinuedScrollingRestartsTheDeadline() {
         var trigger = CaptureTrigger()
-        trigger.scroll(at: 10)
-        trigger.scroll(at: 11.5)
-        XCTAssertNil(trigger.poll(at: 12))
-        XCTAssertEqual(trigger.poll(at: 13.5), .scrollIdle)
+        trigger.scroll(at: 10, deltaY: -1)
+        trigger.scroll(at: 11.5, deltaY: -1)
+        XCTAssertNil(trigger.poll(at: 14.499))
+        XCTAssertEqual(trigger.poll(at: 14.5), .scrollIdle)
+    }
+
+    func testUpwardAndHorizontalScrollingDoNotTriggerCapture() {
+        for deltaY in [1.0, 0.0] {
+            var trigger = CaptureTrigger()
+            XCTAssertFalse(trigger.scroll(at: 10, deltaY: deltaY))
+            XCTAssertNil(trigger.poll(at: 13))
+            XCTAssertNil(trigger.poll(at: 20))
+        }
+    }
+
+    func testUpwardOrHorizontalScrollingCancelsPendingScrollCapture() {
+        for deltaY in [1.0, 0.0] {
+            var trigger = CaptureTrigger()
+            XCTAssertTrue(trigger.scroll(at: 10, deltaY: -0.25))
+            XCTAssertFalse(trigger.scroll(at: 12, deltaY: deltaY))
+            XCTAssertNil(trigger.poll(at: 13))
+            XCTAssertNil(trigger.poll(at: 20))
+        }
+    }
+
+    func testDownwardScrollingCanRestartAfterADirectionChange() {
+        var trigger = CaptureTrigger()
+        XCTAssertTrue(trigger.scroll(at: 10, deltaY: -1))
+        XCTAssertFalse(trigger.scroll(at: 11, deltaY: 1))
+        XCTAssertTrue(trigger.scroll(at: 12, deltaY: -0.25))
+        XCTAssertNil(trigger.poll(at: 14.999))
+        XCTAssertEqual(trigger.poll(at: 15), .scrollIdle)
+    }
+
+    func testUpwardAndHorizontalScrollingPreservePendingClickCapture() {
+        for deltaY in [1.0, 0.0] {
+            var trigger = CaptureTrigger()
+            trigger.activity(at: 10)
+            trigger.press(at: 12)
+            trigger.click(at: 12.25)
+            XCTAssertFalse(trigger.scroll(at: 12.5, deltaY: deltaY))
+            XCTAssertEqual(trigger.poll(at: 12.75), .clickAfterIdle)
+            XCTAssertNil(trigger.poll(at: 20))
+        }
     }
 
     func testScrollingDoesNotQualifyAsPointerMovementForClick() {
         var trigger = CaptureTrigger()
-        trigger.scroll(at: 10)
+        trigger.scroll(at: 10, deltaY: -1)
         XCTAssertFalse(trigger.press(at: 11))
         XCTAssertFalse(trigger.click(at: 11.25))
-        XCTAssertEqual(trigger.poll(at: 12), .scrollIdle)
+        XCTAssertEqual(trigger.poll(at: 13), .scrollIdle)
     }
 
     func testPointerMovementDoesNotPostponeScrollCapture() {
         var trigger = CaptureTrigger()
-        trigger.scroll(at: 10)
+        trigger.scroll(at: 10, deltaY: -1)
         trigger.activity(at: 11)
-        XCTAssertEqual(trigger.poll(at: 12), .scrollIdle)
+        XCTAssertEqual(trigger.poll(at: 13), .scrollIdle)
         XCTAssertNil(trigger.poll(at: 20))
     }
 
@@ -173,20 +227,20 @@ final class CaptureTriggerTests: XCTestCase {
         trigger.activity(at: 10)
         trigger.press(at: 12)
         trigger.click(at: 12.25)
-        trigger.scroll(at: 12.5)
+        trigger.scroll(at: 12.5, deltaY: -1)
         XCTAssertNil(trigger.poll(at: 12.75))
-        XCTAssertEqual(trigger.poll(at: 14.5), .scrollIdle)
+        XCTAssertEqual(trigger.poll(at: 15.5), .scrollIdle)
         XCTAssertNil(trigger.poll(at: 20))
     }
 
     func testEligibleClickConsumesPendingScroll() {
         var trigger = CaptureTrigger()
         trigger.activity(at: 10)
-        trigger.scroll(at: 11)
+        trigger.scroll(at: 11, deltaY: -1)
         trigger.press(at: 12)
         trigger.click(at: 12.25)
         XCTAssertEqual(trigger.poll(at: 12.75), .clickAfterIdle)
-        XCTAssertNil(trigger.poll(at: 13))
+        XCTAssertNil(trigger.poll(at: 14))
     }
 
     func testReturnWithoutLettersDoesNotCaptureByDefault() {
@@ -232,18 +286,18 @@ final class CaptureTriggerTests: XCTestCase {
     func testMouseCaptureDoesNotConsumeTypedLetter() {
         var trigger = CaptureTrigger()
         _ = trigger.keyDown(keyCode: 0)
-        trigger.scroll(at: 10)
-        XCTAssertEqual(trigger.poll(at: 12), .scrollIdle)
+        trigger.scroll(at: 10, deltaY: -1)
+        XCTAssertEqual(trigger.poll(at: 13), .scrollIdle)
         XCTAssertEqual(trigger.keyDown(keyCode: 36), .enter)
     }
 
     func testFocusChangeDiscardsLettersWithoutLosingPendingMouseCapture() {
         var trigger = CaptureTrigger()
         _ = trigger.keyDown(keyCode: 0)
-        trigger.scroll(at: 10)
+        trigger.scroll(at: 10, deltaY: -1)
         trigger.resetKeyboard()
         XCTAssertNil(trigger.keyDown(keyCode: 36))
-        XCTAssertEqual(trigger.poll(at: 12), .scrollIdle)
+        XCTAssertEqual(trigger.poll(at: 13), .scrollIdle)
     }
 
     func testPauseAndSettingsChangesDiscardArmedInput() {
@@ -252,10 +306,10 @@ final class CaptureTriggerTests: XCTestCase {
         trigger.reset()
         XCTAssertNil(trigger.keyDown(keyCode: 36))
         _ = trigger.keyDown(keyCode: 0)
-        trigger.scroll(at: 10)
+        trigger.scroll(at: 10, deltaY: -1)
         trigger.settings.scope = .focusedDisplay
         XCTAssertNil(trigger.keyDown(keyCode: 36))
-        XCTAssertNil(trigger.poll(at: 12))
+        XCTAssertNil(trigger.poll(at: 13))
     }
 
     func testMouseOptionsAreIndependentAndCanBothBeOff() {
@@ -265,8 +319,8 @@ final class CaptureTriggerTests: XCTestCase {
             XCTAssertEqual(trigger.press(at: 11), selected.contains(.click))
             XCTAssertEqual(trigger.click(at: 11.25), selected.contains(.click))
             XCTAssertEqual(trigger.poll(at: 11.75), selected.contains(.click) ? .clickAfterIdle : nil)
-            trigger.scroll(at: 20)
-            XCTAssertEqual(trigger.poll(at: 22), selected.contains(.scroll) ? .scrollIdle : nil)
+            trigger.scroll(at: 20, deltaY: -1)
+            XCTAssertEqual(trigger.poll(at: 23), selected.contains(.scroll) ? .scrollIdle : nil)
             _ = trigger.keyDown(keyCode: 0)
             XCTAssertEqual(trigger.keyDown(keyCode: 36), .enter)
         }
@@ -310,9 +364,9 @@ final class CaptureTriggerTests: XCTestCase {
 
     func testReturnConsumesPendingScroll() {
         var trigger = CaptureTrigger(settings: CaptureSettings(keyboard: .returnKey))
-        trigger.scroll(at: 10)
+        trigger.scroll(at: 10, deltaY: -1)
         XCTAssertEqual(trigger.enter(isRepeat: false), .enter)
-        XCTAssertNil(trigger.poll(at: 12))
+        XCTAssertNil(trigger.poll(at: 13))
     }
 
     func testPauseDiscardsPendingClickAndMovement() {
@@ -346,8 +400,8 @@ final class CaptureTriggerTests: XCTestCase {
 
     func testPauseDiscardsPendingScroll() {
         var trigger = CaptureTrigger()
-        trigger.scroll(at: 10)
+        trigger.scroll(at: 10, deltaY: -1)
         trigger.reset()
-        XCTAssertNil(trigger.poll(at: 12))
+        XCTAssertNil(trigger.poll(at: 13))
     }
 }

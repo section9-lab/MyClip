@@ -27,7 +27,7 @@ Necesitas **macOS 13 o posterior** y una **cuenta de Codex o Claude**. Instalar 
 
 1. Abre MyClip y entra en **Backstage** desde la barra lateral. Instala un conector, inicia sesión y pulsa **Connect** para comprobar que está disponible. Después pulsa **Enable** para utilizar ese agente en la organización. Conectarlo no inicia tareas; puedes conectar varios agentes, pero solo activar uno a la vez.
 2. Concede los permisos de **grabación de pantalla** y **accesibilidad**. La captura comienza automáticamente mientras MyClip está abierto, también después de conceder los permisos.
-3. Trabaja con normalidad. Por defecto, MyClip captura la ventana activa al hacer clic después de mantener el puntero quieto un segundo, tras dos segundos sin desplazamiento vertical o al pulsar una letra y después Intro. La organización automática convierte las nuevas capturas en Memory.
+3. Trabaja con normalidad. Por defecto, MyClip captura la ventana activa al hacer clic dentro de los cinco segundos tras mover el ratón, tras una pausa de tres segundos después de desplazarse hacia abajo o al pulsar una letra y después Intro. La organización automática convierte las nuevas capturas en Memory.
 4. Consulta las notas en **Memory**, las capturas en **Timeline** y el trabajo sugerido en **Kanban**.
 
 Para usar tu memoria desde una herramienta de IA, activa **MyClip MCP** en Ajustes, selecciona los clientes y aplica la configuración. Después reinicia el cliente o abre una sesión nueva.
@@ -85,7 +85,7 @@ Pulsa un registro de organización en **Backstage** para inspeccionar cada solic
 
 ## Privacidad y control
 
-- **Elige qué capturar.** Ajustes agrupa la captura en tres controles: ámbito (ventana activa por defecto o pantalla que la contiene), disparadores independientes del ratón (reposo seguido de clic y desplazamiento seguido de pausa) y disparador del teclado (letras seguidas de Intro por defecto, o cada Intro). La captura funciona mientras MyClip está abierto; sal de la aplicación para detenerla. Puedes excluir aplicaciones concretas, también en la captura de pantalla completa.
+- **Elige qué capturar.** Ajustes agrupa la captura en tres controles: ámbito (ventana activa por defecto o pantalla que la contiene), disparadores independientes del ratón (clic dentro de los 5 s tras mover el ratón y pausa de 3 s tras desplazarse hacia abajo) y disparador del teclado (letras seguidas de Intro por defecto, o cada Intro). La captura funciona mientras MyClip está abierto; sal de la aplicación para detenerla. Puedes excluir aplicaciones concretas, también en la captura de pantalla completa.
 - **Conserva tu biblioteca localmente.** Las capturas y notas se almacenan en tu Mac. Las imágenes originales caducan a los 30 días por defecto; las notas guardadas permanecen. Puedes cambiar ese período en Ajustes.
 - **Decide cuándo usar IA.** La organización utiliza el servicio del modelo del agente seleccionado, que puede procesar capturas y notas en la nube. Desactiva la organización automática para mantener las nuevas capturas localmente hasta que decidas procesarlas.
 

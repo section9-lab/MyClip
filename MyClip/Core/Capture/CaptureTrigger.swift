@@ -21,8 +21,8 @@ public enum CaptureReason: String, Codable, Sendable {
         switch self {
         case .pointerIdle: String(localized: "鼠标活动停止 2 秒")
         case .clickIdle: String(localized: "移动后点击，停顿 2 秒")
-        case .clickAfterIdle: String(localized: "移动并静止后点击")
-        case .scrollIdle: String(localized: "上下滚动停止 2 秒")
+        case .clickAfterIdle: String(localized: "鼠标移动后5秒内点击")
+        case .scrollIdle: String(localized: "scroll向下滚动后静止3秒")
         case .enter: String(localized: "回车触发")
         case .manual: String(localized: "手动截图")
         }
@@ -51,7 +51,7 @@ public struct CaptureTrigger: Sendable {
     public mutating func press(at time: TimeInterval, clickCount: Int = 1) -> Bool {
         guard settings.mouseTriggers.contains(.click) else { return false }
         let continuingClick = clickCount > 1 && pending?.reason == .clickAfterIdle && time <= (pending?.deadline ?? 0)
-        pressedClick = continuingClick || lastMovement.map { time >= $0 + 1 } == true
+        pressedClick = continuingClick || lastMovement.map { time >= $0 && time <= $0 + 5 } == true
         if pressedClick {
             lastMovement = nil
             if continuingClick { pending = nil }
@@ -67,9 +67,16 @@ public struct CaptureTrigger: Sendable {
         return true
     }
 
-    public mutating func scroll(at time: TimeInterval) {
-        guard settings.mouseTriggers.contains(.scroll) else { return }
-        pending = (time + 2, .scrollIdle)
+    @discardableResult
+    public mutating func scroll(at time: TimeInterval, deltaY: Double) -> Bool {
+        guard settings.mouseTriggers.contains(.scroll) else { return false }
+        // AppKit's scrolling delta already follows the user's scrolling direction preference.
+        guard deltaY < 0 else {
+            if pending?.reason == .scrollIdle { pending = nil }
+            return false
+        }
+        pending = (time + 3, .scrollIdle)
+        return true
     }
 
     public mutating func poll(at time: TimeInterval) -> CaptureReason? {

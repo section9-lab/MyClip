@@ -63,10 +63,11 @@ final class FocusedCaptureService {
                                                    .leftMouseUp, .rightMouseUp, .otherMouseUp, .scrollWheel]
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: activityMask, handler: { [weak self] event in
             let type = event.type
-            guard type != .scrollWheel || event.scrollingDeltaY != 0 else { return }
+            guard type != .scrollWheel || event.scrollingDeltaY != 0 || event.scrollingDeltaX != 0 else { return }
             let time = event.timestamp
             let clickCount = type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown ? event.clickCount : 1
-            Task { @MainActor in self?.activity(type: type, at: time, clickCount: clickCount) }
+            let scrollDeltaY = type == .scrollWheel ? Double(event.scrollingDeltaY) : 0
+            Task { @MainActor in self?.activity(type: type, at: time, clickCount: clickCount, scrollDeltaY: scrollDeltaY) }
         }) { monitors.append(monitor) }
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
             let code = event.keyCode
@@ -143,13 +144,12 @@ final class FocusedCaptureService {
         onStatus?(value ? String(localized: "屏幕休眠，等待恢复") : String(localized: "等待应用中的活动"))
     }
 
-    private func activity(type: NSEvent.EventType, at time: TimeInterval, clickCount: Int) {
+    private func activity(type: NSEvent.EventType, at time: TimeInterval, clickCount: Int, scrollDeltaY: Double) {
         guard enabled, !suspended, !screenLocked else { return }
         switch type {
         case .scrollWheel:
-            guard settings.mouseTriggers.contains(.scroll) else { return }
-            trigger.scroll(at: time)
-            onStatus?(String(localized: "已检测到上下滚动，停止 2 秒后截图"))
+            guard trigger.scroll(at: time, deltaY: scrollDeltaY) else { return }
+            onStatus?(String(localized: "已检测到向下滚动，静止 3 秒后截图"))
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
             guard settings.mouseTriggers.contains(.click) else { return }
             updatePointer(at: time)
@@ -159,7 +159,7 @@ final class FocusedCaptureService {
             guard settings.mouseTriggers.contains(.click) else { return }
             updatePointer(at: time)
             guard trigger.click(at: time, doubleClickInterval: NSEvent.doubleClickInterval) else { return }
-            onStatus?(String(localized: "已检测到静止 1 秒后的点击，等待单击或双击结束后截图"))
+            onStatus?(String(localized: "已检测到鼠标移动后 5 秒内的点击，等待单击或双击结束后截图"))
         default:
             guard settings.mouseTriggers.contains(.click) else { return }
             lastPointer = NSEvent.mouseLocation
