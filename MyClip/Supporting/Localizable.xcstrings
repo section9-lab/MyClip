@@ -19086,46 +19086,6 @@
         }
       }
     },
-    "本次跳过：%@ 刚截过图": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Übersprungen: %@ wurde gerade erst aufgenommen"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Skipped: %@ was just captured"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Omitido: %@ se acaba de capturar"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ignoré : %@ vient d'être capturé"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "今回はスキップ：%@ は直前に撮影済み"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "이번에는 건너뜀: %@ 스크린샷을 방금 찍었습니다"
-          }
-        }
-      }
-    },
     "本次跳过：当前为 MyClip、排除的应用或没有可识别的焦点窗口": {
       "localizations": {
         "de": {
@@ -22362,6 +22322,246 @@
           "stringUnit": {
             "state": "translated",
             "value": "현재 "
+          }
+        }
+      }
+    },
+    "已过滤近纯色画面（背景比例 ≥98%）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtered near-uniform image (background ≥98%)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ほぼ単色の画面を除外しました（背景が98%以上）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단색에 가까운 화면을 필터링했습니다(배경 비율 98% 이상)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imagen casi uniforme filtrada (fondo ≥98%)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Image presque unie filtrée (fond ≥98 %)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast einfarbiges Bild gefiltert (Hintergrund ≥98 %)"
+          }
+        }
+      }
+    },
+    "相似画面": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Similar images"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "類似画像"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "유사 이미지"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imágenes similares"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Images similaires"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ähnliche Bilder"
+          }
+        }
+      }
+    },
+    "相似画面去重": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deduplicate similar images"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "類似画像の重複を除外"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "유사 이미지 중복 제거"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deduplicar imágenes similares"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dédupliquer les images similaires"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ähnliche Bilder deduplizieren"
+          }
+        }
+      }
+    },
+    "近纯色画面": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Near-uniform images"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ほぼ単色の画面"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단색에 가까운 화면"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imágenes casi uniformes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Images presque unies"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast einfarbige Bilder"
+          }
+        }
+      }
+    },
+    "近纯色画面过滤（≥98%）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter near-uniform images (≥98%)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ほぼ単色の画面を除外（98%以上）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단색에 가까운 화면 필터링(98% 이상)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrar imágenes casi uniformes (≥98%)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrer les images presque unies (≥98 %)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast einfarbige Bilder filtern (≥98 %)"
+          }
+        }
+      }
+    },
+    "近纯色过滤会跳过内容区域至少 98% 接近同一背景色的自动截图。相似画面在同一窗口的 5 分钟内复用原图，并保留每次出现的时间。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Near-uniform filtering skips automatic screenshots when at least 98% of the content area is close to one background color. Similar images from the same window within 5 minutes reuse the original image while preserving every occurrence time."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内容領域の98%以上が同じ背景色に近い自動スクリーンショットを除外します。同じウインドウの5分以内の類似画像は元の画像を再利用し、各撮影時刻を保持します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "콘텐츠 영역의 98% 이상이 동일한 배경색에 가까운 자동 스크린샷을 건너뜁니다. 같은 창에서 5분 이내에 캡처한 유사 이미지는 원본을 재사용하며 각 캡처 시각은 유지됩니다."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El filtro omite las capturas automáticas cuando al menos el 98% del área de contenido se aproxima a un mismo color de fondo. Las imágenes similares de la misma ventana en un intervalo de 5 minutos reutilizan la imagen original y conservan la hora de cada captura."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le filtre ignore les captures automatiques dont au moins 98 % de la zone de contenu est proche d’une même couleur de fond. Les images similaires de la même fenêtre prises dans un intervalle de 5 minutes réutilisent l’image originale, tout en conservant l’heure de chaque capture."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Filter überspringt automatische Bildschirmfotos, wenn mindestens 98 % des Inhaltsbereichs einer einheitlichen Hintergrundfarbe ähneln. Ähnliche Bilder desselben Fensters innerhalb von 5 Minuten verwenden das Originalbild erneut; jeder Aufnahmezeitpunkt bleibt erhalten."
           }
         }
       }
@@ -27322,6 +27522,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "출력"
+          }
+        }
+      }
+    },
+    "过滤策略": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtering strategies"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フィルタリング方法"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "필터링 전략"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estrategias de filtrado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stratégies de filtrage"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filterstrategien"
           }
         }
       }

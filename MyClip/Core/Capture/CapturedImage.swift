@@ -12,6 +12,18 @@ public struct CapturedImage: Sendable {
     /// Perceptual fingerprint for near-duplicate detection; nil below `BlockHash.minimumSide` where blocks are meaningless.
     public let blockHash: BlockHash?
 
+    /// Applies automatic-capture filtering before PNG encoding, hashing, OCR or persistence.
+    public static func prepare(image: CGImage, settings: CaptureSettings, reason: CaptureReason) throws -> CapturedImage? {
+        if settings.filterStrategies.contains(.nearUniformImages), reason != .manual {
+            // Match the validated window-corpus geometry; full-display captures keep their entire frame.
+            let top = settings.scope == .focusedWindow ? Int(Double(image.height) * 0.085) : 0
+            let body = CGRect(x: 0, y: top, width: image.width, height: image.height - top)
+            if let analysis = CaptureContentAnalysis(image: image, contentBounds: body, analyzeRegions: false),
+               analysis.backgroundFraction >= 0.98 { return nil }
+        }
+        return try CapturedImage(image: image)
+    }
+
     public init(image: CGImage) throws {
         guard image.width > 0, image.height > 0, image.width * image.height <= 80_000_000,
               let context = CGContext(data: nil, width: image.width, height: image.height,

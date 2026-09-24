@@ -19,12 +19,24 @@ public enum KeyboardCaptureMode: String, CaseIterable, Sendable, Identifiable {
     public var label: String { self == .returnKey ? String(localized: "回车后截图") : String(localized: "字母键后再回车") }
 }
 
+public enum CaptureFilterStrategy: String, CaseIterable, Sendable, Identifiable {
+    case similarImages, nearUniformImages
+    public static let defaults: Set<Self> = [.similarImages]
+    public var id: String { rawValue }
+    public var label: String { self == .similarImages ? String(localized: "相似画面去重") : String(localized: "近纯色画面过滤（≥98%）") }
+    public var shortLabel: String { self == .similarImages ? String(localized: "相似画面") : String(localized: "近纯色画面") }
+}
+
 public struct CaptureSettings: Equatable, Sendable, CustomStringConvertible {
     public var scope: CaptureScope
     public var mouseTriggers: Set<MouseCaptureTrigger>
     public var keyboard: KeyboardCaptureMode
+    public var filterStrategies: Set<CaptureFilterStrategy>
     public var mouseSummary: String {
         mouseTriggers.isEmpty ? String(localized: "已关闭") : MouseCaptureTrigger.allCases.filter { mouseTriggers.contains($0) }.map(\.shortLabel).joined(separator: "、")
+    }
+    public var filterSummary: String {
+        filterStrategies.isEmpty ? String(localized: "已关闭") : CaptureFilterStrategy.allCases.filter { filterStrategies.contains($0) }.map(\.shortLabel).joined(separator: "、")
     }
     public var description: String {
         let scopeText = scope == .focusedWindow ? String(localized: "只记录前台焦点窗口。") : String(localized: "记录焦点窗口所在的显示器全屏。")
@@ -33,10 +45,12 @@ public struct CaptureSettings: Equatable, Sendable, CustomStringConvertible {
         return scopeText + String(localized: "触发方式：") + triggers.joined(separator: "；") + "。"
     }
 
-    public init(scope: CaptureScope = .focusedWindow, mouseTriggers: Set<MouseCaptureTrigger> = [.click, .scroll], keyboard: KeyboardCaptureMode = .afterLetters) {
+    public init(scope: CaptureScope = .focusedWindow, mouseTriggers: Set<MouseCaptureTrigger> = [.click, .scroll], keyboard: KeyboardCaptureMode = .afterLetters,
+                filterStrategies: Set<CaptureFilterStrategy> = CaptureFilterStrategy.defaults) {
         self.scope = scope
         self.mouseTriggers = mouseTriggers
         self.keyboard = keyboard
+        self.filterStrategies = filterStrategies
     }
 
     public static func load(from defaults: UserDefaults) -> CaptureSettings {
@@ -52,13 +66,17 @@ public struct CaptureSettings: Equatable, Sendable, CustomStringConvertible {
         }
         return CaptureSettings(scope: CaptureScope(rawValue: defaults.string(forKey: "myclip.captureScope") ?? "") ?? .focusedWindow,
                                mouseTriggers: mouse,
-                               keyboard: KeyboardCaptureMode(rawValue: defaults.string(forKey: "myclip.keyboardTrigger") ?? "") ?? .afterLetters)
+                               keyboard: KeyboardCaptureMode(rawValue: defaults.string(forKey: "myclip.keyboardTrigger") ?? "") ?? .afterLetters,
+                               filterStrategies: defaults.stringArray(forKey: "myclip.captureFilterStrategies").map {
+                                   Set($0.compactMap(CaptureFilterStrategy.init(rawValue:)))
+                               } ?? CaptureFilterStrategy.defaults)
     }
 
     public func save(to defaults: UserDefaults) {
         defaults.set(scope.rawValue, forKey: "myclip.captureScope")
         defaults.set(mouseTriggers.map(\.rawValue).sorted(), forKey: "myclip.mouseTriggers")
         defaults.set(keyboard.rawValue, forKey: "myclip.keyboardTrigger")
+        defaults.set(filterStrategies.map(\.rawValue).sorted(), forKey: "myclip.captureFilterStrategies")
     }
 }
 

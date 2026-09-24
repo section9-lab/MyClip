@@ -44,6 +44,29 @@ final class CaptureSettingsTests: XCTestCase {
         XCTAssertEqual(CaptureSettings.load(from: UserDefaults(suiteName: name)!), options)
     }
 
+    func testImageFilteringIsEnabledForOldPreferences() {
+        let name = "MyClip.CaptureTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        CaptureSettings.load(from: defaults).save(to: defaults)
+        XCTAssertEqual(defaults.stringArray(forKey: "myclip.captureFilterStrategies"), ["similarImages"])
+        XCTAssertEqual(CaptureFilterStrategy.allCases, [.similarImages, .nearUniformImages])
+    }
+
+    func testFilteringSelectionsSurviveReloadIncludingAllDisabled() {
+        let name = "MyClip.CaptureTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        for values in [[], ["mouseCooldown"], ["similarImages"], ["mouseCooldown", "similarImages"], ["similarImages", "unknown"],
+                       ["nearUniformImages"], ["similarImages", "nearUniformImages"]] {
+            defaults.set(values, forKey: "myclip.captureFilterStrategies")
+            let settings = CaptureSettings.load(from: defaults)
+            defaults.removeObject(forKey: "myclip.captureFilterStrategies")
+            settings.save(to: defaults)
+            XCTAssertEqual(defaults.stringArray(forKey: "myclip.captureFilterStrategies"), values.filter { ["similarImages", "nearUniformImages"].contains($0) }.sorted())
+        }
+    }
+
     func testFocusedDisplayUsesLargestWindowOverlapAcrossMultipleScreens() {
         let screens = [
             DisplayCandidate(id: 1, frame: CGRect(x: 0, y: 0, width: 1920, height: 1080)),

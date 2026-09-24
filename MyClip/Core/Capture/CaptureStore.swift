@@ -16,9 +16,10 @@ extension LibraryStore {
         public var verdict: BlockComparison.Verdict?
     }
 
-    public func record(image: CapturedImage, context: CaptureContext, agent: ClipAgent, organize: Bool, extractedText: String? = nil) throws {
+    public func record(image: CapturedImage, context: CaptureContext, agent: ClipAgent, organize: Bool, extractedText: String? = nil,
+                       filterStrategies: Set<CaptureFilterStrategy> = CaptureFilterStrategy.defaults) throws {
         let decision = try database.transaction { () -> RecordingDecision in
-            let decision = try recordingDecision(for: image, context: context)
+            let decision = try recordingDecision(for: image, context: context, filterStrategies: filterStrategies)
             if !decision.reusedImage {
                 try database.run("INSERT INTO images(id,width,height,block_hash) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET available=1,block_hash=coalesce(images.block_hash,excluded.block_hash)",
                                  [image.fingerprint, String(image.width), String(image.height), image.blockHash?.hex])
@@ -49,7 +50,7 @@ extension LibraryStore {
     }
 
     /// Compares against the newest capture of the same window. Manual screenshots always keep their own image.
-    func recordingDecision(for image: CapturedImage, context: CaptureContext) throws -> RecordingDecision {
+    func recordingDecision(for image: CapturedImage, context: CaptureContext, filterStrategies: Set<CaptureFilterStrategy> = CaptureFilterStrategy.defaults) throws -> RecordingDecision {
         var decision = RecordingDecision(sceneID: UUID().uuidString, imageID: image.fingerprint, reusedImage: false, verdict: nil)
         guard let previous = try database.run("""
             SELECT c.image_id,c.captured_at,c.scene_id,i.block_hash FROM captures c JOIN images i ON i.id=c.image_id
@@ -64,7 +65,7 @@ extension LibraryStore {
             let started = bounds?["started"].flatMap(Double.init) ?? previousTime
             if frames < Self.sceneFrameLimit, context.date.timeIntervalSince1970 - started < Self.sceneDuration { decision.sceneID = scene }
         }
-        guard context.reason != .manual, let previousImage = previous["image_id"] else { return decision }
+        guard filterStrategies.contains(.similarImages), context.reason != .manual, let previousImage = previous["image_id"] else { return decision }
         if previousImage == image.fingerprint {
             decision.verdict = .identical
         } else if let current = image.blockHash, let stored = previous["block_hash"].flatMap(BlockHash.init(hex:)) {

@@ -22,9 +22,6 @@ final class FocusedCaptureService {
     private var pendingCaptures: [(CaptureReason, Focus, Int)] = []
     private var lastPointer = NSEvent.mouseLocation
     private var keyboardFocus: Focus?
-    /// Reading one window fires the idle triggers every few seconds; a second look inside the cooldown adds nothing.
-    private var lastWindowCapture: [String: TimeInterval] = [:]
-    static let mouseCooldown: TimeInterval = 8
 
     var hasScreenPermission: Bool { CGPreflightScreenCaptureAccess() }
     var hasAccessibilityPermission: Bool { AXIsProcessTrusted() }
@@ -214,8 +211,6 @@ final class FocusedCaptureService {
         let title: String
     }
 
-    private static func windowKey(_ focus: Focus) -> String { "\(focus.app.processIdentifier)|\(focus.title)" }
-
     private func focus() -> Focus? {
         guard let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
@@ -247,11 +242,6 @@ final class FocusedCaptureService {
 
     private func capture(reason: CaptureReason) {
         guard let focused = focus() else { onStatus?(String(localized: "本次跳过：当前为 MyClip、排除的应用或没有可识别的焦点窗口")); return }
-        if reason != .enter, reason != .manual, let last = lastWindowCapture[Self.windowKey(focused)],
-           Date.now.timeIntervalSinceReferenceDate - last < Self.mouseCooldown {
-            onStatus?(String(localized: "本次跳过：\(focused.app.localizedName ?? String(localized: "应用")) 刚截过图"))
-            return
-        }
         if busy {
             if pendingCaptures.count < 16 { pendingCaptures.append((reason, focused, generation)); onStatus?(String(localized: "截图正在读取，另有 \(pendingCaptures.count) 次触发等待")) }
             else { onStatus?(String(localized: "采集较繁忙，已跳过过密的触发")) }
@@ -320,11 +310,14 @@ final class FocusedCaptureService {
                 onStatus?(String(localized: "正在读取 \(focused.app.localizedName ?? String(localized: "应用")) 的截图"))
                 let image = try await WindowImageCapture.capture(filter: filter, configuration: config)
                 guard enabled, !suspended, !screenLocked, generation == startedGeneration, stillFocused(focused) else { onStatus?(String(localized: "本次跳过：焦点窗口发生变化或无法匹配")); return }
-                let captured = try await Task.detached(priority: .utility) { try CapturedImage(image: image) }.value
+                let captureSettings = settings
+                let captured = try await Task.detached(priority: .utility) {
+                    try CapturedImage.prepare(image: image, settings: captureSettings, reason: reason)
+                }.value
                 guard enabled, generation == startedGeneration else { return }
+                guard let captured else { onStatus?(String(localized: "已过滤近纯色画面（背景比例 ≥98%）")); return }
                 let context = CaptureContext(appName: focused.app.localizedName ?? String(localized: "应用"), bundleID: focused.app.bundleIdentifier ?? "",
                                              windowTitle: title, windowID: id, reason: reason)
-                lastWindowCapture[Self.windowKey(focused)] = Date.now.timeIntervalSinceReferenceDate
                 await onCapture?(captured, context)
 
             } catch { onStatus?(String(localized: "本次采集未完成：\(error.localizedDescription)")) }
