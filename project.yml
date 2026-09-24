@@ -32,14 +32,6 @@ targets:
       - path: MyClip
         excludes:
           - Core/**
-          - App/KaraApp.swift
-          - Features/AgentBridge/**
-          - Features/AIIntegration/**
-          - Features/CursorCompanion/**
-          - Features/IMChannel/**
-          - Features/ScheduledTasks/**
-          - Features/Settings/**
-          - Services/**
           - Supporting/AppIcon.icon/**
           - Supporting/IconSources/**
           - Supporting/Kara.icns

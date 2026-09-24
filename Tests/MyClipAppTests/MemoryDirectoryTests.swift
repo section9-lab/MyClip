@@ -1,4 +1,7 @@
-// Compiled with MyClipViews.swift by Scripts/test_memory_directory.sh.
+@testable import MyClip
+import AppKit
+import SwiftUI
+import MyClipCore
 @main
 struct MemoryDirectoryTests {
     @MainActor static func main() async throws {
@@ -76,8 +79,9 @@ struct MemoryDirectoryTests {
             let wikiRow = nodes.firstIndex { $0.id == "Wiki" }!
             outline.expandItem(outline.item(atRow: wikiRow))
             await settle()
-            // SwiftUI creates child rows lazily after the parent expands.
-            outline.expandItem(outline.item(atRow: wikiRow + 1))
+            // SwiftUI creates child rows lazily; other Wiki folders can sort before Projects.
+            let projectsIndex = nodes[wikiRow].children!.firstIndex { $0.id == "Wiki/Projects" }!
+            outline.expandItem(outline.item(atRow: wikiRow + 1 + projectsIndex))
             await settle()
             rows = flattened(nodes)
             check(table.numberOfRows == rows.count, "Expanding folders reveals nested files")

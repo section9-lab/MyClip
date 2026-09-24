@@ -2,28 +2,11 @@ import AppKit
 import SwiftUI
 import MyClipCore
 
-@main
 @MainActor
 final class MyClipAppDelegate: NSObject, NSApplicationDelegate {
     private var model: MyClipModel?
     private var window: NSWindow?
     private var menuBar: MyClipMenuBarController?
-
-    static func main() {
-        if CommandLine.arguments.contains("--mcp") {
-            Task.detached {
-                await MemoryMCP.run(arguments: CommandLine.arguments)
-                exit(0)
-            }
-            dispatchMain()
-        }
-        // Before AppKit exists, so the bundle has not resolved its language yet.
-        AppLanguage.applyAtLaunch()
-        let app = NSApplication.shared
-        let delegate = MyClipAppDelegate()
-        app.delegate = delegate
-        withExtendedLifetime(delegate) { app.run() }
-    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)

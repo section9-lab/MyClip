@@ -1,3 +1,4 @@
+@testable import MyClip
 import AppKit
 import MyClipCore
 

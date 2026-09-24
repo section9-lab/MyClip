@@ -68,23 +68,14 @@ jobs:
           sudo security add-trusted-cert -d -r trustRoot -p codeSign -k /Library/Keychains/System.keychain "$RUNNER_TEMP/myclip-signing.pem"
           rm -f "$certificate"
 
-      - name: Test packaging
-        run: python3 Scripts/test_package_dmg.py
-
-      - name: Test MyClip core and local adapters
+      - name: Test core, adapters, packaging and benchmarks
         run: |
-          swift test
-          node --test Scripts/test_ephemeral_codex.cjs
+          bash Scripts/test.sh core
+          bash Scripts/test.sh scripts
+          bash Scripts/test.sh benchmark
 
       - name: Test native app with macOS 13 deployment target
-        run: |
-          bash Scripts/test_agent_activation.sh
-          bash Scripts/test_capture_lifecycle.sh
-          bash Scripts/test_capture_filters.sh
-          bash Scripts/test_screenshot_documents.sh
-          bash Scripts/test_memory_directory.sh
-          bash Scripts/test_memory_scrolling.sh
-          bash Scripts/test_task_board_scrolling.sh
+        run: bash Scripts/test.sh app
 
       - name: Build architecture-specific DMG
         env:
