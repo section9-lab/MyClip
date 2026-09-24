@@ -1,7 +1,7 @@
 import SwiftUI
 import MyClipCore
 
-private extension WorkTaskStatus {
+extension WorkTaskStatus {
     var tint: Color {
         switch self {
         case .candidate: .orange
@@ -90,8 +90,8 @@ struct TaskDashboardView: View {
                 discoveryNotice(message)
             }
             if tasks.filter({ $0.status != .ignored }).isEmpty {
-                LibraryUnavailableView(model.search.isEmpty ? "从一项待办开始" : "没有匹配的任务", systemImage: "checklist",
-                    description: Text(model.search.isEmpty ? "新建待办，或让 AI 从 Memory 发现工作。之后 AI 会根据截图与记忆更新进展。" : "尝试搜索任务名称、项目或来源依据。"))
+                LibraryUnavailableView(model.search.isEmpty ? String(localized: "从一项待办开始") : String(localized: "没有匹配的任务"), systemImage: "checklist",
+                    description: Text(model.search.isEmpty ? String(localized: "新建待办，或让 AI 从 Memory 发现工作。之后 AI 会根据截图与记忆更新进展。") : String(localized: "尝试搜索任务名称、项目或来源依据。")))
                     .frame(maxWidth: .infinity).padding(.vertical, 20)
             }
             if !candidateTasks.isEmpty {
@@ -99,12 +99,12 @@ struct TaskDashboardView: View {
             }
             if let review = model.lastTaskReview {
                 HStack(spacing: 8) {
-                    Label(review.status == .ignored ? "已忽略建议" : "已加入「\(review.status.title)」", systemImage: "checkmark")
+                    Label(review.status == .ignored ? String(localized: "已忽略建议") : String(localized: "已加入「\(review.status.title)」"), systemImage: "checkmark")
                     Text(review.title).lineLimit(1).foregroundStyle(.secondary).help(review.title)
                     Spacer(minLength: 8)
                     Button("撤销") { model.undoTaskReview() }
                         .disabled(model.updatingTaskIDs.contains(review.taskID))
-                    Button("关闭确认提示", systemImage: "xmark") { model.lastTaskReview = nil }.labelStyle(.iconOnly)
+                    Button(String(localized: "关闭确认提示"), systemImage: "xmark") { model.lastTaskReview = nil }.labelStyle(.iconOnly)
                 }
                 .font(.caption).buttonStyle(.borderless)
                 .padding(10).background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 7))
@@ -132,9 +132,9 @@ struct TaskDashboardView: View {
     private func viewTab(_ title: String, reports: Bool) -> some View {
         let selected = model.showingTaskReports == reports
         return Button { model.showingTaskReports = reports } label: {
-            Text(title).font(.system(size: 18, weight: .medium))
+            Text(title).font(.system(size: 15, weight: .medium))
                 .foregroundStyle(selected ? Color.accentColor : .secondary)
-                .frame(height: 64).contentShape(Rectangle())
+                .frame(height: 40).contentShape(Rectangle())
                 .overlay(alignment: .bottom) {
                     Rectangle().fill(selected ? Color.accentColor : .clear).frame(height: 2)
                 }
@@ -153,11 +153,11 @@ struct TaskDashboardView: View {
                 ProgressView().controlSize(.small)
                 Button("取消识别") { model.cancelTaskDiscovery() }
             } else {
-                Button("AI 更新进展", systemImage: "sparkles") { model.discoverTasks() }
+                Button(String(localized: "AI 更新进展"), systemImage: "sparkles") { model.discoverTasks() }
                     .disabled(!model.canStartOrganization)
                     .help("从最近 200 篇 Memory 发现待办并更新已有任务；新截图整理时也会自动更新。")
             }
-            Button("新建待办", systemImage: "plus") { editing = TaskEditRequest(task: nil) }
+            Button(String(localized: "新建待办"), systemImage: "plus") { editing = TaskEditRequest(task: nil) }
                 .buttonStyle(.borderedProminent).keyboardShortcut("n", modifiers: .command)
         }.controlSize(.small).fixedSize(horizontal: true, vertical: false)
     }
@@ -167,14 +167,14 @@ struct TaskDashboardView: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: model.taskDiscoveryFailed ? "exclamationmark.circle" : "sparkles")
                     .foregroundStyle(model.taskDiscoveryFailed ? Color.orange : Color.secondary)
-                Text(model.taskDiscoveryFailed ? (message.hasPrefix("Memory 已保存") ? "任务识别未完成，Memory 已保存" : "任务识别未完成") : message)
+                Text(model.taskDiscoveryFailed ? (model.taskDiscoveryMemorySaved ? String(localized: "任务识别未完成，Memory 已保存") : String(localized: "任务识别未完成")) : message)
                     .foregroundStyle(.secondary)
                 if model.taskDiscoveryFailed {
-                    Button(showingDiscoveryDetails ? "收起原因" : "查看原因") { showingDiscoveryDetails.toggle() }.buttonStyle(.borderless)
+                    Button(showingDiscoveryDetails ? String(localized: "收起原因") : String(localized: "查看原因")) { showingDiscoveryDetails.toggle() }.buttonStyle(.borderless)
                 }
                 Spacer(minLength: 0)
                 if !model.discoveringTasks {
-                    Button("关闭提示", systemImage: "xmark") { model.taskDiscoveryMessage = nil }
+                    Button(String(localized: "关闭提示"), systemImage: "xmark") { model.taskDiscoveryMessage = nil }
                         .labelStyle(.iconOnly).buttonStyle(.borderless).foregroundStyle(.secondary)
                 }
             }
@@ -199,12 +199,12 @@ struct TaskDashboardView: View {
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 4))
                     }
-                }.buttonStyle(.plain).accessibilityLabel(showingCandidates ? "收起待确认任务" : "展开待确认任务")
+                }.buttonStyle(.plain).accessibilityLabel(showingCandidates ? String(localized: "收起待确认任务") : String(localized: "展开待确认任务"))
                 Text("AI 从近期活动中发现").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
                 Button { showingCandidates.toggle() } label: {
                     HStack(spacing: 4) {
-                        Text(showingCandidates ? "收起" : "展开")
+                        Text(showingCandidates ? String(localized: "收起") : String(localized: "展开"))
                         Image(systemName: showingCandidates ? "chevron.up" : "chevron.down")
                     }.font(.caption).foregroundStyle(.secondary)
                 }.buttonStyle(.plain)
@@ -219,14 +219,14 @@ struct TaskDashboardView: View {
                 }.padding(.horizontal, 16)
                 Divider()
                 HStack(spacing: 8) {
-                    Label("确认后，加入建议的看板列", systemImage: "sparkles").lineLimit(1)
+                    Label(String(localized: "确认后，加入建议的看板列"), systemImage: "sparkles").lineLimit(1)
                     Spacer(minLength: 8)
                     Text("\(start + 1)–\(start + visible.count) / \(candidateTasks.count)").monospacedDigit()
                     if candidateTasks.count > 3 {
-                        Button("上一页待确认任务", systemImage: "chevron.left") {
+                        Button(String(localized: "上一页待确认任务"), systemImage: "chevron.left") {
                             candidatePage = visibleCandidatePage - 1; expandedCandidateID = nil
                         }.labelStyle(.iconOnly).disabled(visibleCandidatePage == 0)
-                        Button("下一页待确认任务", systemImage: "chevron.right") {
+                        Button(String(localized: "下一页待确认任务"), systemImage: "chevron.right") {
                             candidatePage = visibleCandidatePage + 1; expandedCandidateID = nil
                         }.labelStyle(.iconOnly).disabled(visibleCandidatePage == lastCandidatePage)
                     }
@@ -256,7 +256,7 @@ struct TaskDashboardView: View {
                 VStack(alignment: .leading, spacing: 9) {
                     Text(task.title).font(.callout.weight(.medium)).textSelection(.enabled)
                     if let evidence = task.evidence.first {
-                        Label("来源依据 · \(evidence.date.formatted(date: .abbreviated, time: .shortened))", systemImage: "doc.text")
+                        Label(String(localized: "来源依据 · \(evidence.date.formatted(date: .abbreviated, time: .shortened))"), systemImage: "doc.text")
                             .font(.caption).foregroundStyle(.secondary)
                         Text(evidence.body).font(.callout).textSelection(.enabled)
                     } else {
@@ -292,12 +292,12 @@ struct TaskDashboardView: View {
     private func candidateControls(_ task: WorkTask) -> some View {
         let status = candidateStatuses[task.id] ?? task.suggestedStatus.flatMap { $0.isConfirmed ? $0 : nil } ?? .todo
         return HStack(spacing: 10) {
-            statusLabel(status, prefix: candidateStatuses[task.id] == nil ? "建议" : "设为")
+            statusLabel(status, prefix: candidateStatuses[task.id] == nil ? String(localized: "建议") : String(localized: "设为"))
                 .font(.caption).foregroundStyle(status.tint).frame(width: 80, alignment: .leading)
-            Button("确认", systemImage: "checkmark") { model.reviewTask(task.id, status) }
+            Button(String(localized: "确认"), systemImage: "checkmark") { model.reviewTask(task.id, status) }
                 .buttonStyle(.bordered).controlSize(.small)
                 .accessibilityLabel("确认\(task.title)，加入\(status.title)")
-            Button("忽略\(task.title)", systemImage: "xmark") { model.reviewTask(task.id, .ignored) }
+            Button(String(localized: "忽略\(task.title)"), systemImage: "xmark") { model.reviewTask(task.id, .ignored) }
                 .labelStyle(.iconOnly).buttonStyle(.borderless).foregroundStyle(.secondary).help("忽略这条建议")
         }.fixedSize(horizontal: true, vertical: false)
     }
@@ -343,20 +343,20 @@ struct TaskDashboardView: View {
                                 Text(task.title).font(.body.weight(.medium)).foregroundStyle(.primary)
                                     .lineLimit(waiting && hasUpdate ? 2 : 3)
                                 if waiting {
-                                    Label("等待：\(task.waitingReason)", systemImage: "clock").font(.caption).foregroundStyle(.orange)
+                                    Label(String(localized: "等待：\(task.waitingReason)"), systemImage: "clock").font(.caption).foregroundStyle(.orange)
                                         .lineLimit(1).help("等待：\(task.waitingReason)")
                                 }
                                 if let suggestion = task.suggestedStatus, suggestion != task.status {
-                                    Label("待确认：调整为\(suggestion.title)", systemImage: "sparkle").font(.caption).foregroundStyle(.orange).lineLimit(1)
+                                    Label(String(localized: "待确认：调整为\(suggestion.title)"), systemImage: "sparkle").font(.caption).foregroundStyle(.orange).lineLimit(1)
                                 } else if aiUpdated {
-                                    Label("AI 已更新进展", systemImage: "sparkles").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                    Label(String(localized: "AI 已更新进展"), systemImage: "sparkles").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                                 }
                                 Spacer(minLength: 0)
                                 HStack(alignment: .firstTextBaseline) {
                                     Text(task.projectTitle).lineLimit(1)
                                     Spacer(minLength: 6)
                                     if let date = task.completedAt { Text(date, format: .dateTime.month(.defaultDigits).day()).fixedSize() }
-                                    else { Text(task.evidence.isEmpty ? "手动创建" : "\(task.evidence.count) 条依据").fixedSize() }
+                                    else { Text(task.evidence.isEmpty ? String(localized: "手动创建") : String(localized: "\(task.evidence.count) 条依据")).fixedSize() }
                                 }.font(.caption).foregroundStyle(.secondary)
                             }.padding(12).frame(maxWidth: .infinity, alignment: .leading).frame(height: taskCardHeight)
                                 .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
@@ -403,6 +403,7 @@ private struct TaskReportsView: View {
     @State private var period = WorkTaskReportPeriod.day
     @State private var date = Date()
     @State private var copied = false
+    @State private var sharing = false
     @State private var savedDocument: WorkTaskReportDocument?
     @State private var editingDocument: WorkTaskReportDocument?
     @State private var loading = true
@@ -432,9 +433,9 @@ private struct TaskReportsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
-                            Label(savedDocument?.id == document.id ? "已保存草稿" : "草稿", systemImage: "doc.badge.ellipsis")
+                            Label(savedDocument?.id == document.id ? String(localized: "已保存草稿") : String(localized: "草稿"), systemImage: "doc.badge.ellipsis")
                             Spacer()
-                            Button("参考任务", systemImage: "sidebar.right") { showingSources = true }
+                            Button(String(localized: "参考任务"), systemImage: "sidebar.right") { showingSources = true }
                                 .buttonStyle(.plain).disabled(document.taskIDs.isEmpty || loading)
                         }.font(.callout).foregroundStyle(.secondary)
                         if loading {
@@ -498,9 +499,14 @@ private struct TaskReportsView: View {
 
     private var actions: some View {
         HStack(spacing: 10) {
-            Button("编辑", systemImage: "square.and.pencil") { editingDocument = document }
+            Button(String(localized: "编辑"), systemImage: "square.and.pencil") { editingDocument = document }
                 .disabled(loading || loadError != nil || document.taskIDs.isEmpty)
-            Button(copied ? "已复制" : "复制报告", systemImage: copied ? "checkmark" : "doc.on.doc") {
+            Button(String(localized: "分享"), systemImage: "square.and.arrow.up") { sharing = true }
+                .disabled(loading || loadError != nil || document.taskIDs.isEmpty)
+                .popover(isPresented: $sharing, arrowEdge: .bottom) {
+                    ReportSharePanel(document: document) { sharing = false }
+                }
+            Button(copied ? String(localized: "已复制") : String(localized: "复制报告"), systemImage: copied ? "checkmark" : "doc.on.doc") {
                 NSPasteboard.general.clearContents()
                 copied = NSPasteboard.general.setString(document.markdown, forType: .string)
             }.buttonStyle(.borderedProminent).disabled(loading || loadError != nil || document.taskIDs.isEmpty)
@@ -509,9 +515,9 @@ private struct TaskReportsView: View {
 
     private var dateControls: some View {
         HStack(spacing: 10) {
-            Button("上一期", systemImage: "chevron.left") { movePeriod(-1) }.labelStyle(.iconOnly)
+            Button(String(localized: "上一期"), systemImage: "chevron.left") { movePeriod(-1) }.labelStyle(.iconOnly)
             Label(report.dateTitle, systemImage: "calendar").font(.callout).foregroundStyle(.secondary)
-            Button("下一期", systemImage: "chevron.right") { movePeriod(1) }
+            Button(String(localized: "下一期"), systemImage: "chevron.right") { movePeriod(1) }
                 .labelStyle(.iconOnly).disabled(report.interval.end > Date())
             if !report.isCurrent { Button("本期") { date = Date() } }
         }.buttonStyle(.borderless).fixedSize()
@@ -537,7 +543,7 @@ private struct TaskReportsView: View {
 
 }
 
-private struct ReportStatusIcon: View {
+struct ReportStatusIcon: View {
     let status: WorkTaskStatus
     var body: some View {
         Image(systemName: status == .done ? "checkmark.circle.fill" : status == .doing ? "circle.lefthalf.filled" : "circle")
@@ -619,7 +625,7 @@ private struct ReportEditor: View {
                 Text("编辑\(document.title)").font(.headline)
                 Spacer()
                 Button("取消") { dismiss() }.keyboardShortcut(.cancelAction).disabled(saving)
-                Button(saving ? "正在保存…" : "保存") {
+                Button(saving ? String(localized: "正在保存…") : String(localized: "保存")) {
                     saving = true
                     Task {
                         do { try await store.saveWorkTaskReport(document); saved(document); dismiss() }
@@ -654,7 +660,7 @@ private struct TaskDetailView: View {
                         Text("\(task.projectTitle) · \(task.status.title)").font(.callout).foregroundStyle(.secondary)
                     }.frame(maxWidth: .infinity, alignment: .leading)
                     Button("编辑") { editing = true }.buttonStyle(.borderless)
-                    Button("关闭详情", systemImage: "xmark") { dismiss() }
+                    Button(String(localized: "关闭详情"), systemImage: "xmark") { dismiss() }
                         .labelStyle(.iconOnly).buttonStyle(.borderless).keyboardShortcut(.cancelAction)
                 }.padding(24)
                 Divider()
@@ -676,11 +682,11 @@ private struct TaskDetailView: View {
                 Spacer()
             }
             if !task.waitingReason.isEmpty && task.status != .done {
-                Label("等待：\(task.waitingReason)", systemImage: "clock").font(.callout).foregroundStyle(.orange)
+                Label(String(localized: "等待：\(task.waitingReason)"), systemImage: "clock").font(.callout).foregroundStyle(.orange)
             }
             if let suggestion = task.suggestedStatus, suggestion != task.status {
                 HStack {
-                    Label("AI 建议调整为\(suggestion.title)", systemImage: "sparkle").foregroundStyle(.orange)
+                    Label(String(localized: "AI 建议调整为\(suggestion.title)"), systemImage: "sparkle").foregroundStyle(.orange)
                     Button("确认\(suggestion.title)") { model.setTaskStatus(task.id, suggestion) }
                     Button("保留当前状态") { model.setTaskStatus(task.id, task.status) }.buttonStyle(.borderless)
                 }.font(.callout)
@@ -697,7 +703,7 @@ private struct TaskDetailView: View {
             DisclosureGroup("状态历史 · \(events.count)") {
                 ForEach(events.reversed()) { event in
                     HStack {
-                        Text("\(event.actor.title) · " + (event.from.map { "\($0.title) → \(event.to.title)" } ?? "创建 · \(event.to.title)"))
+                        Text("\(event.actor.title) · " + (event.from.map { "\($0.title) → \(event.to.title)" } ?? String(localized: "创建 · \(event.to.title)")))
                         Spacer()
                         Text(event.date, format: .dateTime.month().day().hour().minute()).foregroundStyle(.secondary)
                     }.font(.callout).padding(.vertical, 4)
@@ -757,7 +763,7 @@ private struct TaskEditorView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text(task == nil ? "新建待办" : "编辑任务").font(.title2.bold())
+            Text(task == nil ? String(localized: "新建待办") : String(localized: "编辑任务")).font(.title2.bold())
             if task == nil { Text("先记下要做的事，AI 会根据后续工作记录更新进展。").font(.callout).foregroundStyle(.secondary) }
             TextField("待办名称", text: $title).textFieldStyle(.roundedBorder).focused($titleFocused).disabled(saving)
             TextField("项目（可选）", text: $project).textFieldStyle(.roundedBorder).disabled(saving)
@@ -766,7 +772,7 @@ private struct TaskEditorView: View {
             HStack {
                 Button("取消") { dismiss() }.keyboardShortcut(.cancelAction).disabled(saving)
                 Spacer()
-                Button(saving ? "正在保存…" : task == nil ? "创建待办" : "保存修改") {
+                Button(saving ? String(localized: "正在保存…") : task == nil ? String(localized: "创建待办") : String(localized: "保存修改")) {
                     saving = true
                     Task {
                         do { let id = try await model.saveTask(id: task?.id, title: title, project: project, waitingReason: waitingReason); onSave(id); dismiss() }

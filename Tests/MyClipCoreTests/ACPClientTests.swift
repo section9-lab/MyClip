@@ -203,29 +203,6 @@ final class ACPClientTests: XCTestCase {
         XCTAssertEqual(result.text, "你好，已整理")
     }
 
-    func testCaptureToAgentToSearchableWikiPipeline() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let store = try LibraryStore(root: root)
-        let image = try fixtureImage()
-        let context = fixtureContext()
-        try await store.record(image: image, context: context, agent: .codex, organize: true)
-        let claimed = try await store.claimNextJob(immediately: true)
-        let job = try XCTUnwrap(claimed)
-        let inputs = try await store.captures(ids: job.sourceIDs)
-        let client = ACPClient()
-        addTeardownBlock { await client.close() }
-        _ = try await client.connect(command: command("knowledge"))
-        let session = try await client.newSession(directory: root)
-        let result = try await client.prompt(sessionID: session, text: KnowledgeComposer.prompt(captures: inputs, existing: []), images: [image.pngData])
-        XCTAssertEqual(result.stopReason, "end_turn")
-        try await store.commit(jobID: job.id, drafts: KnowledgeComposer.parse(result.text))
-        let found = try await store.snapshot(query: "回车")
-        XCTAssertEqual(found.entries.count, 1)
-        XCTAssertEqual(found.entries.first?.sourceIDs, [context.id])
-        XCTAssertEqual(found.jobs.first?.state, .completed)
-    }
-
     func testProcessExitFailsPendingRequest() async throws {
         let client = ACPClient()
         addTeardownBlock { await client.close() }

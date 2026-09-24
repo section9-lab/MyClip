@@ -19,12 +19,12 @@ public enum CaptureReason: String, Codable, Sendable {
 
     public var label: String {
         switch self {
-        case .pointerIdle: "鼠标活动停止 2 秒"
-        case .clickIdle: "移动后点击，停顿 2 秒"
-        case .clickAfterIdle: "移动并静止后点击"
-        case .scrollIdle: "上下滚动停止 2 秒"
-        case .enter: "回车触发"
-        case .manual: "手动截图"
+        case .pointerIdle: String(localized: "鼠标活动停止 2 秒")
+        case .clickIdle: String(localized: "移动后点击，停顿 2 秒")
+        case .clickAfterIdle: String(localized: "移动并静止后点击")
+        case .scrollIdle: String(localized: "上下滚动停止 2 秒")
+        case .enter: String(localized: "回车触发")
+        case .manual: String(localized: "手动截图")
         }
     }
 }

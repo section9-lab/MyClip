@@ -6,9 +6,9 @@ public struct CaptureFilter: Equatable, Sendable {
 
         public var label: String {
             switch self {
-            case .all: "全部事件"
-            case .mouse: "鼠标"
-            case .keyboard: "键盘"
+            case .all: String(localized: "全部事件")
+            case .mouse: String(localized: "鼠标")
+            case .keyboard: String(localized: "键盘")
             }
         }
     }

@@ -9,7 +9,7 @@ final class SQLiteConnection: @unchecked Sendable {
         var database: OpaquePointer?
         guard sqlite3_open_v2(url.path, &database, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK,
               let database else {
-            let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? "无法打开数据库"
+            let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? String(localized: "无法打开数据库")
             if let database { sqlite3_close(database) }
             throw LibraryError.database(message)
         }

@@ -4,12 +4,15 @@ import Foundation
 public enum RetryPolicy {
     public enum Verdict: Sendable, Equatable { case transient, permanent }
 
-    /// Attempts a batch gets before the queue pauses, counting the first run.
-    public static let maxAttempts = 3
+    /// Attempts a batch gets before the queue pauses, counting the first run. With the backoff below a batch keeps
+    /// retrying for about two hours, long enough to ride out a flaky network or an overloaded provider.
+    public static let maxAttempts = 6
 
-    /// Wait before automatically re-running a batch. The queue's own 3 minute interval still applies on top.
+    static let backoff: [TimeInterval] = [60, 300, 900, 1800, 3600]
+
+    /// Wait before automatically re-running a batch. The queue's own 5 minute interval still applies on top.
     public static func delay(afterAttempt attempt: Int) -> TimeInterval {
-        attempt <= 1 ? 60 : 300
+        backoff[min(max(attempt, 1), backoff.count) - 1]
     }
 
     public static func canRetry(afterAttempt attempt: Int) -> Bool { attempt < maxAttempts }
@@ -25,8 +28,7 @@ public enum RetryPolicy {
         }
         if let library = error as? LibraryError {
             switch library {
-            case .invalidResult(let message): return message.contains("完成前停止") ? .transient : .permanent
-            case .rolledBack: return .transient
+            case .agentStopped, .rolledBack: return .transient
             default: return .permanent
             }
         }

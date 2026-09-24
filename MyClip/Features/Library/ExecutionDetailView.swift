@@ -33,9 +33,9 @@ struct ExecutionDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                AgentBrandIcon(agent: job.agent, size: 32)
+                JobIcon(job: job, size: 32)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("\(job.sourceIDs.count) 条素材 · \(jobLabel(currentJob.state))").font(.title3.weight(.semibold))
+                    Text("\(jobTitle(job)) · \(jobLabel(currentJob))").font(.title3.weight(.semibold))
                     HStack(spacing: 8) {
                         Text(job.agent.name)
                         Text("·")
@@ -51,7 +51,7 @@ struct ExecutionDetailView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     if let error = currentJob.error {
                         Label {
-                            Text(error + (currentJob.state == .failed ? "\n重试会用同一个 Agent 重新建立连接并处理这批素材。" : ""))
+                            Text(error + (currentJob.state == .failed && job.kind == .batch ? String(localized: "\n重试会用同一个 Agent 重新建立连接并处理这批素材。") : ""))
                                 .fixedSize(horizontal: false, vertical: true)
                         } icon: { Image(systemName: "exclamationmark.circle") }
                             .font(.callout).foregroundStyle(.orange).textSelection(.enabled)
@@ -59,6 +59,7 @@ struct ExecutionDetailView: View {
                             .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
                     }
                     summaryTiles
+                    if let plan = currentJob.dreamPlan { dreamSection(plan) }
                     if let loadError {
                         Label(loadError, systemImage: "exclamationmark.circle").foregroundStyle(.orange)
                     } else if !loaded {
@@ -92,9 +93,9 @@ struct ExecutionDetailView: View {
 
     private var summaryTiles: some View {
         HStack(spacing: 10) {
-            tile("用时", value: duration.map(clock) ?? "–")
-            tile("工具调用", value: loaded ? "\(tools.count) 次" : "–")
-            tile("Token", value: usage.totalTokens.map(compact) ?? (isLive ? "等待回传" : "未记录"))
+            tile(String(localized: "用时"), value: duration.map(clock) ?? "–")
+            tile(String(localized: "工具调用"), value: loaded ? String(localized: "\(tools.count) 次") : "–")
+            tile("Token", value: usage.totalTokens.map(compact) ?? (isLive ? String(localized: "等待回传") : String(localized: "未记录")))
         }
     }
 
@@ -128,9 +129,9 @@ struct ExecutionDetailView: View {
 
     private var toolsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel("调用过的工具")
+            sectionLabel(String(localized: "调用过的工具"))
             if toolGroups.isEmpty {
-                Text(isLive ? "等待 Agent 开始调用工具…" : "这批没有回传工具调用。").font(.caption).foregroundStyle(.secondary)
+                Text(isLive ? String(localized: "等待 Agent 开始调用工具…") : String(localized: "这批没有回传工具调用。")).font(.caption).foregroundStyle(.secondary)
             } else {
                 let most = toolGroups.first?.count ?? 1
                 ForEach(toolGroups) { group in
@@ -157,7 +158,7 @@ struct ExecutionDetailView: View {
 
     private var sequenceSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel("调用顺序")
+            sectionLabel(String(localized: "调用顺序"))
             if tools.isEmpty {
                 Text("–").font(.caption).foregroundStyle(.tertiary)
             } else {
@@ -178,17 +179,17 @@ struct ExecutionDetailView: View {
 
     private var sequenceNote: String {
         switch currentJob.state {
-        case .failed: "最后一次调用之后没有新进度，停止等待。"
-        case .cancelled: "在第 \(tools.count) 次调用后被取消，素材已回到队列。"
-        case .running: "正在进行第 \(tools.count + 1) 次调用…"
-        case .queued: "等待下一次尝试。"
-        case .completed: "共 \(tools.count) 次调用，\(records.count) 次请求。"
+        case .failed: String(localized: "最后一次调用之后没有新进度，停止等待。")
+        case .cancelled: String(localized: "在第 \(tools.count) 次调用后被取消，素材已回到队列。")
+        case .running: String(localized: "正在进行第 \(tools.count + 1) 次调用…")
+        case .queued: String(localized: "等待下一次尝试。")
+        case .completed: String(localized: "共 \(tools.count) 次调用，\(records.count) 次请求。")
         }
     }
 
     private var writtenSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel("写入")
+            sectionLabel(String(localized: "写入"))
             FlowLayout(spacing: 6) {
                 ForEach(writtenPaths, id: \.self) { path in
                     Text(path).font(.caption).padding(.horizontal, 8).padding(.vertical, 3)
@@ -198,9 +199,32 @@ struct ExecutionDetailView: View {
         }
     }
 
+    /// What the dream was given, grouped by why each page is in it.
+    private func dreamSection(_ plan: ConsolidationPlan) -> some View {
+        let groups: [(String, [String])] = [
+            (String(localized: "需要归位"), plan.misfiled), (String(localized: "今天改动"), plan.changed),
+            (String(localized: "相邻页面"), plan.neighbours), (String(localized: "例行巡检"), plan.patrol),
+            (String(localized: "周报"), plan.weekly.map { [$0.path] } ?? [])
+        ]
+        return VStack(alignment: .leading, spacing: 10) {
+            sectionLabel(String(localized: "梦的范围"))
+            ForEach(groups.filter { !$0.1.isEmpty }, id: \.0) { title, paths in
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title).font(.caption).foregroundStyle(.secondary)
+                    FlowLayout(spacing: 6) {
+                        ForEach(paths, id: \.self) { path in
+                            Text(path).font(.caption).padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6)).textSelection(.enabled)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private var tokenSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel("Token 明细")
+            sectionLabel(String(localized: "Token 明细"))
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
                 GridRow { Text("输入").foregroundStyle(.secondary); Text(count(usage.inputTokens)) }
                 GridRow { Text("输出").foregroundStyle(.secondary); Text(count(usage.outputTokens)) }
@@ -215,11 +239,11 @@ struct ExecutionDetailView: View {
     @ViewBuilder private var actions: some View {
         HStack(spacing: 8) {
             if currentJob.state == .failed {
-                Button("重试这批", systemImage: "arrow.clockwise") { model.retry(currentJob); dismiss() }
+                Button(job.kind == .dream ? String(localized: "重新做梦") : String(localized: "重试这批"), systemImage: "arrow.clockwise") { model.retry(currentJob); dismiss() }
                     .buttonStyle(.borderedProminent).disabled(!model.canRetry(currentJob))
             }
             if currentJob.state == .running || currentJob.state == .queued {
-                Button("取消本批") { model.cancel(currentJob); dismiss() }
+                Button(job.kind == .dream ? String(localized: "停止做梦") : String(localized: "取消本批")) { model.cancel(currentJob); dismiss() }
             }
         }
     }
@@ -230,7 +254,7 @@ struct ExecutionDetailView: View {
         Text(text).font(.caption.weight(.medium)).foregroundStyle(.secondary).textCase(.uppercase).tracking(0.4)
     }
 
-    private func count(_ value: Int?) -> String { value?.formatted() ?? "未回传" }
+    private func count(_ value: Int?) -> String { value?.formatted() ?? String(localized: "未回传") }
 
     private func compact(_ value: Int) -> String {
         switch value {
@@ -242,7 +266,7 @@ struct ExecutionDetailView: View {
 
     private func clock(_ interval: TimeInterval) -> String {
         let seconds = Int(interval.rounded())
-        return "\(seconds / 60) 分 \(seconds % 60) 秒"
+        return String(localized: "\(seconds / 60) 分 \(seconds % 60) 秒")
     }
 }
 
@@ -264,13 +288,13 @@ private enum ToolKind {
 
     var label: String {
         switch self {
-        case .read: "读取"
-        case .edit: "写入"
-        case .execute: "命令"
-        case .search: "搜索"
-        case .fetch: "获取"
-        case .think: "思考"
-        case .other: "其他"
+        case .read: String(localized: "读取")
+        case .edit: String(localized: "写入")
+        case .execute: String(localized: "命令")
+        case .search: String(localized: "搜索")
+        case .fetch: String(localized: "获取")
+        case .think: String(localized: "思考")
+        case .other: String(localized: "其他")
         }
     }
 

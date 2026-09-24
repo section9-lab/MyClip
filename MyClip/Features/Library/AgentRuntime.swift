@@ -7,10 +7,10 @@ enum LocalAgentAvailability {
     var canSelect: Bool { self == .connector || self == .commandLine }
     var detail: String {
         switch self {
-        case .connector: "连接组件已安装"
-        case .commandLine: "已检测到 · 需安装连接组件"
-        case .desktopOnly: "仅检测到桌面端 · 需安装命令行"
-        case .missing: "未检测到"
+        case .connector: String(localized: "连接组件已安装")
+        case .commandLine: String(localized: "已检测到 · 需安装连接组件")
+        case .desktopOnly: String(localized: "仅检测到桌面端 · 需安装命令行")
+        case .missing: String(localized: "未检测到")
         }
     }
 }
@@ -82,7 +82,7 @@ struct AgentRuntime {
 
     func install(_ agent: ClipAgent) async throws {
         guard let package = agent.package else {
-            throw LibraryError.invalidResult("\(agent.name) 自带 ACP 支持，无需连接组件；请先安装 \(agent.cliName) 命令行。")
+            throw LibraryError.invalidResult(String(localized: "\(agent.name) 自带 ACP 支持，无需连接组件；请先安装 \(agent.cliName) 命令行。"))
         }
         let env = environment
         let root = root
@@ -101,7 +101,7 @@ struct AgentRuntime {
             try process.run()
             process.waitUntilExit()
             guard process.terminationStatus == 0 else {
-                throw LibraryError.invalidResult("连接组件安装失败。请安装 Node.js 22 或更新版本，并查看 Runtime/install.log。")
+                throw LibraryError.invalidResult(String(localized: "连接组件安装失败。请安装 Node.js 22 或更新版本，并查看 Runtime/install.log。"))
             }
         }.value
     }

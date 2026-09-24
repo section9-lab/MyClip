@@ -13,7 +13,8 @@ swiftc -parse-as-library -swift-version 6 \
     -target "$(uname -m)-apple-macosx13.0" \
     -I "$package_build/Modules" "$package_build"/MyClipCore.build/*.o \
     MyClip/Features/Library/AgentRuntime.swift \
-    MyClip/Features/Library/MyClipModel.swift \
+    MyClip/Features/Library/AgentSessionCoordinator.swift \
+    MyClip/Features/Library/MyClipModel*.swift \
     Tests/MyClipAppTests/CaptureLifecycleTests.swift \
     -o "$test_build/CaptureLifecycleTests"
 "$test_build/CaptureLifecycleTests"

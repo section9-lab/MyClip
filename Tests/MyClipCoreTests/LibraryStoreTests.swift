@@ -412,6 +412,6 @@ final class SceneFoldingTests: XCTestCase {
         let byWindow = Dictionary(grouping: snapshot.captures, by: \.windowID)
         XCTAssertEqual(Set(byWindow[1]!.map(\.sceneID)).count, 2, "A 7 minute gap splits the window into two scenes")
         XCTAssertEqual(Set(byWindow[9]!.map(\.sceneID)).count, 1)
-        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "11")
+        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "15")
     }
 }

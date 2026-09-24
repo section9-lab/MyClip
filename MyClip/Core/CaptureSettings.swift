@@ -3,20 +3,20 @@ import Foundation
 public enum CaptureScope: String, CaseIterable, Sendable, Identifiable {
     case focusedWindow, focusedDisplay
     public var id: String { rawValue }
-    public var label: String { self == .focusedWindow ? "前台焦点应用窗口" : "焦点显示器全屏" }
+    public var label: String { self == .focusedWindow ? String(localized: "前台焦点应用窗口") : String(localized: "焦点显示器全屏") }
 }
 
 public enum MouseCaptureTrigger: String, CaseIterable, Sendable, Identifiable {
     case click, scroll
     public var id: String { rawValue }
-    public var label: String { self == .click ? "移动后静止 1 秒，再点击或双击" : "上下滚动停止 2 秒" }
-    public var shortLabel: String { self == .click ? "静止后点击" : "停止滚动" }
+    public var label: String { self == .click ? String(localized: "移动后静止 1 秒，再点击或双击") : String(localized: "上下滚动停止 2 秒") }
+    public var shortLabel: String { self == .click ? String(localized: "静止后点击") : String(localized: "停止滚动") }
 }
 
 public enum KeyboardCaptureMode: String, CaseIterable, Sendable, Identifiable {
     case returnKey, afterLetters
     public var id: String { rawValue }
-    public var label: String { self == .returnKey ? "回车后截图" : "字母键后再回车" }
+    public var label: String { self == .returnKey ? String(localized: "回车后截图") : String(localized: "字母键后再回车") }
 }
 
 public struct CaptureSettings: Equatable, Sendable, CustomStringConvertible {
@@ -24,13 +24,13 @@ public struct CaptureSettings: Equatable, Sendable, CustomStringConvertible {
     public var mouseTriggers: Set<MouseCaptureTrigger>
     public var keyboard: KeyboardCaptureMode
     public var mouseSummary: String {
-        mouseTriggers.isEmpty ? "已关闭" : MouseCaptureTrigger.allCases.filter { mouseTriggers.contains($0) }.map(\.shortLabel).joined(separator: "、")
+        mouseTriggers.isEmpty ? String(localized: "已关闭") : MouseCaptureTrigger.allCases.filter { mouseTriggers.contains($0) }.map(\.shortLabel).joined(separator: "、")
     }
     public var description: String {
-        let scopeText = scope == .focusedWindow ? "只记录前台焦点窗口。" : "记录焦点窗口所在的显示器全屏。"
+        let scopeText = scope == .focusedWindow ? String(localized: "只记录前台焦点窗口。") : String(localized: "记录焦点窗口所在的显示器全屏。")
         let triggers = MouseCaptureTrigger.allCases.filter { mouseTriggers.contains($0) }.map(\.label)
-            + [keyboard == .returnKey ? "每次按下回车" : "字母键后再回车"]
-        return scopeText + "触发方式：" + triggers.joined(separator: "；") + "。"
+            + [keyboard == .returnKey ? String(localized: "每次按下回车") : String(localized: "字母键后再回车")]
+        return scopeText + String(localized: "触发方式：") + triggers.joined(separator: "；") + "。"
     }
 
     public init(scope: CaptureScope = .focusedWindow, mouseTriggers: Set<MouseCaptureTrigger> = [.click, .scroll], keyboard: KeyboardCaptureMode = .afterLetters) {

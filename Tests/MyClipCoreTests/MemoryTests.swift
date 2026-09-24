@@ -51,13 +51,6 @@ final class MemoryTests: XCTestCase {
         XCTAssertEqual(current?.body, "人工确认的内容")
     }
 
-    func testComposerDescribesOnlyMemoryAndAllowsMemoryRetrieval() {
-        let prompt = KnowledgeComposer.prompt(captures: [], existing: [])
-        XCTAssertFalse(prompt.contains("Wiki 用于"))
-        XCTAssertTrue(prompt.contains("search_memories"))
-        XCTAssertTrue(prompt.contains("Wikilink"))
-    }
-
     func testGeneratedLinksCannotPointAtInventedMemory() async throws {
         let store = try LibraryStore(root: root)
         let entry = try await seed(store)
@@ -126,6 +119,57 @@ final class MemoryTests: XCTestCase {
         XCTAssertNil(recent.averageSeconds)
     }
 
+    func testPublishedFilesLeaveBatchContextInHistoryAndLegacyFilesAreSlimmedOnce() async throws {
+        let id = UUID(), cited = UUID(), context = (0..<50).map { _ in UUID() }
+        let url = root.appendingPathComponent("Memory/Wiki/Archives/旧版.md")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let legacy = try MemoryDocument.encode(id: id, title: "旧版", body: "事实。来源：截图 `\(cited)`。", revision: 3, agent: .codex, sourceIDs: [cited],
+                                               path: "Inbox/旧版.md", contextSourceIDs: context)
+        try legacy.write(to: url, atomically: true, encoding: .utf8)
+        _ = try await LibraryStore(root: root).snapshot()
+        // Simulate a library written before v12: the published file still carries the full frontmatter.
+        let database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
+        let stored = try XCTUnwrap(database.run("SELECT path FROM entries WHERE id=?", [id.uuidString]).first?["path"])
+        let full = try String(contentsOf: root.appendingPathComponent(stored), encoding: .utf8)
+        try full.write(to: url, atomically: true, encoding: .utf8)
+        try database.run("UPDATE memory_files SET published_hash=?,pending=0 WHERE id=?", [LibraryStore.memoryHash(full), id.uuidString])
+        try database.script("PRAGMA user_version=11;")
+
+        let store = try LibraryStore(root: root)
+        let before = try await store.readMemory(id)
+        let published = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertFalse(published.contains("context_source_ids"), "Migration rewrites every file once without the batch context")
+        XCTAssertTrue(published.contains("\nsource_ids: [\(cited.uuidString)]\n"))
+        XCTAssertTrue(published.contains("\ntype: archive\n"), "The type follows the folder")
+        XCTAssertEqual(Set(before.contextSourceIDs), Set(context), "The history keeps the context")
+        let reread = try await store.readMemory(id)
+        XCTAssertEqual(before.revision, reread.revision, "Slimming is not an edit")
+        let protected = try database.run("SELECT id FROM protected_entries WHERE id=?", [id.uuidString])
+        XCTAssertEqual(protected.count, 1, "Imported files were protected before; slimming must not change that")
+
+        // An external edit of the slim file keeps the context the file no longer shows.
+        try published.replacingOccurrences(of: "事实。", with: "修改后的事实。").write(to: url, atomically: true, encoding: .utf8)
+        let edited = try await store.readMemory(id)
+        XCTAssertTrue(edited.body.contains("修改后的事实"))
+        XCTAssertEqual(edited.revision, before.revision + 1)
+        XCTAssertEqual(Set(edited.contextSourceIDs), Set(context))
+        XCTAssertEqual(edited.sourceIDs, [cited])
+        XCTAssertFalse(try String(contentsOf: url, encoding: .utf8).contains("context_source_ids"))
+    }
+
+    func testRebuiltIndexRecoversContextFromHistory() async throws {
+        let store = try LibraryStore(root: root)
+        let memory = try await seed(store)
+        let url = memory.fileURL
+        XCTAssertFalse(try String(contentsOf: url, encoding: .utf8).contains("context_source_ids"))
+        try FileManager.default.removeItem(at: root.appendingPathComponent("Library.sqlite"))
+        for suffix in ["-wal", "-shm"] { try? FileManager.default.removeItem(at: root.appendingPathComponent("Library.sqlite" + suffix)) }
+        let rebuilt = try LibraryStore(root: root)
+        let recovered = try await rebuilt.readMemory(memory.id)
+        XCTAssertEqual(recovered.sourceIDs, memory.sourceIDs)
+        XCTAssertEqual(recovered.contextSourceIDs, memory.contextSourceIDs)
+    }
+
     func testMarkdownVaultCanRebuildMemoryIndexInFreshLibrary() async throws {
         let store = try LibraryStore(root: root)
         let memory = try await seed(store)
@@ -139,7 +183,8 @@ final class MemoryTests: XCTestCase {
         XCTAssertEqual(snapshot.entries.first?.sourceIDs, memory.sourceIDs, "Keep provenance IDs even when images are not included in the vault backup")
         let service = MemoryMCP(store: restored)
         _ = await service.respond("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\"}}")
-        let response = await service.respond("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"get_sources\",\"arguments\":{\"id\":\"\(memory.id.uuidString)\"}}}")
-        XCTAssertTrue(response?.contains("\"recordAvailable\":false") == true, "Missing source metadata must be explicit, not fail the whole retrieval")
+        let response = await service.respond("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_get\",\"arguments\":{\"path\":\"\(memory.id.uuidString).md\"}}}")
+        XCTAssertTrue(response?.contains("\"isError\":false") == true, "Missing source metadata must not fail the whole retrieval")
+        XCTAssertTrue(response?.contains("\"count\":0") == true, "Missing source metadata is reported as no recorded screenshots")
     }
 }

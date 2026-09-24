@@ -20,6 +20,10 @@
 	<string>0.6.13</string>
 	<key>CFBundleVersion</key>
 	<string>32</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>MyClip 会读取桌面中的文件，帮助首次整理知识库内容。</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>MyClip 会读取文档中的文件，帮助首次整理知识库内容。</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>

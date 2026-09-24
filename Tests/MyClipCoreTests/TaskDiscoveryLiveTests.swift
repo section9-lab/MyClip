@@ -20,7 +20,7 @@ final class TaskDiscoveryLiveTests: XCTestCase {
         let listener = Task {
             for await event in client.events {
                 if case .permission(let request) = event {
-                    let allowed = ["read_memory", "search_memories"].contains { request.title.contains($0) }
+                    let allowed = ["memory_get", "memory_search"].contains { request.title.contains($0) }
                     let option = request.options.first { $0.kind == (allowed ? "allow_once" : "reject_once") }
                     try? await client.respondToPermission(id: request.id, optionID: option?.id)
                 }

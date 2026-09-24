@@ -165,4 +165,37 @@ final class WorkTaskReportTests: XCTestCase {
             XCTAssertEqual(report(period, start).document.sections.last?.title, title)
         }
     }
+
+    func testSharedFormatsDropMarkdownSyntaxAndEscapeHTML() {
+        let start = date("2026-09-18T00:00:00+08:00")
+        let id = UUID()
+        let task = WorkTask(id: id, title: "修复 <Slack> & 飞书分享", project: "MyClip", status: .doing, suggestedStatus: nil,
+                            createdAt: start, updatedAt: start, confirmedAt: start, completedAt: nil,
+                            evidence: [WorkTaskEvidence(id: UUID(), body: "已复制富文本\n待验证钉钉", sourceIDs: [], memoryIDs: [], date: start)])
+        let events = [WorkTaskEvent(id: UUID(), taskID: id, from: nil, to: .doing, date: start, actor: .user)]
+        let document = WorkTaskReport(period: .day, containing: start, tasks: [task], events: events,
+                                      now: start.addingTimeInterval(60), calendar: calendar).document
+        let text = document.plainText
+        XCTAssertTrue(text.hasPrefix("工作日报\n"))
+        XCTAssertTrue(text.contains("\n一、今日工作与成果\n暂无记录。\n"))
+        XCTAssertTrue(text.contains("MyClip · 推进中 1 项\n- [进行中] 修复 <Slack> & 飞书分享：已复制富文本\n  待验证钉钉"))
+        XCTAssertFalse(text.contains("**"))
+        XCTAssertFalse(text.contains("#"))
+        let html = document.html
+        XCTAssertTrue(html.hasPrefix("<meta charset=\"utf-8\"><h1>工作日报</h1>"))
+        XCTAssertTrue(html.contains("<li>[进行中] <b>修复 &lt;Slack&gt; &amp; 飞书分享</b>：已复制富文本<br>待验证钉钉</li>"))
+        XCTAssertEqual(document.shareSubject, "工作日报 · \(document.dateTitle)")
+    }
+
+    func testShareDestinationsPreferInstalledAppsAndOneLarkBuild() {
+        let installed: Set<String> = ["com.electron.lark", "com.tinyspeck.slackmacgap"]
+        let chinese = ReportShareDestination.available(language: .chinese) { installed.contains($0) }
+        XCTAssertEqual(chinese, [.gmail, .notion, .feishu, .dingTalk, .slack], "WeCom and WeChat have no web client")
+        let english = ReportShareDestination.available(language: .english) { installed.contains($0) }
+        XCTAssertEqual(english, chinese, "An installed Feishu app replaces the Lark web version")
+        XCTAssertEqual(ReportShareDestination.available(language: .english) { _ in false }, [.gmail, .notion, .lark, .dingTalk, .slack])
+        XCTAssertEqual(ReportShareDestination.available(language: .chinese) { _ in true }, ReportShareDestination.allCases)
+        let gmail = ReportShareDestination.gmail.webURL(subject: "工作日报 · A&B+C")!.absoluteString
+        XCTAssertEqual(gmail, "https://mail.google.com/mail/?view=cm&fs=1&su=%E5%B7%A5%E4%BD%9C%E6%97%A5%E6%8A%A5%20%C2%B7%20A%26B%2BC")
+    }
 }

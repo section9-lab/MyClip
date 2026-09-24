@@ -5,7 +5,7 @@ public struct ClipAgentState: Sendable {
     public enum Expression: Sendable { case asleep, idle, working, happy, attention }
 
     public var phase: Phase = .disconnected
-    public var detail = "尚未连接"
+    public var detail = String(localized: "尚未连接")
     public var authMethods: [ACPAuthMethod] = []
     public var lastCompleted: Date?
     public var sessionID: String?

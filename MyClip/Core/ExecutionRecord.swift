@@ -52,13 +52,13 @@ public struct ExecutionRecord: Sendable, Identifiable {
 
 extension LibraryStore {
     public func executePrompt(_ client: ACPClient, agent: ClipAgent, sessionID: String, text: String,
-                              images: [Data], jobID: UUID? = nil) async throws -> ACPCompletion {
+                              images: [Data], jobID: UUID? = nil, maximumDuration: Duration? = nil) async throws -> ACPCompletion {
         let id = UUID()
         try database.run("INSERT INTO execution_records(id,job_id,session_id,started_at) VALUES(?,?,?,?)",
             [id.uuidString, jobID?.uuidString, sessionID, String(Date().timeIntervalSince1970)])
         let result: ACPCompletion
         do {
-            result = try await client.prompt(sessionID: sessionID, text: text, images: images) { update in
+            result = try await client.prompt(sessionID: sessionID, text: text, images: images, maximumDuration: maximumDuration) { update in
                 try await self.recordExecutionUpdate(update, id: id)
             }
         } catch {

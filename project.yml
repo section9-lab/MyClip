@@ -1,6 +1,7 @@
 name: MyClip
 options:
   bundleIdPrefix: cc.vibevibe
+  developmentLanguage: zh-Hans
   deploymentTarget:
     macOS: "13.0"
   xcodeVersion: "26.0"
@@ -9,6 +10,8 @@ settings:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "13.0"
     GENERATE_INFOPLIST_FILE: NO
+    SWIFT_EMIT_LOC_STRINGS: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
 schemes:
   MyClip:
     build:

@@ -1,0 +1,100 @@
+{
+  "sourceLanguage": "zh-Hans",
+  "strings": {
+    "NSDesktopFolderUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip liest Dateien auf deinem Schreibtisch, um die erste Organisation zu unterstützen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip reads files on your Desktop to help build your library the first time."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip lee archivos del escritorio para ayudar en la primera organización."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip lit les fichiers de votre bureau pour faciliter la première organisation."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip はデスクトップのファイルを読み取り、初回の整理を助けます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip이 데스크탑의 파일을 읽어 첫 정리를 돕습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip 会读取桌面中的文件，帮助首次整理知识库内容。"
+          }
+        }
+      }
+    },
+    "NSDocumentsFolderUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip liest Dateien in deinem Ordner „Dokumente“, um die erste Organisation zu unterstützen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip reads files in your Documents folder to help build your library the first time."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip lee archivos de la carpeta Documentos para ayudar en la primera organización."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip lit les fichiers de votre dossier Documents pour faciliter la première organisation."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip は書類フォルダのファイルを読み取り、初回の整理を助けます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip이 서류 폴더의 파일을 읽어 첫 정리를 돕습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip 会读取文档中的文件，帮助首次整理知识库内容。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

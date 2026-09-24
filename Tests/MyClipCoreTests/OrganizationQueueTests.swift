@@ -33,7 +33,7 @@ final class OrganizationQueueTests: XCTestCase {
             try await store.record(image: fixtureImage(changed: true, x: index), context: context,
                 agent: .codex, organize: true, extractedText: "OCR \(index)")
         }
-        let job = try await claim(store, at: 280)
+        let job = try await claim(store, at: 400)
         XCTAssertEqual(job.sourceIDs, Array(sources.prefix(32)))
     }
 
@@ -47,7 +47,7 @@ final class OrganizationQueueTests: XCTestCase {
             try await store.record(image: fixtureImage(changed: true, x: index), context: context,
                 agent: .codex, organize: true, extractedText: String(repeating: "文", count: 7_000))
         }
-        let job = try await claim(store, at: 280)
+        let job = try await claim(store, at: 400)
         XCTAssertEqual(job.sourceIDs, [sources[0]])
     }
 
@@ -61,7 +61,7 @@ final class OrganizationQueueTests: XCTestCase {
             try await store.record(image: fixtureImage(changed: true, x: index), context: context,
                 agent: .codex, organize: true, extractedText: "OCR \(index)")
         }
-        let first = try await claim(store, at: 280)
+        let first = try await claim(store, at: 400)
         XCTAssertEqual(first.sourceIDs, Array(sources.prefix(40)))
         let original = try await store.organizationInputs(jobID: first.id)
         XCTAssertEqual(original.filter(\.usesImage).count, 8)
@@ -70,7 +70,7 @@ final class OrganizationQueueTests: XCTestCase {
         try await store.finishJob(id: first.id, state: .failed)
         let reopened = try LibraryStore(root: directory)
         try await reopened.retryJob(id: first.id)
-        let retried = try await reopened.claimNextJob(at: date(460), immediately: true, jobID: first.id)
+        let retried = try await reopened.claimNextJob(at: date(700), immediately: true, jobID: first.id)
         let retry = try XCTUnwrap(retried)
         let inputs = try await reopened.organizationInputs(jobID: retry.id)
         XCTAssertEqual(retry.id, first.id)
@@ -84,7 +84,7 @@ final class OrganizationQueueTests: XCTestCase {
             try await store.record(image: fixtureImage(changed: true, x: index), context: fixtureContext(at: 100 + Double(index)),
                 agent: .codex, organize: true, extractedText: text)
         }
-        let job = try await claim(store, at: 280)
+        let job = try await claim(store, at: 400)
         let inputs = try await store.organizationInputs(jobID: job.id)
         XCTAssertEqual(inputs.map(\.usesImage), [true, true, true, false])
         try await store.finishJob(id: job.id, state: .cancelled)
@@ -124,10 +124,10 @@ final class OrganizationQueueTests: XCTestCase {
     func testOldestCaptureSetsDeadlineAndNewCapturesDoNotResetIt() async throws {
         let store = try LibraryStore(root: directory)
         try await store.record(image: fixtureImage(), context: fixtureContext(), agent: .codex, organize: true)
-        try await store.record(image: fixtureImage(changed: true), context: fixtureContext(at: 279, windowID: 2), agent: .codex, organize: true)
-        let early = try await store.claimNextJob(at: date(279))
+        try await store.record(image: fixtureImage(changed: true), context: fixtureContext(at: 399, windowID: 2), agent: .codex, organize: true)
+        let early = try await store.claimNextJob(at: date(399))
         XCTAssertNil(early)
-        let onTime = try await store.claimNextJob(at: date(280))
+        let onTime = try await store.claimNextJob(at: date(400))
         XCTAssertEqual(onTime?.sourceIDs.count, 2)
     }
 
@@ -139,18 +139,18 @@ final class OrganizationQueueTests: XCTestCase {
             sources.append(context.id)
             try await store.record(image: fixtureImage(changed: true, x: index), context: context, agent: .codex, organize: true)
         }
-        let first = try await claim(store, at: 280)
+        let first = try await claim(store, at: 400)
         XCTAssertEqual(first.sourceIDs, Array(sources.prefix(8)))
         let simultaneous = try await store.claimNextJob(at: date(600), immediately: true)
         XCTAssertNil(simultaneous)
         try await store.commit(jobID: first.id, drafts: [])
         let reopened = try LibraryStore(root: directory)
-        let early = try await reopened.claimNextJob(at: date(459))
+        let early = try await reopened.claimNextJob(at: date(699))
         XCTAssertNil(early)
-        let second = try await claim(reopened, at: 460)
+        let second = try await claim(reopened, at: 700)
         XCTAssertEqual(second.sourceIDs, Array(sources[8..<16]))
         try await reopened.commit(jobID: second.id, drafts: [])
-        let third = try await claim(reopened, at: 640)
+        let third = try await claim(reopened, at: 1000)
         XCTAssertEqual(third.sourceIDs, Array(sources.suffix(4)))
         let status = try await reopened.organizationQueue()
         XCTAssertEqual(status.pendingCount, 0)
@@ -163,14 +163,14 @@ final class OrganizationQueueTests: XCTestCase {
         try await store.record(image: fixtureImage(), context: codex, agent: .codex, organize: true)
         // Switching agent must not suppress an identical screenshot for the new agent.
         try await store.record(image: fixtureImage(), context: claude, agent: .claude, organize: true)
-        let first = try await claim(store, at: 280)
+        let first = try await claim(store, at: 400)
         XCTAssertEqual(first.sourceIDs, [codex.id])
-        try await store.record(image: fixtureImage(changed: true), context: fixtureContext(at: 281), agent: .codex, organize: true)
+        try await store.record(image: fixtureImage(changed: true), context: fixtureContext(at: 401), agent: .codex, organize: true)
         let snapshot = try await store.snapshot()
         XCTAssertEqual(snapshot.jobs.first?.sourceIDs, [codex.id])
         XCTAssertEqual(snapshot.queue.pendingCounts, [.codex: 1, .claude: 1])
         try await store.commit(jobID: first.id, drafts: [])
-        let second = try await claim(store, at: 460)
+        let second = try await claim(store, at: 700)
         XCTAssertEqual(second.agent, .claude)
         XCTAssertEqual(second.sourceIDs, [claude.id])
     }
@@ -205,10 +205,10 @@ final class OrganizationQueueTests: XCTestCase {
         let store = try LibraryStore(root: directory)
         let first = fixtureContext()
         try await store.record(image: fixtureImage(), context: first, agent: .codex, organize: true)
-        let running = try await claim(store, at: 280)
-        let pending = fixtureContext(at: 281)
+        let running = try await claim(store, at: 400)
+        let pending = fixtureContext(at: 401)
         try await store.record(image: fixtureImage(changed: true), context: pending, agent: .codex, organize: true)
-        let selected = fixtureContext(at: 282)
+        let selected = fixtureContext(at: 402)
         try await store.record(image: fixtureImage(changed: true, x: 2), context: selected, agent: .codex, organize: false)
         let explicitID = try await store.enqueue(sourceIDs: [selected.id], agent: .codex)
 
@@ -220,9 +220,9 @@ final class OrganizationQueueTests: XCTestCase {
         XCTAssertEqual(unchanged.agent, .codex)
         XCTAssertEqual(unchanged.sourceIDs, [first.id])
         XCTAssertEqual(snapshot.queue.pendingCounts, [.codex: 1, .claude: 1])
-        XCTAssertEqual(snapshot.queue.lastStartedAt, date(280))
+        XCTAssertEqual(snapshot.queue.lastStartedAt, date(400))
         try await store.commit(jobID: running.id, drafts: [])
-        let next = try await claim(store, at: 461)
+        let next = try await claim(store, at: 701)
         XCTAssertEqual(next.agent, .claude)
         XCTAssertEqual(next.sourceIDs, [pending.id])
         try await store.commit(jobID: next.id, drafts: [])
@@ -246,8 +246,8 @@ final class OrganizationQueueTests: XCTestCase {
 
         let queue = try await store.organizationQueue()
         XCTAssertEqual(queue.pendingCounts, [.claude: 1])
-        XCTAssertEqual(queue.readyAt, date(280))
-        let job = try await claim(store, at: 280)
+        XCTAssertEqual(queue.readyAt, date(400))
+        let job = try await claim(store, at: 400)
         XCTAssertEqual(job.agent, .claude)
         XCTAssertEqual(job.sourceIDs, [context.id])
         let snapshot = try await store.snapshot()
@@ -275,7 +275,7 @@ final class OrganizationQueueTests: XCTestCase {
             try await store.record(image: fixtureImage(changed: true, x: index), context: fixtureContext(at: 100 + Double(index)), agent: .codex, organize: true)
         }
         try await store.setOrganizationPaused(true)
-        let paused = try await store.claimNextJob(at: date(400))
+        let paused = try await store.claimNextJob(at: date(500))
         XCTAssertNil(paused)
         let first = try await store.claimNextJob(at: date(110), immediately: true)
         let job = try XCTUnwrap(first)
@@ -286,17 +286,17 @@ final class OrganizationQueueTests: XCTestCase {
         let status = try await store.organizationQueue()
         XCTAssertTrue(status.paused, "A one-off manual flush must not silently resume a paused queue")
         try await store.setOrganizationPaused(false)
-        let early = try await store.claimNextJob(at: date(289))
+        let early = try await store.claimNextJob(at: date(409))
         XCTAssertNil(early)
-        let second = try await store.claimNextJob(at: date(290))
+        let second = try await store.claimNextJob(at: date(410))
         XCTAssertEqual(second?.sourceIDs.count, 2)
     }
 
     func testFailurePausesAcrossRestartAndExplicitRetryKeepsSameSources() async throws {
         let store = try LibraryStore(root: directory)
         try await store.record(image: fixtureImage(), context: fixtureContext(), agent: .codex, organize: true)
-        let first = try await claim(store, at: 280)
-        try await store.record(image: fixtureImage(changed: true), context: fixtureContext(at: 281), agent: .codex, organize: true)
+        let first = try await claim(store, at: 400)
+        try await store.record(image: fixtureImage(changed: true), context: fixtureContext(at: 401), agent: .codex, organize: true)
         try await store.finishJob(id: first.id, state: .failed, error: "Offline")
         let reopened = try LibraryStore(root: directory)
         let status = try await reopened.organizationQueue()
@@ -329,20 +329,20 @@ final class OrganizationQueueTests: XCTestCase {
     func testInterruptionPreservesPartialMemoryAndRetriesAfterBackoff() async throws {
         let store = try LibraryStore(root: directory)
         try await store.record(image: fixtureImage(), context: fixtureContext(), agent: .codex, organize: true)
-        let first = try await claim(store, at: 280)
+        let first = try await claim(store, at: 400)
         _ = try await store.beginMemoryEditing(jobID: first.id)
         let path = directory.appendingPathComponent("Memory/Wiki/Topics/partial.md")
         try "# Partial\n\nKeep this work.\n".write(to: path, atomically: true, encoding: .utf8)
         let reopened = try LibraryStore(root: directory)
-        try await reopened.recoverInterruptedJobs(at: date(300))
-        try await reopened.recoverInterruptedJobs(at: date(300))
+        try await reopened.recoverInterruptedJobs(at: date(420))
+        try await reopened.recoverInterruptedJobs(at: date(420))
         let snapshot = try await reopened.snapshot()
         XCTAssertEqual(snapshot.jobs.first?.state, .queued)
         XCTAssertEqual(snapshot.jobs.first?.isAwaitingRetry, true)
         XCTAssertEqual(snapshot.jobs.first?.sourceIDs, first.sourceIDs)
         XCTAssertFalse(snapshot.queue.paused)
         XCTAssertTrue(try String(contentsOf: path, encoding: .utf8).contains("Keep this work."))
-        let early = try await reopened.claimNextJob(at: date(300 + RetryPolicy.delay(afterAttempt: 1) - 1))
+        let early = try await reopened.claimNextJob(at: date(420 + RetryPolicy.delay(afterAttempt: 1) - 1))
         XCTAssertNil(early, "Not before the backoff has passed")
         let automatic = try await reopened.claimNextJob(at: date(1000))
         XCTAssertEqual(automatic?.id, first.id)
@@ -376,11 +376,11 @@ final class OrganizationQueueTests: XCTestCase {
         let reopened = try LibraryStore(root: directory)
         try await reopened.recoverInterruptedJobs(at: date(280))
         // The interrupted legacy batch runs again first, then the unstarted jobs are rebatched.
-        let resumed = try await claim(reopened, at: 450)
+        let resumed = try await claim(reopened, at: 570)
         XCTAssertEqual(resumed.id.uuidString, running)
         XCTAssertEqual(resumed.sourceIDs, [sources[0]])
         try await reopened.finishJob(id: resumed.id, state: .cancelled)
-        let batch = try await claim(reopened, at: 700)
+        let batch = try await claim(reopened, at: 870)
         XCTAssertEqual(batch.sourceIDs, Array(sources.prefix(8)))
         let snapshot = try await reopened.snapshot()
         XCTAssertEqual(snapshot.captures.count, 12)

@@ -11,7 +11,8 @@ swiftc -parse-as-library -swift-version 6 \
     -target "$(uname -m)-apple-macosx13.0" \
     -I "$myclip_package_build/Modules" "$myclip_package_build"/MyClipCore.build/*.o \
     MyClip/Features/Library/AgentRuntime.swift \
-    MyClip/Features/Library/MyClipModel.swift \
+    MyClip/Features/Library/AgentSessionCoordinator.swift \
+    MyClip/Features/Library/MyClipModel*.swift \
     Tests/MyClipAppTests/AgentActivationTests.swift \
     -o "$myclip_test_build/AgentActivationTests"
 "$myclip_test_build/AgentActivationTests"

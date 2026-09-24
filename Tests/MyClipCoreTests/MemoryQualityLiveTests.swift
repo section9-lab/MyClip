@@ -47,7 +47,7 @@ final class MemoryQualityLiveTests: XCTestCase {
             for await event in client.events {
                 if case .tool(_, let title, _) = event { print("Memory quality tool: \(title)") }
                 if case .permission(let request) = event {
-                    let allowed = ["search_memories", "read_memory", "get_sources", "get_related_memories"].contains { request.title.contains($0) }
+                    let allowed = ["memory_search", "memory_get"].contains { request.title.contains($0) }
                     let option = request.options.first { $0.kind == (allowed ? "allow_once" : "reject_once") }
                     try? await client.respondToPermission(id: request.id, optionID: option?.id)
                 }

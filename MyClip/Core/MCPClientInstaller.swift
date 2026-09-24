@@ -1,15 +1,16 @@
 import Foundation
 
 public enum MCPClient: String, CaseIterable, Identifiable, Sendable {
-    case codex, claudeCode, claudeDesktop, cursor, openCode
+    case codex, claudeCode, claudeDesktop, cursor, openCode, workBuddy
     public var id: String { rawValue }
     public var name: String {
         switch self {
         case .codex: "Codex"
-        case .claudeCode: "Claude Code（命令行）"
-        case .claudeDesktop: "Claude Desktop（桌面端）"
+        case .claudeCode: String(localized: "Claude Code（命令行）")
+        case .claudeDesktop: String(localized: "Claude Desktop（桌面端）")
         case .cursor: "Cursor"
         case .openCode: "OpenCode"
+        case .workBuddy: "WorkBuddy"
         }
     }
 }
@@ -37,6 +38,8 @@ public struct MCPClientInstaller: Sendable {
             return homeDirectory.appendingPathComponent("Library/Application Support/Claude/claude_desktop_config.json")
         case .cursor:
             return homeDirectory.appendingPathComponent(".cursor/mcp.json")
+        case .workBuddy:
+            return homeDirectory.appendingPathComponent(".workbuddy/mcp.json")
         case .openCode:
             let directory = directory("XDG_CONFIG_HOME", fallback: ".config").appendingPathComponent("opencode")
             let jsonc = directory.appendingPathComponent("opencode.jsonc")
@@ -60,16 +63,16 @@ public struct MCPClientInstaller: Sendable {
         let exists = FileManager.default.fileExists(atPath: url.path)
         let original = exists ? try Data(contentsOf: url) : nil
         guard var config = try original.map({ try JSONSerialization.jsonObject(with: $0, options: [.json5Allowed]) as? [String: Any] }) ?? [:] else {
-            throw LibraryError.invalidResult("\(client.name) 配置必须是 JSON 对象，原文件未改动。")
+            throw LibraryError.invalidResult(String(localized: "\(client.name) 配置必须是 JSON 对象，原文件未改动。"))
         }
         let key = client == .openCode ? "mcp" : "mcpServers"
         guard var servers = config[key].map({ $0 as? [String: Any] }) ?? [:],
               var entry = servers["myclip"].map({ $0 as? [String: Any] }) ?? [:] else {
-            throw LibraryError.invalidResult("\(client.name) 的 MCP 配置格式不正确，原文件未改动。")
+            throw LibraryError.invalidResult(String(localized: "\(client.name) 的 MCP 配置格式不正确，原文件未改动。"))
         }
         let oldCommand = entry["command"] as? String ?? (entry["command"] as? [String])?.first
         if entry["url"] != nil || oldCommand.map({ !["MyClip", "myclip-mcp"].contains(URL(fileURLWithPath: $0).lastPathComponent) }) == true {
-            throw LibraryError.invalidResult("\(client.name) 已有其他服务使用 myclip 名称，请先在客户端中重命名该服务。")
+            throw LibraryError.invalidResult(String(localized: "\(client.name) 已有其他服务使用 myclip 名称，请先在客户端中重命名该服务。"))
         }
         if client == .openCode {
             entry["type"] = "local"
@@ -87,7 +90,7 @@ public struct MCPClientInstaller: Sendable {
         let data = try JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         if let original {
-            guard try Data(contentsOf: url) == original else { throw LibraryError.invalidResult("配置已被其他应用更新，请重试。") }
+            guard try Data(contentsOf: url) == original else { throw LibraryError.invalidResult(String(localized: "配置已被其他应用更新，请重试。")) }
             try backup(url)
         }
         try data.write(to: url, options: .atomic)
@@ -99,7 +102,7 @@ public struct MCPClientInstaller: Sendable {
             + [homeDirectory.appendingPathComponent(".local/bin/codex").path, "/opt/homebrew/bin/codex", "/usr/local/bin/codex",
                "/Applications/Codex.app/Contents/Resources/codex", "/Applications/ChatGPT.app/Contents/Resources/codex"]
         guard let executable = codexExecutable ?? paths.first(where: { FileManager.default.isExecutableFile(atPath: $0) }).map({ URL(fileURLWithPath: $0) }) else {
-            throw LibraryError.invalidResult("未找到 Codex。请先安装 Codex 应用或 CLI，再重试。")
+            throw LibraryError.invalidResult(String(localized: "未找到 Codex。请先安装 Codex 应用或 CLI，再重试。"))
         }
         let config = configurationURL(for: .codex)
         try FileManager.default.createDirectory(at: config.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -120,7 +123,7 @@ public struct MCPClientInstaller: Sendable {
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
             let detail = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-            throw LibraryError.invalidResult("Codex 配置未完成。\(detail.isEmpty ? "请检查 Codex 安装后重试。" : String(detail.prefix(600)))")
+            throw LibraryError.invalidResult(String(localized: "Codex 配置未完成。\(detail.isEmpty ? String(localized: "请检查 Codex 安装后重试。") : String(detail.prefix(600)))"))
         }
     }
 

@@ -124,20 +124,20 @@ extension LibraryStore {
 
     public func readMemory(_ id: UUID) throws -> KnowledgeEntry {
         try synchronizeMemoryFiles()
-        guard let memory = try resolveMemory(id.uuidString) else { throw LibraryError.invalidResult("Memory 不存在。") }
+        guard let memory = try resolveMemory(id.uuidString) else { throw LibraryError.invalidResult(String(localized: "Memory 不存在。")) }
         return memory
     }
 
     public func readMemory(path: String) throws -> KnowledgeEntry {
         try synchronizeMemoryFiles()
         _ = try MemoryLayout.url(path, in: root.appendingPathComponent("Memory"))
-        guard let memory = try resolveMemory(path) else { throw LibraryError.invalidResult("Memory 不存在。") }
+        guard let memory = try resolveMemory(path) else { throw LibraryError.invalidResult(String(localized: "Memory 不存在。")) }
         return memory
     }
 
     public func resolveMemoryLink(_ target: String) throws -> KnowledgeEntry {
         try synchronizeMemoryFiles()
-        guard let memory = try resolveMemory(target) else { throw LibraryError.invalidResult("此链接未找到唯一的 Memory。") }
+        guard let memory = try resolveMemory(target) else { throw LibraryError.invalidResult(String(localized: "此链接未找到唯一的 Memory。")) }
         return memory
     }
 
@@ -192,13 +192,24 @@ extension LibraryStore {
         var affected = Set(try database.run("SELECT DISTINCT target_id FROM memory_links WHERE source=? AND target_id IS NOT NULL", [id.uuidString]).compactMap { $0["target_id"] })
         try database.run("DELETE FROM memory_links WHERE source=?", [id.uuidString])
         let passages = MemoryPassage.parse(body, sourceIDs: [])
+        let sourcePath = try database.run("SELECT path FROM memory_files WHERE id=?", [id.uuidString]).first?["path"] ?? ""
+        let events = Dictionary(try database.run("SELECT ordinal,event_start FROM memory_passages WHERE entry_id=? AND event_start IS NOT NULL", [id.uuidString])
+            .compactMap { row in row["ordinal"].flatMap(Int.init).flatMap { ordinal in row["event_start"].flatMap(Double.init).map { (ordinal, $0) } } },
+            uniquingKeysWith: { first, _ in first })
         for link in Wikilink.parse(body) {
             let target = UUID(uuidString: link.target)?.uuidString ?? link.target
             let resolved = ((try? resolveMemoryRow(link.target)) ?? nil)?["id"]
-            let offset = Range(link.range, in: body).map { body.distance(from: body.startIndex, to: $0.lowerBound) }
-            let ordinal = offset.flatMap { position in passages.first { $0.startOffset <= position && position < $0.endOffset }?.ordinal }
-            try database.run("INSERT INTO memory_links(source,target,target_id,fragment,ordinal,label) VALUES(?,?,?,?,?,?)",
-                             [id.uuidString, target, resolved, link.fragment, ordinal.map(String.init), link.hasLabel ? link.label : ""])
+            guard let range = Range(link.range, in: body) else { continue }
+            let offset = body.distance(from: body.startIndex, to: range.lowerBound)
+            let ordinal = passages.first { $0.startOffset <= offset && offset < $0.endOffset }?.ordinal
+            let edge = MemoryEdgeText(body: body, link: range)
+            // An edge is dated by an event annotation on its passage, else by a date in the source or target path.
+            let date = ordinal.flatMap { events[$0] } ?? MemoryEdgeText.pathDate(sourcePath) ?? MemoryEdgeText.pathDate(link.target)
+            try database.run("INSERT INTO memory_links(source,target,target_id,fragment,ordinal,label,fact,section,date) VALUES(?,?,?,?,?,?,?,?,?)",
+                             [id.uuidString, target, resolved, link.fragment, ordinal.map(String.init), link.hasLabel ? link.label : "",
+                              edge.fact, edge.section, date.map { String($0) }])
+            try database.run("INSERT INTO memory_edge_search(rowid,fact,section,terms) VALUES(last_insert_rowid(),?,?,?)",
+                             [edge.fact, edge.section, Self.tokens(edge.section + " " + edge.fact)])
             if let resolved { affected.insert(resolved) }
         }
         try refreshAnchors(affected)
@@ -226,5 +237,57 @@ extension LibraryStore {
             affected.insert(resolved)
         }
         try refreshAnchors(affected)
+    }
+}
+
+/// The readable text around one link: the line that holds it (a fact line on an entity page) and the nearest heading.
+struct MemoryEdgeText {
+    static let factLimit = 300
+    let fact: String
+    let section: String
+
+    init(body: String, link: Range<String.Index>) {
+        let lineStart = body[..<link.lowerBound].lastIndex(where: \.isNewline).map { body.index(after: $0) } ?? body.startIndex
+        let lineEnd = body[link.upperBound...].firstIndex(where: \.isNewline) ?? body.endIndex
+        var line = String(body[lineStart..<lineEnd])
+        if line.count > Self.factLimit {
+            // Long paragraphs keep only the sentence around the link.
+            let stops = CharacterSet(charactersIn: "。！？；.!?;")
+            let before = body[lineStart..<link.lowerBound].lastIndex { $0.unicodeScalars.allSatisfy(stops.contains) }.map { body.index(after: $0) } ?? lineStart
+            let after = body[link.upperBound..<lineEnd].firstIndex { $0.unicodeScalars.allSatisfy(stops.contains) }.map { body.index(after: $0) } ?? lineEnd
+            line = String(body[before..<after].prefix(Self.factLimit))
+        }
+        fact = Self.plain(line)
+        var heading = ""
+        for candidate in body[..<lineStart].split(whereSeparator: \.isNewline).reversed() {
+            let trimmed = candidate.trimmingCharacters(in: .whitespaces)
+            if trimmed.range(of: #"^#{1,6}\s"#, options: .regularExpression) != nil {
+                heading = String(trimmed.drop { $0 == "#" }).trimmingCharacters(in: .whitespaces)
+                break
+            }
+        }
+        section = Self.plain(heading)
+    }
+
+    /// Markdown reduced to what a reader sees: link labels instead of link syntax, no list markers or event annotations.
+    static func plain(_ text: String) -> String {
+        var result = text
+        for link in Wikilink.parse(text).reversed() {
+            guard let range = Range(link.range, in: result) else { continue }
+            result.replaceSubrange(range, with: link.hasLabel ? link.label : (link.target as NSString).lastPathComponent)
+        }
+        result = result.replacingOccurrences(of: #"<!-- myclip-event [^>]*-->"#, with: "", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"^\s*(?:[-*+]|\d+[.)])\s+"#, with: "", options: .regularExpression)
+        return result.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// A `YYYY-MM-DD` day in a memory path, as the start of that day in the current time zone.
+    static func pathDate(_ path: String) -> Double? {
+        guard let range = path.range(of: #"\d{4}-\d{2}-\d{2}"#, options: .regularExpression) else { return nil }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: String(path[range]))?.timeIntervalSince1970
     }
 }

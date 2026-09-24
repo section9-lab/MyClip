@@ -70,4 +70,34 @@ enum PermissionCoordinator {
             return
         }
     }
+
+    private static let folderAccessRequestedKey = "folderAccessRequested"
+
+    /// macOS has no Preflight API for folder access; the only way to know is to attempt a read, and that read shows the
+    /// system prompt while the user has not answered it. So nothing is read until the user asks for access in onboarding;
+    /// permissions are polled every few seconds and would otherwise raise the prompt unasked.
+    static func hasFolderAccess(defaults: UserDefaults = .standard) -> Bool {
+        guard defaults.bool(forKey: folderAccessRequestedKey) else { return false }
+        let manager = FileManager.default
+        let home = manager.homeDirectoryForCurrentUser
+        return ["Desktop", "Documents"].allSatisfy {
+            (try? manager.contentsOfDirectory(at: home.appendingPathComponent($0), includingPropertiesForKeys: nil)) != nil
+        }
+    }
+
+    static func markFolderAccessRequested(defaults: UserDefaults = .standard) {
+        defaults.set(true, forKey: folderAccessRequestedKey)
+    }
+
+    @MainActor
+    static func openFilesAndFoldersSettings() {
+        let urls = [
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_DesktopFolder",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_DocumentsFolder"
+        ].compactMap(URL.init(string:))
+
+        for url in urls where NSWorkspace.shared.open(url) {
+            return
+        }
+    }
 }

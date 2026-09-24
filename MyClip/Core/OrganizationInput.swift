@@ -40,7 +40,7 @@ extension LibraryStore {
 
     public func organizationInputs(jobID: UUID) throws -> [OrganizationInput] {
         guard let row = try database.run("SELECT * FROM jobs WHERE id=?", [jobID.uuidString]).first else {
-            throw LibraryError.invalidResult("任务不存在")
+            throw LibraryError.invalidResult(String(localized: "任务不存在"))
         }
         return try captures(ids: job(row).sourceIDs).map { capture in
             let frozen = try database.run("SELECT ocr_text FROM job_inputs WHERE job_id=? AND capture_id=?",

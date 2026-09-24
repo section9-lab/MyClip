@@ -22,7 +22,7 @@ final class MCPExecutableTests: XCTestCase {
         {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}
         {"jsonrpc":"2.0","method":"notifications/initialized"}
         {"jsonrpc":"2.0","id":2,"method":"tools/list"}
-        {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"search_memories","arguments":{"query":"上海"}}}
+        {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"memory_search","arguments":{"query":"上海"}}}
         {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"delete_memory","arguments":{}}}
         """
         try input.fileHandleForWriting.write(contentsOf: Data((requests + "\n").utf8))

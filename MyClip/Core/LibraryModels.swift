@@ -62,16 +62,19 @@ public enum LibraryError: Error, LocalizedError, Sendable {
     case missingSource
     case textRecognitionFailed
     case conflict
+    /// The agent ended its turn without finishing the batch (for example on a cancelled or truncated run).
+    case agentStopped
 
     public var errorDescription: String? {
         switch self {
-        case .invalidImage: "无法读取截图。"
-        case .database(let message): "资料库错误：\(message)"
-        case .invalidResult(let message): "整理结果无效：\(message)"
-        case .rolledBack(let files): "已恢复上一版：\(files)。其余改动已保存，将先拆分过长页面再重新整理本批。"
-        case .missingSource: "来源截图已过期或不可用。"
-        case .textRecognitionFailed: "OCR 文字提取失败，请重试。"
-        case .conflict: "这条知识已更新，请重新整理后再保存。"
+        case .invalidImage: String(localized: "无法读取截图。")
+        case .database(let message): String(localized: "资料库错误：\(message)")
+        case .invalidResult(let message): String(localized: "整理结果无效：\(message)")
+        case .rolledBack(let files): String(localized: "已恢复上一版：\(files)。其余改动已保存，将先拆分过长页面再重新整理本批。")
+        case .missingSource: String(localized: "来源截图已过期或不可用。")
+        case .textRecognitionFailed: String(localized: "OCR 文字提取失败，请重试。")
+        case .conflict: String(localized: "这条知识已更新，请重新整理后再保存。")
+        case .agentStopped: String(localized: "Agent 在完成前停止，请重试。")
         }
     }
 }
@@ -154,10 +157,6 @@ public struct KnowledgeDraft: Codable, Sendable {
     }
 }
 
-public struct KnowledgeResponse: Codable, Sendable {
-    public var entries: [KnowledgeDraft]
-}
-
 public struct KnowledgeEntry: Identifiable, Sendable {
     public let id: UUID
     public let kind: KnowledgeKind
@@ -171,6 +170,8 @@ public struct KnowledgeEntry: Identifiable, Sendable {
     public let relativePath: String
     public var contextSourceIDs: [UUID] = []
     public var observedAt: Date? = nil
+    /// Search terms declared in the file's `aliases:` metadata.
+    public var aliases: [String] = []
     public var isRootDocument: Bool { MemoryLayout.rootFiles.contains(relativePath) }
 }
 
@@ -181,6 +182,9 @@ public enum ClipJobState: String, Codable, Sendable {
     case failed
     case cancelled
 }
+
+/// A batch turns new screenshots into memory; a dream reorganizes the memory that already exists.
+public enum ClipJobKind: String, Sendable { case batch, dream }
 
 public struct ClipJob: Identifiable, Sendable {
     public let id: UUID
@@ -193,6 +197,9 @@ public struct ClipJob: Identifiable, Sendable {
     public var attempts = 0
     /// Earliest automatic re-run after a transient failure; nil once claimed or when waiting for the user.
     public var retryAt: Date?
+    public var kind: ClipJobKind = .batch
+    /// The pages a dream was given, fixed when it was queued.
+    public var dreamPlan: ConsolidationPlan?
 
     public init(id: UUID, agent: ClipAgent, state: ClipJobState, createdAt: Date, sourceIDs: [UUID], error: String?,
                 attempts: Int = 0, retryAt: Date? = nil) {

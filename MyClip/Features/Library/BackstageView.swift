@@ -9,14 +9,13 @@ struct BackstageView: View {
     @State private var jobFilter = JobFilter.all
     @State private var usageRange = UsageRange.month
     @State private var usageAsTable = false
+    /// Fixed row height so the history shows exactly five batches; older ones scroll inside the card.
+    private let jobRowHeight: CGFloat = 58
+    private let visibleJobRows = 5
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Backstage").font(.system(size: 26, weight: .bold)).tracking(-0.4)
-                    Text("谁在整理你的截图、进展如何、花了多少").foregroundStyle(.secondary)
-                }
                 ForEach(model.permissions) { permission in PermissionRequestView(model: model, permission: permission) }
                 agentsSection
                 jobsSection
@@ -31,13 +30,13 @@ struct BackstageView: View {
 
     private var agentsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("整理 Agent", hint: "只会有一个在工作，切换后对等待中的截图生效")
+            sectionHeader(String(localized: "整理 Agent"), hint: String(localized: "只会有一个在工作，切换后对等待中的截图生效"))
             BackstageCard {
                 ForEach(Array(ClipAgent.allCases.enumerated()), id: \.element) { index, agent in
                     if index > 0 { Divider().padding(.leading, 18) }
                     agentRow(agent)
                 }
-                cardFooter("Agent 以 Full 权限运行，读写文件、运行工具和访问网络都不需要逐次确认；使用各自已有的登录。", symbol: "checkmark.shield")
+                cardFooter(String(localized: "Agent 以 Full 权限运行，读写文件、运行工具和访问网络都不需要逐次确认；使用各自已有的登录。"), symbol: "checkmark.shield")
             }
         }
     }
@@ -56,7 +55,7 @@ struct BackstageView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     Text(agent.name).font(.headline)
-                    if enabled { StatusChip("当前使用", tone: .accent) }
+                    if enabled { StatusChip(String(localized: "当前使用"), tone: .accent) }
                     phaseChip(state, enabled: enabled, availability: availability)
                 }
                 Text(agentDescription(agent, state: state, enabled: enabled, availability: availability))
@@ -88,7 +87,7 @@ struct BackstageView: View {
                 Button(useLabel(state, availability: availability)) { Task { await model.selectDefaultAgent(agent) } }
                     .controlSize(.small)
                     .disabled(model.preview || !availability.canSelect || installing || selecting)
-                    .help(availability.canSelect ? "把后续截图交给 \(agent.name) 整理" : "先安装 \(agent.name) 命令行")
+                    .help(availability.canSelect ? String(localized: "把后续截图交给 \(agent.name) 整理") : String(localized: "先安装 \(agent.name) 命令行"))
             }
         }
         .padding(.horizontal, 18).padding(.vertical, 14)
@@ -98,21 +97,21 @@ struct BackstageView: View {
     }
 
     private func useLabel(_ state: ClipAgentState, availability: LocalAgentAvailability) -> String {
-        if state.available { return "使用" }
-        return availability == .connector ? "连接并使用" : "安装并使用"
+        if state.available { return String(localized: "使用") }
+        return availability == .connector ? String(localized: "连接并使用") : String(localized: "安装并使用")
     }
 
     @ViewBuilder private func phaseChip(_ state: ClipAgentState, enabled: Bool, availability: LocalAgentAvailability) -> some View {
         switch state.phase {
-        case .working: StatusChip("整理中", tone: .accent, pulsing: true)
-        case .connecting: StatusChip("连接中", tone: .neutral)
-        case .installing: StatusChip("安装组件", tone: .neutral)
-        case .permission: StatusChip("等待确认", tone: .warning)
-        case .failed: StatusChip("出错", tone: .warning)
-        case .ready: StatusChip("已连接", tone: .good)
+        case .working: StatusChip(String(localized: "整理中"), tone: .accent, pulsing: true)
+        case .connecting: StatusChip(String(localized: "连接中"), tone: .neutral)
+        case .installing: StatusChip(String(localized: "安装组件"), tone: .neutral)
+        case .permission: StatusChip(String(localized: "等待确认"), tone: .warning)
+        case .failed: StatusChip(String(localized: "出错"), tone: .warning)
+        case .ready: StatusChip(String(localized: "已连接"), tone: .good)
         case .disconnected:
-            if !availability.canSelect { StatusChip("未检测到", tone: .neutral) }
-            else if enabled { StatusChip("待连接", tone: .neutral) }
+            if !availability.canSelect { StatusChip(String(localized: "未检测到"), tone: .neutral) }
+            else if enabled { StatusChip(String(localized: "待连接"), tone: .neutral) }
         }
     }
 
@@ -122,18 +121,18 @@ struct BackstageView: View {
             return state.detail.hasSuffix("。") ? state.detail : state.detail + "。"
         }
         if state.phase == .disconnected, enabled, let retrying = model.jobAwaitingRetry, retrying.agent == agent, let error = retrying.error {
-            return "\(error) 第 \(retrying.attempts + 1) 次尝试排队中。"
+            return String(localized: "\(error) 第 \(retrying.attempts + 1) 次尝试排队中。")
         }
         switch (availability, agent) {
-        case (.missing, .codex): return "没有找到 Codex 命令行。安装 Codex 桌面端或命令行后再来连接。"
-        case (.missing, _): return "没有找到 \(agent.cliName) 命令行。安装后再来连接。"
-        case (.desktopOnly, _): return "只检测到桌面端。整理需要 \(agent.name) 命令行。"
-        case (.commandLine, .codex): return "会安装 ACP 连接组件，使用 Codex / ChatGPT 的现有登录。"
-        case (.commandLine, _): return "会安装 ACP 连接组件，使用 \(agent.name) 的现有登录和网络设置。"
-        case (.connector, .codex): return "使用 Codex / ChatGPT 的现有登录。"
-        case (.connector, .claude): return "使用 Claude Code 命令行的现有登录和网络设置。首次使用需先在终端完成登录。"
-        case (.connector, .opencode): return "通过 opencode acp 连接，使用 OpenCode 已登录的模型和服务商。首次使用需先运行 opencode auth login。"
-        case (.connector, .cursor): return "通过 cursor-agent acp 连接，使用 Cursor 的现有登录。首次使用需先运行 cursor-agent login。"
+        case (.missing, .codex): return String(localized: "没有找到 Codex 命令行。安装 Codex 桌面端或命令行后再来连接。")
+        case (.missing, _): return String(localized: "没有找到 \(agent.cliName) 命令行。安装后再来连接。")
+        case (.desktopOnly, _): return String(localized: "只检测到桌面端。整理需要 \(agent.name) 命令行。")
+        case (.commandLine, .codex): return String(localized: "会安装 ACP 连接组件，使用 Codex / ChatGPT 的现有登录。")
+        case (.commandLine, _): return String(localized: "会安装 ACP 连接组件，使用 \(agent.name) 的现有登录和网络设置。")
+        case (.connector, .codex): return String(localized: "使用 Codex / ChatGPT 的现有登录。")
+        case (.connector, .claude): return String(localized: "使用 Claude Code 命令行的现有登录和网络设置。首次使用需先在终端完成登录。")
+        case (.connector, .opencode): return String(localized: "通过 opencode acp 连接，使用 OpenCode 已登录的模型和服务商。首次使用需先运行 opencode auth login。")
+        case (.connector, .cursor): return String(localized: "通过 cursor-agent acp 连接，使用 Cursor 的现有登录。首次使用需先运行 cursor-agent login。")
         }
     }
 
@@ -144,9 +143,9 @@ struct BackstageView: View {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .all: "全部"
-            case .open: "未完成"
-            case .done: "已完成"
+            case .all: String(localized: "全部")
+            case .open: String(localized: "未完成")
+            case .done: String(localized: "已完成")
             }
         }
         func matches(_ job: ClipJob) -> Bool {
@@ -186,8 +185,8 @@ struct BackstageView: View {
                 }
                 if visibleJobs.isEmpty {
                     Text(model.library.jobs.isEmpty
-                         ? (model.library.queue.pendingCount > 0 ? "截图已保存，开始整理后会在这里看到进度。" : "还没有整理记录。截图开始后会出现在这里。")
-                         : "没有符合筛选条件的记录。")
+                         ? (model.library.queue.pendingCount > 0 ? String(localized: "截图已保存，开始整理后会在这里看到进度。") : String(localized: "还没有整理记录。截图开始后会出现在这里。"))
+                         : String(localized: "没有符合筛选条件的记录。"))
                         .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 28)
                 } else {
                     ScrollView {
@@ -197,42 +196,53 @@ struct BackstageView: View {
                                 Divider().padding(.leading, 60)
                             }
                         }
-                    }.frame(maxHeight: 400)
+                    }.frame(height: CGFloat(min(visibleJobs.count, visibleJobRows)) * (jobRowHeight + 1))
                 }
                 HStack {
-                    Text(visibleJobs.isEmpty ? "" : "\(visibleJobs.count) 条\(visibleJobs.count > 50 ? " · 显示最近 50 条" : "")")
+                    Text(visibleJobs.isEmpty ? "" : String(localized: "\(visibleJobs.count) 条\(visibleJobs.count > 50 ? String(localized: " · 显示最近 50 条") : "")"))
                     Spacer()
                     Text("点击一条查看调用过的工具")
                 }.font(.caption).foregroundStyle(.tertiary).padding(.horizontal, 18).padding(.vertical, 8)
                 Divider()
                 DisclosureGroup {
                     Grid(alignment: .topLeading, horizontalSpacing: 16, verticalSpacing: 6) {
-                        GridRow { Text("顺序").foregroundStyle(.tertiary); Text("按截图时间先后整理，自动整理之间至少间隔 3 分钟。") }
+                        GridRow { Text("顺序").foregroundStyle(.tertiary); Text("按截图时间先后整理，自动整理之间至少间隔 5 分钟。") }
                         GridRow { Text("每批上限").foregroundStyle(.tertiary); Text("最多 8 张图片、32 条 OCR 文本，文本合计不超过 12,000 字符。") }
                         GridRow { Text("用图还是用文字").foregroundStyle(.tertiary); Text("回车和手动截图直接用图片；鼠标事件优先用 OCR 文本，文字不可用或过长时改用原图。") }
-                        GridRow { Text("超时与重试").foregroundStyle(.tertiary); Text("连续 5 分钟没有新进度就停止等待，单批最长 15 分钟。超时、断线等临时故障会自动重试，最多 \(RetryPolicy.maxAttempts) 次；之后停下等你处理。") }
+                        GridRow { Text("超时与重试").foregroundStyle(.tertiary); Text("连续 \(ACPClient.promptIdleSeconds / 60) 分钟没有新进度就停止等待，单批最长 \(ACPClient.promptMaximumSeconds / 60) 分钟。超时、断线等临时故障会自动重试，最多 \(RetryPolicy.maxAttempts) 次，间隔从 1 分钟逐步拉长到 1 小时；之后停下等你处理。") }
+                        GridRow { Text("做梦").foregroundStyle(.tertiary); Text("每天一次回头整理已有记忆：归位、合并、清理过期状态、补别名，并轮流巡检旧页面。凌晨 \(MemoryDream.dayStartHour) 点后、队列空闲且 \(Int(MemoryDream.idleInterval / 60)) 分钟没有新截图时自动开始，也可以点“整理记忆”手动开始。失败不会暂停队列，第二天会再做。") }
                     }.font(.caption).foregroundStyle(.secondary).padding(.top, 8).fixedSize(horizontal: false, vertical: true)
                 } label: {
-                    Label("整理是怎么分批的", systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
+                    Label(String(localized: "整理是怎么分批的"), systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
                 }.padding(.horizontal, 18).padding(.vertical, 10)
             }
         }
     }
 
+    /// What the dream button does, since “dream” alone does not say it.
+    private var dreamHelp: String {
+        if model.library.jobs.contains(where: { $0.kind == .dream && ($0.state == .queued || $0.state == .running) }) {
+            return String(localized: "已经有一次做梦在队列里，完成后才能再整理。")
+        }
+        return String(localized: "让 Agent 现在做一次梦：不读新截图，回头整理已有的记忆。它会把放错的页面归位、合并重复内容、清理已经过期的当前状态、补充别名，并轮流巡检一段时间没看过的页面。平时每天凌晨 \(MemoryDream.dayStartHour) 点后，等队列空闲、你离开电脑 \(Int(MemoryDream.idleInterval / 60)) 分钟时会自动做一次；手动整理后当天不再自动进行。")
+    }
+
     @ViewBuilder private var queueActions: some View {
         let queue = model.library.queue
         if queue.pauseReason != nil {
-            Button("重试并继续", systemImage: "arrow.clockwise") { model.resumeAfterFailure() }
+            Button(String(localized: "重试并继续"), systemImage: "arrow.clockwise") { model.resumeAfterFailure() }
                 .buttonStyle(.borderedProminent).controlSize(.small).tint(.orange)
                 .disabled(model.preview || model.preferences.enabledAgent == nil)
                 .help("用同一个 Agent 重新整理失败的那批，然后继续队列")
         } else if model.processingPaused {
-            Button("继续整理", systemImage: "play.fill") { model.processingPaused = false }
+            Button(String(localized: "继续整理"), systemImage: "play.fill") { model.processingPaused = false }
                 .buttonStyle(.borderedProminent).controlSize(.small).disabled(model.preview)
         } else {
+            Button(String(localized: "整理记忆"), systemImage: "moon.stars", action: model.dreamNow).controlSize(.small).disabled(!model.canDreamNow)
+                .help(dreamHelp)
             Button("立即整理", action: model.organizeNow).controlSize(.small).disabled(!model.canOrganizeNow)
                 .help("不等间隔，马上整理下一批")
-            Button("暂停", systemImage: "pause.fill") { model.processingPaused = true }
+            Button(String(localized: "暂停"), systemImage: "pause.fill") { model.processingPaused = true }
                 .buttonStyle(.borderless).controlSize(.small).disabled(model.preview || model.preferences.enabledAgent == nil)
                 .help("停止分配新批次，当前批次会先完成")
         }
@@ -243,10 +253,10 @@ struct BackstageView: View {
         return HStack(alignment: .center, spacing: 12) {
             Button { selectedJob = job } label: {
                 HStack(alignment: .center, spacing: 12) {
-                    AgentBrandIcon(agent: job.agent, size: 28)
+                    JobIcon(job: job, size: 28)
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 8) {
-                            Text("\(job.sourceIDs.count) 条素材").font(.subheadline.weight(.medium))
+                            Text(jobTitle(job)).font(.subheadline.weight(.medium))
                             StatusChip(jobChipTitle(job), tone: jobTone(job), pulsing: job.state == .running)
                         }
                         jobDetail(job, usage: usage).font(.caption).lineLimit(1)
@@ -256,20 +266,20 @@ struct BackstageView: View {
                     Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
-                .accessibilityLabel("查看 \(job.sourceIDs.count) 条素材的整理详情，\(jobLabel(job.state))")
+                .accessibilityLabel(String(localized: "查看\(jobTitle(job))的详情，\(jobLabel(job))"))
             if job.state == .failed {
-                Button("重试", systemImage: "arrow.clockwise") { model.retry(job) }.controlSize(.small).disabled(!model.canRetry(job))
-                    .help(model.canRetry(job) ? "重新整理这批素材" : "请先选择并连接 \(job.agent.name)，重试会继续使用原 Agent")
+                Button(String(localized: "重试"), systemImage: "arrow.clockwise") { model.retry(job) }.controlSize(.small).disabled(!model.canRetry(job))
+                    .help(model.canRetry(job) ? (job.kind == .dream ? String(localized: "重新做梦") : String(localized: "重新整理这批素材")) : String(localized: "请先选择并连接 \(job.agent.name)，重试会继续使用原 Agent"))
             } else if job.state == .running || job.state == .queued {
                 Button("取消") { model.cancel(job) }.buttonStyle(.borderless).controlSize(.small)
             }
         }
-        .padding(.horizontal, 18).padding(.vertical, 12)
+        .padding(.horizontal, 18).frame(height: jobRowHeight)
     }
 
     private func jobChipTitle(_ job: ClipJob) -> String {
-        if job.isAwaitingRetry { return "等待第 \(job.attempts + 1) 次尝试" }
-        return jobLabel(job.state)
+        if job.isAwaitingRetry { return String(localized: "等待第 \(job.attempts + 1) 次尝试") }
+        return jobLabel(job)
     }
 
     private func jobTone(_ job: ClipJob) -> StatusChip.Tone {
@@ -289,16 +299,18 @@ struct BackstageView: View {
                 Text(model.organizationActivity(at: context.date)).foregroundStyle(.secondary)
             }
         case .failed:
-            Text(job.error ?? "未完成").foregroundStyle(.orange)
+            Text(job.error ?? String(localized: "未完成")).foregroundStyle(.orange)
         case .queued:
             if let error = job.error { Text(error).foregroundStyle(.orange) }
+            else if job.kind == .dream, let plan = job.dreamPlan { Text(dreamScope(plan)).foregroundStyle(.secondary) }
             else { Text("排队中").foregroundStyle(.secondary) }
         case .cancelled:
-            Text("素材已回到队列").foregroundStyle(.secondary)
+            Text(job.kind == .dream ? String(localized: "已停止，明天会再做") : String(localized: "素材已回到队列")).foregroundStyle(.secondary)
         case .completed:
             HStack(spacing: 10) {
+                if job.kind == .dream, let plan = job.dreamPlan { Text(dreamScope(plan)) }
                 if job.attempts > 1 { Text("第 \(job.attempts) 次尝试成功") }
-                Text(usage?.totalTokens.map { "Token \($0.formatted())" } ?? "Token 未记录").monospacedDigit()
+                Text(usage?.totalTokens.map { "Token \($0.formatted())" } ?? String(localized: "Token 未记录")).monospacedDigit()
             }.foregroundStyle(.secondary)
         }
     }
@@ -310,9 +322,9 @@ struct BackstageView: View {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .week: "7 天"
-            case .month: "30 天"
-            case .all: "全部"
+            case .week: String(localized: "7 天")
+            case .month: String(localized: "30 天")
+            case .all: String(localized: "全部")
             }
         }
         var days: Int? {
@@ -333,7 +345,7 @@ struct BackstageView: View {
                 Picker("范围", selection: $usageRange) {
                     ForEach(UsageRange.allCases) { Text($0.title).tag($0) }
                 }.pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(width: 170)
-                Toggle(usageAsTable ? "图表" : "表格", isOn: $usageAsTable).toggleStyle(.button).controlSize(.small)
+                Toggle(usageAsTable ? String(localized: "图表") : String(localized: "表格"), isOn: $usageAsTable).toggleStyle(.button).controlSize(.small)
             }
             BackstageCard { UsageDashboard(statistics: model.tokenUsage, days: usageRange.days, asTable: usageAsTable) }
         }
@@ -407,13 +419,37 @@ struct StatusChip: View {
     }
 }
 
+/// The row title: how many screenshots a batch carries, or that a dream reorganizes all of memory.
+func jobTitle(_ job: ClipJob) -> String {
+    job.kind == .dream ? String(localized: "做梦 · 整理记忆") : String(localized: "\(job.sourceIDs.count) 条素材")
+}
+
+func jobLabel(_ job: ClipJob) -> String {
+    guard job.kind == .dream else { return jobLabel(job.state) }
+    switch job.state {
+    case .queued: return String(localized: "等待做梦")
+    case .running: return String(localized: "做梦中")
+    default: return jobLabel(job.state)
+    }
+}
+
+/// What a dream covers, e.g. “12 页 · 巡检 8 页 · 周报 2026-W38”.
+func dreamScope(_ plan: ConsolidationPlan) -> String {
+    var parts: [String] = []
+    let pages = plan.misfiled.count + plan.changed.count + plan.neighbours.count
+    if pages > 0 { parts.append(String(localized: "整理 \(pages) 页")) }
+    if !plan.patrol.isEmpty { parts.append(String(localized: "巡检 \(plan.patrol.count) 页")) }
+    if let weekly = plan.weekly { parts.append(String(localized: "周报 \(((weekly.path as NSString).lastPathComponent as NSString).deletingPathExtension)")) }
+    return parts.joined(separator: " · ")
+}
+
 func jobLabel(_ state: ClipJobState) -> String {
     switch state {
-    case .queued: "等待整理"
-    case .running: "整理中"
-    case .completed: "已完成"
-    case .failed: "未完成"
-    case .cancelled: "已取消"
+    case .queued: String(localized: "等待整理")
+    case .running: String(localized: "整理中")
+    case .completed: String(localized: "已完成")
+    case .failed: String(localized: "未完成")
+    case .cancelled: String(localized: "已取消")
     }
 }
 
@@ -437,7 +473,7 @@ private struct UsageDashboard: View {
         let previous = statistics.previousSummary(days: days)
         guard let now = summary.totalTokens, let before = previous.totalTokens, before > 0 else { return nil }
         let change = Int((Double(now - before) / Double(before) * 100).rounded())
-        return "较前 \(days) 天 \(change >= 0 ? "+" : "")\(change)%"
+        return String(localized: "较前 \(days) 天 \(change >= 0 ? "+" : "")\(change)%")
     }
 
     var body: some View {
@@ -445,7 +481,7 @@ private struct UsageDashboard: View {
             tiles
             Divider()
             if summary.calls == 0 {
-                Text(days == nil ? "还没有回传过用量。任务结束后会在这里汇总。" : "这段时间没有整理任务。")
+                Text(days == nil ? String(localized: "还没有回传过用量。任务结束后会在这里汇总。") : String(localized: "这段时间没有整理任务。"))
                     .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 36)
             } else if asTable {
                 table
@@ -463,17 +499,17 @@ private struct UsageDashboard: View {
 
     private var tiles: some View {
         HStack(spacing: 0) {
-            tile(days.map { "近 \($0) 天 Token" } ?? "累计 Token", value: compact(summary.totalTokens),
-                 detail: deltaText ?? (days == nil ? "\(summary.calls) 次请求" : "全部 \(statistics.total.totalTokens?.formatted() ?? "未记录")"))
+            tile(days.map { String(localized: "近 \($0) 天 Token") } ?? String(localized: "累计 Token"), value: compact(summary.totalTokens),
+                 detail: deltaText ?? (days == nil ? String(localized: "\(summary.calls) 次请求") : String(localized: "全部 \(statistics.total.totalTokens?.formatted() ?? String(localized: "未记录"))")))
             Divider()
-            tile("平均每次请求", value: summary.reportedCalls > 0 ? compact((summary.totalTokens ?? 0) / summary.reportedCalls) : "–",
-                 detail: "\(summary.calls) 次请求")
+            tile(String(localized: "平均每次请求"), value: summary.reportedCalls > 0 ? compact((summary.totalTokens ?? 0) / summary.reportedCalls) : "–",
+                 detail: String(localized: "\(summary.calls) 次请求"))
             Divider()
-            tile("缓存命中率", value: summary.cacheHitRate.map { "\(Int(($0 * 100).rounded()))%" } ?? "–",
-                 detail: "读取缓存比重新输入便宜")
+            tile(String(localized: "缓存命中率"), value: summary.cacheHitRate.map { "\(Int(($0 * 100).rounded()))%" } ?? "–",
+                 detail: String(localized: "读取缓存比重新输入便宜"))
             Divider()
-            tile("回传完整度", value: summary.calls > 0 ? "\(Int((Double(summary.reportedCalls) / Double(summary.calls) * 100).rounded()))%" : "–",
-                 detail: "\(summary.reportedCalls) / \(summary.calls) 次有用量")
+            tile(String(localized: "回传完整度"), value: summary.calls > 0 ? "\(Int((Double(summary.reportedCalls) / Double(summary.calls) * 100).rounded()))%" : "–",
+                 detail: String(localized: "\(summary.reportedCalls) / \(summary.calls) 次有用量"))
         }.fixedSize(horizontal: false, vertical: true)
     }
 
@@ -503,7 +539,7 @@ private struct UsageDashboard: View {
     private var chart: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 16) {
-                Text(weekly ? "每周用量，按 Agent" : "每天用量，按 Agent").font(.caption).foregroundStyle(.secondary)
+                Text(weekly ? String(localized: "每周用量，按 Agent") : String(localized: "每天用量，按 Agent")).font(.caption).foregroundStyle(.secondary)
                 ForEach(ClipAgent.allCases) { agent in
                     HStack(spacing: 6) {
                         RoundedRectangle(cornerRadius: 2).fill(UsageDashboard.color(for: agent)).frame(width: 10, height: 10)
@@ -513,7 +549,7 @@ private struct UsageDashboard: View {
                 }
             }
             Chart(bars) { bar in
-                BarMark(x: .value("日期", bar.day, unit: weekly ? .weekOfYear : .day),
+                BarMark(x: .value(String(localized: "日期"), bar.day, unit: weekly ? .weekOfYear : .day),
                         y: .value("Token", bar.tokens))
                     .foregroundStyle(by: .value("Agent", bar.agent.name))
                     .cornerRadius(3)
@@ -533,7 +569,7 @@ private struct UsageDashboard: View {
                 }
             }
             .frame(height: 170)
-            .accessibilityLabel("按\(weekly ? "周" : "天")的 Token 用量柱状图")
+            .accessibilityLabel("按\(weekly ? String(localized: "周") : String(localized: "天"))的 Token 用量柱状图")
         }
     }
 
@@ -544,10 +580,10 @@ private struct UsageDashboard: View {
 
     private var composition: some View {
         let parts: [(String, Int?, Color)] = [
-            ("输入", summary.inputTokens, Color(hex: 0x2A78D6)),
-            ("输出", summary.outputTokens, Color(hex: 0x104281)),
-            ("缓存读取", summary.cachedReadTokens, Color(hex: 0x86B6EF)),
-            ("缓存写入", summary.cachedWriteTokens, Color(hex: 0x5598E7))
+            (String(localized: "输入"), summary.inputTokens, Color(hex: 0x2A78D6)),
+            (String(localized: "输出"), summary.outputTokens, Color(hex: 0x104281)),
+            (String(localized: "缓存读取"), summary.cachedReadTokens, Color(hex: 0x86B6EF)),
+            (String(localized: "缓存写入"), summary.cachedWriteTokens, Color(hex: 0x5598E7))
         ]
         let total = max(1, parts.compactMap(\.1).reduce(0, +))
         return VStack(alignment: .leading, spacing: 10) {
@@ -575,7 +611,7 @@ private struct UsageDashboard: View {
                             RoundedRectangle(cornerRadius: 2).fill(part.2).frame(width: 10, height: 10)
                             Text(part.0).font(.caption).foregroundStyle(.secondary)
                         }
-                        Text(part.1?.formatted() ?? "未记录").font(.caption).monospacedDigit()
+                        Text(part.1?.formatted() ?? String(localized: "未记录")).font(.caption).monospacedDigit()
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -613,7 +649,7 @@ private struct UsageDashboard: View {
     }
 
     private func compact(_ value: Int?) -> String {
-        guard let value else { return "未记录" }
+        guard let value else { return String(localized: "未记录") }
         switch value {
         case 1_000_000_000...: return String(format: "%.1fB", Double(value) / 1e9)
         case 10_000_000...: return "\(value / 1_000_000)M"

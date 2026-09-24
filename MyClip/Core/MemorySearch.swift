@@ -1,44 +1,23 @@
 import Foundation
 
 public enum MemorySearchTimeField: String, Sendable {
+    /// The file edit time; used by the app's own list.
     case updated
-    case captured
-    case event
+    /// When the content happened: an annotated event on a passage, else a cited screenshot, else the file edit time.
+    case observed
 }
 
-public struct MemorySearchResult: Sendable {
-    public let memory: KnowledgeEntry
-    public let matches: [MemoryPassage]
-    /// Queries that ranked this memory; one entry for a single-query search.
-    public let matchedQueries: [String]
-}
-
-/// Why a related memory was reached from a search hit.
-public struct MemoryRelatedVia: Sendable {
-    public let from: UUID
-    /// `outgoing` when the hit links to the related memory, `backlink` when the related memory links to the hit.
-    public let direction: String
-    public let label: String
-    public let fragment: String
-    public let ordinal: Int?
-    /// Passage that holds the link, taken from whichever document wrote it.
-    public let passage: String
-}
-
-public struct MemoryRelatedResult: Sendable {
-    public let memory: KnowledgeEntry
-    public let score: Double
-    public let via: [MemoryRelatedVia]
-}
-
-public struct MemorySearchPage: Sendable {
-    public let results: [MemorySearchResult]
-    public let related: [MemoryRelatedResult]
+/// Fixed ranking constants, chosen on the LoCoMo development split (conversations 00–04).
+enum RankingConstants {
+    /// Share of lexical relevance from a page's best passages; the rest is whole-page BM25.
+    static let passageWeight = 0.5
+    /// Passages that count toward a page, each weighted half as much as the one before.
+    static let passageDepth = 3
+    static let passageDecay = 0.5
 }
 
 extension LibraryStore {
     static let archivePrefix = "Wiki/Archives/"
-    static let relatedLimit = 8
 
     public func searchMemories(query: String, limit: Int = 20, offset: Int = 0, since: Date? = nil, app: String? = nil,
                                until: Date? = nil, timeField: MemorySearchTimeField = .updated, includeArchives: Bool = true) throws -> [KnowledgeEntry] {
@@ -46,207 +25,156 @@ extension LibraryStore {
         return try matchingMemories(query: query, limit: min(max(limit, 1), 50), offset: max(0, offset), since: since, until: until, timeField: timeField, app: app, includeArchives: includeArchives)
     }
 
-    public func searchMemoryResults(query: String, limit: Int = 20, offset: Int = 0, since: Date? = nil, app: String? = nil,
-                                    until: Date? = nil, timeField: MemorySearchTimeField = .updated) throws -> [MemorySearchResult] {
-        try searchMemoryPage(queries: [query], limit: limit, offset: offset, since: since, app: app, until: until, timeField: timeField, includeArchives: true, expand: false).results
-    }
-
-    /// Ranks memories for one or more queries, then expands the page one hop along resolved Wikilinks.
-    public func searchMemoryPage(queries rawQueries: [String], limit: Int = 20, offset: Int = 0, since: Date? = nil, app: String? = nil,
-                                 until: Date? = nil, timeField: MemorySearchTimeField = .updated, includeArchives: Bool = false, expand: Bool = true) throws -> MemorySearchPage {
-        try synchronizeMemoryFiles()
-        let limit = min(max(limit, 1), 50), offset = max(0, offset)
-        var queries: [String] = []
-        for query in rawQueries.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }) where !query.isEmpty && !queries.contains(query) { queries.append(query) }
-        if queries.isEmpty { queries = [""] }
-        var matched: [UUID: [String]] = [:]
-        let entries: [KnowledgeEntry]
-        if queries.count == 1 {
-            entries = try matchingMemories(query: queries[0], limit: limit, offset: offset, since: since, until: until, timeField: timeField, app: app, includeArchives: includeArchives)
-            for item in entries { matched[item.id] = queries }
-        } else {
-            // Reciprocal rank fusion: a memory ranked by several sub-questions outranks a single strong hit.
-            var scores: [UUID: Double] = [:], found: [UUID: KnowledgeEntry] = [:]
-            for query in queries {
-                let list = try matchingMemories(query: query, limit: offset + limit, offset: 0, since: since, until: until, timeField: timeField, app: app, includeArchives: includeArchives)
-                for (rank, item) in list.enumerated() {
-                    scores[item.id, default: 0] += 1 / Double(60 + rank)
-                    found[item.id] = item
-                    matched[item.id, default: []].append(query)
-                }
-            }
-            let ordered = found.values.sorted {
-                let left = scores[$0.id] ?? 0, right = scores[$1.id] ?? 0
-                return left == right ? $0.updatedAt > $1.updatedAt : left > right
-            }
-            entries = Array(ordered.dropFirst(offset).prefix(limit))
-        }
-        let results = try entries.map { item -> MemorySearchResult in
-            let itemQueries = matched[item.id] ?? queries
-            var best: [Int: (passage: MemoryPassage, score: (phrase: Int, coverage: Int), query: String)] = [:]
-            var fallback: [MemoryPassage] = []
-            for (index, query) in itemQueries.enumerated() {
-                var ordinals: Set<Int>?
-                if timeField == .event {
-                    let predicate = Self.eventPassageFilter(query: query, since: since, until: until, app: app)
-                    let rows = try database.run("SELECT p.ordinal FROM memory_passages p WHERE p.entry_id=? AND \(predicate.sql)", [item.id.uuidString] + predicate.args)
-                    ordinals = Set(rows.compactMap { $0["ordinal"].flatMap(Int.init) })
-                }
-                let ranked = item.rankedPassages(query: query, ordinals: ordinals)
-                if index == 0 { fallback = Array(ranked.prefix(1)).map { $0.excerpt(query: query, limit: 1600) } }
-                for passage in ranked {
-                    let score = passage.score(query: query)
-                    guard score.coverage > 0 || score.phrase > 0 else { continue }
-                    if let current = best[passage.ordinal], current.score >= score { continue }
-                    best[passage.ordinal] = (passage, score, query)
-                }
-            }
-            let hits = best.values.sorted { $0.score == $1.score ? $0.passage.ordinal < $1.passage.ordinal : $0.score > $1.score }
-            let selected = hits.isEmpty ? fallback : hits.prefix(3).map { $0.passage.excerpt(query: $0.query, limit: 1600) }
-            return MemorySearchResult(memory: item, matches: selected, matchedQueries: itemQueries)
-        }
-        let related = expand && queries != [""] ? try relatedMemories(for: results, includeArchives: includeArchives) : []
-        return MemorySearchPage(results: results, related: related)
-    }
-
-    /// One-hop neighbours of the page. Each seed contributes once per neighbour, scaled by the seed's rank;
-    /// a link inside a matching passage counts double. Root files are hubs and never expand.
-    func relatedMemories(for results: [MemorySearchResult], includeArchives: Bool, limit: Int = relatedLimit) throws -> [MemoryRelatedResult] {
-        let seeds = Set(results.map(\.memory.id))
-        var scores: [UUID: Double] = [:], via: [UUID: [MemoryRelatedVia]] = [:]
-        for (rank, result) in results.enumerated() where !result.memory.isRootDocument {
-            let seed = result.memory, weight = 0.5 / Double(1 + rank)
-            let matchedOrdinals = Set(result.matches.map(\.ordinal))
-            var contribution: [UUID: Double] = [:]
-            func record(_ edge: MemoryRelatedVia, to neighbour: UUID, boost: Double) {
-                contribution[neighbour] = max(contribution[neighbour] ?? 0, weight * boost)
-                let existing = via[neighbour] ?? []
-                guard existing.count < 3, !existing.contains(where: { $0.from == edge.from && $0.direction == edge.direction && $0.label == edge.label && $0.fragment == edge.fragment }) else { return }
-                via[neighbour] = existing + [edge]
-            }
-            for row in try database.run("SELECT * FROM memory_links WHERE source=? AND target_id IS NOT NULL ORDER BY ordinal, rowid", [seed.id.uuidString]) {
-                guard let target = row["target_id"].flatMap(UUID.init(uuidString:)), !seeds.contains(target) else { continue }
-                let ordinal = row["ordinal"].flatMap(Int.init)
-                record(MemoryRelatedVia(from: seed.id, direction: "outgoing", label: row["label"] ?? "", fragment: row["fragment"] ?? "", ordinal: ordinal, passage: Self.passageText(seed.body, ordinal: ordinal)),
-                       to: target, boost: ordinal.map(matchedOrdinals.contains) == true ? 2 : 1)
-            }
-            for row in try database.run("SELECT * FROM memory_links WHERE target_id=? ORDER BY source, ordinal, rowid", [seed.id.uuidString]) {
-                guard let source = row["source"].flatMap(UUID.init(uuidString:)), !seeds.contains(source) else { continue }
-                record(MemoryRelatedVia(from: seed.id, direction: "backlink", label: row["label"] ?? "", fragment: row["fragment"] ?? "", ordinal: row["ordinal"].flatMap(Int.init), passage: ""), to: source, boost: 1)
-            }
-            for (neighbour, value) in contribution { scores[neighbour, default: 0] += value }
-        }
-        var output: [MemoryRelatedResult] = []
-        for (id, score) in scores.sorted(by: { $0.value == $1.value ? $0.key.uuidString < $1.key.uuidString : $0.value > $1.value }) {
-            guard output.count < limit, let row = try database.run("SELECT * FROM entries WHERE id=?", [id.uuidString]).first else { continue }
-            let item = try entry(row)
-            // Root files are navigation hubs and archives are history; neither is a useful neighbour.
-            if item.isRootDocument || (!includeArchives && item.relativePath.hasPrefix(Self.archivePrefix)) { continue }
-            let edges = (via[id] ?? []).map { edge in
-                edge.direction == "backlink"
-                    ? MemoryRelatedVia(from: edge.from, direction: edge.direction, label: edge.label, fragment: edge.fragment, ordinal: edge.ordinal, passage: Self.passageText(item.body, ordinal: edge.ordinal))
-                    : edge
-            }
-            output.append(MemoryRelatedResult(memory: item, score: score, via: edges))
-        }
-        return output
-    }
-
-    private static func matchExpression(_ term: String, phrase: Bool = false) -> String {
+    static func matchExpression(_ term: String, phrase: Bool = false) -> String {
         let tokens = Self.tokens(term).split(separator: " ").map(String.init)
         func quoted(_ text: String) -> String { "\"\(text.replacingOccurrences(of: "\"", with: "\"\""))\"" }
         if phrase { return quoted(tokens.isEmpty ? term : tokens.joined(separator: " ")) }
         return tokens.isEmpty ? quoted(term) : tokens.map(quoted).joined(separator: " OR ")
     }
 
-    private static func eventPassageFilter(query: String, since: Date?, until: Date?, app: String?) -> (sql: String, args: [String?]) {
-        var filters = ["p.event_start IS NOT NULL"], args: [String?] = []
+    /// A page matches a time range and app by when its content happened. Pages with annotated events match when one of
+    /// those passages overlaps the range and, if an app is given, cites a screenshot from it. Pages without events match
+    /// when one cited screenshot satisfies both the range and the app. Pages with neither fall back to the edit time and
+    /// never match an app.
+    private static func observedFilter(since: Date?, until: Date?, app: String?) -> (sql: String, args: [String?]) {
+        let app = app.flatMap { $0.isEmpty ? nil : $0 }
+        guard since != nil || until != nil || app != nil else { return ("", []) }
+        var event = ["p.event_start IS NOT NULL"], capture: [String] = [], update: [String] = []
+        var eventArgs: [String?] = [], captureArgs: [String?] = [], updateArgs: [String?] = []
         if let since {
-            filters.append("(p.event_end>? OR (p.event_start=p.event_end AND p.event_start>=?))")
-            args += [String(since.timeIntervalSince1970), String(since.timeIntervalSince1970)]
+            let value = String(since.timeIntervalSince1970)
+            event.append("(p.event_end>? OR (p.event_start=p.event_end AND p.event_start>=?))"); eventArgs += [value, value]
+            capture.append("c.captured_at>=?"); captureArgs.append(value)
+            update.append("e.updated_at>=?"); updateArgs.append(value)
         }
-        if let until { filters.append("p.event_start<?"); args.append(String(until.timeIntervalSince1970)) }
-        let term = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if !term.isEmpty {
-            filters.append("""
-                p.ordinal IN (SELECT ordinal FROM memory_passage_search WHERE entry_id=p.entry_id AND memory_passage_search MATCH ?
-                    UNION SELECT ordinal FROM memory_passage_search WHERE entry_id=p.entry_id AND (instr(lower(title),?)>0 OR instr(lower(body),?)>0))
-                """)
-            args += [matchExpression(term), term, term]
+        if let until {
+            let value = String(until.timeIntervalSince1970)
+            event.append("p.event_start<?"); eventArgs.append(value)
+            capture.append("c.captured_at<?"); captureArgs.append(value)
+            update.append("e.updated_at<?"); updateArgs.append(value)
         }
-        if let app, !app.isEmpty {
-            filters.append("EXISTS (SELECT 1 FROM json_each(p.source_ids) s JOIN captures c ON c.id=s.value WHERE c.app_name=? OR c.bundle_id=?)")
-            args += [app, app]
+        if let app {
+            event.append("EXISTS (SELECT 1 FROM json_each(p.source_ids) j JOIN captures c ON c.id=j.value WHERE c.app_name=? OR c.bundle_id=?)"); eventArgs += [app, app]
+            capture.append("(c.app_name=? OR c.bundle_id=?)"); captureArgs += [app, app]
+            update.append("0")
         }
-        return (filters.joined(separator: " AND "), args)
+        let hasEvents = "EXISTS (SELECT 1 FROM memory_passages p WHERE p.entry_id=e.id AND p.event_start IS NOT NULL)"
+        let hasSources = "EXISTS (SELECT 1 FROM entry_sources s WHERE s.entry_id=e.id)"
+        let sql = """
+            (EXISTS (SELECT 1 FROM memory_passages p WHERE p.entry_id=e.id AND \(event.joined(separator: " AND ")))
+             OR (NOT \(hasEvents) AND EXISTS (SELECT 1 FROM entry_sources s JOIN captures c ON c.id=s.capture_id WHERE s.entry_id=e.id\(capture.map { " AND " + $0 }.joined())))
+             OR (NOT \(hasEvents) AND NOT \(hasSources) AND \(update.joined(separator: " AND "))))
+            """
+        return (sql, eventArgs + captureArgs + updateArgs)
     }
 
     // The app lists all matches; MCP applies its page limit to the same ranking and filters.
+    /// `candidateSink` receives the unranked full-text candidate rows (with `tier` and `entry_score`) instead of a ranked list.
     func matchingMemories(query: String, limit: Int? = nil, offset: Int = 0, since: Date? = nil, until: Date? = nil,
-                          timeField: MemorySearchTimeField = .updated, app: String? = nil, includeArchives: Bool = true) throws -> [KnowledgeEntry] {
-        if let since, let until, since >= until { throw LibraryError.invalidResult("since 必须早于 until。") }
+                          timeField: MemorySearchTimeField = .updated, app: String? = nil, includeArchives: Bool = true,
+                          candidateSink: (([[String: String]], String) -> Void)? = nil) throws -> [KnowledgeEntry] {
+        if let since, let until, since >= until { throw LibraryError.invalidResult(String(localized: "since 必须早于 until。")) }
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var sql = "SELECT e.* FROM entries e", filters: [String] = [], args: [String?] = []
-        var order = "e.updated_at DESC,e.id"
+        let order = "e.updated_at DESC,e.id"
+        var tier = ""
         if !term.isEmpty {
             // Materialize before joining so FTS5 evaluates BM25 in the MATCH context.
-            // Column weights: title 5, body 1, segmented terms 1, anchor text from other memories 3.
+            // Column weights: title 5, body 1, segmented terms 1, anchor text from other memories 3, declared aliases 4.
             sql = """
                 WITH matches AS MATERIALIZED (
-                    SELECT id,bm25(entry_search,0,5,1,1,3) AS score FROM entry_search WHERE entry_search MATCH ?
+                    SELECT id,bm25(entry_search,0,5,1,1,3,4) AS score FROM entry_search WHERE entry_search MATCH ?
                 )
                 SELECT e.* FROM entries e LEFT JOIN matches m ON m.id=e.id
                 """
             args.append(Self.matchExpression(term))
-            filters.append("(m.id IS NOT NULL OR e.id IN (SELECT id FROM entry_search WHERE instr(lower(title),?)>0 OR instr(lower(body),?)>0))")
-            args += [term, term]
-            order = """
-                CASE WHEN lower(e.title)=? THEN 0 WHEN instr(lower(e.title),?)>0 THEN 1
+            filters.append("(m.id IS NOT NULL OR e.id IN (SELECT id FROM entry_search WHERE instr(lower(title),?)>0 OR instr(lower(body),?)>0 OR instr(aliases,?)>0))")
+            args += [term, term, term]
+            // An exact alias ranks right after an exact title: the author declared that name for this page.
+            tier = """
+                CASE WHEN lower(e.title)=? THEN 0
+                    WHEN e.id IN (SELECT id FROM entry_search WHERE instr(aliases,?)>0) THEN 1
+                    WHEN instr(lower(e.title),?)>0 THEN 2
                     WHEN e.id IN (SELECT id FROM entry_search WHERE entry_search MATCH ?)
-                      OR e.id IN (SELECT id FROM entry_search WHERE instr(lower(body),?)>0) THEN 2 ELSE 3 END,
-                coalesce(m.score,0),
-                """ + order
+                      OR e.id IN (SELECT id FROM entry_search WHERE instr(lower(body),?)>0) THEN 3 ELSE 4 END
+                """
+            sql = sql.replacingOccurrences(of: "SELECT e.* FROM entries e LEFT JOIN", with: "SELECT e.*, \(tier) AS tier, coalesce(m.score,0) AS entry_score FROM entries e LEFT JOIN")
         }
         if !includeArchives {
             filters.append("NOT EXISTS (SELECT 1 FROM memory_files f WHERE f.id=e.id AND f.path LIKE ?)")
             args.append(Self.archivePrefix + "%")
         }
-        if timeField == .event {
-            let predicate = Self.eventPassageFilter(query: query, since: since, until: until, app: app)
-            filters.append("EXISTS (SELECT 1 FROM memory_passages p WHERE p.entry_id=e.id AND \(predicate.sql))")
-            args += predicate.args
-        }
-        var sourceFilters: [String] = []
-        if let since, timeField != .event {
-            if timeField == .updated { filters.append("e.updated_at>=?") }
-            else { sourceFilters.append("c.captured_at>=?") }
-            args.append(String(since.timeIntervalSince1970))
-        }
-        if let until, timeField != .event {
-            if timeField == .updated { filters.append("e.updated_at<?") }
-            else { sourceFilters.append("c.captured_at<?") }
-            args.append(String(until.timeIntervalSince1970))
-        }
-        if let app, !app.isEmpty, timeField != .event {
-            sourceFilters.append("(c.app_name=? OR c.bundle_id=?)")
-            args += [app, app]
-        }
-        if !sourceFilters.isEmpty {
-            filters.append("EXISTS (SELECT 1 FROM entry_sources s JOIN captures c ON c.id=s.capture_id WHERE s.entry_id=e.id AND \(sourceFilters.joined(separator: " AND ")))")
+        switch timeField {
+        case .updated:
+            if let since { filters.append("e.updated_at>=?"); args.append(String(since.timeIntervalSince1970)) }
+            if let until { filters.append("e.updated_at<?"); args.append(String(until.timeIntervalSince1970)) }
+            if let app, !app.isEmpty {
+                filters.append("EXISTS (SELECT 1 FROM entry_sources s JOIN captures c ON c.id=s.capture_id WHERE s.entry_id=e.id AND (c.app_name=? OR c.bundle_id=?))")
+                args += [app, app]
+            }
+        case .observed:
+            let filter = Self.observedFilter(since: since, until: until, app: app)
+            if !filter.sql.isEmpty { filters.append(filter.sql); args += filter.args }
         }
         if !filters.isEmpty { sql += " WHERE " + filters.joined(separator: " AND ") }
-        sql += " ORDER BY " + order
-        if !term.isEmpty { args += [term, term, Self.matchExpression(term, phrase: true), term] }
-        if let limit {
-            sql += " LIMIT ? OFFSET ?"
-            args += [String(limit), String(offset)]
+        guard !term.isEmpty else {
+            sql += " ORDER BY " + order
+            if let limit {
+                sql += " LIMIT ? OFFSET ?"
+                args += [String(limit), String(offset)]
+            }
+            return try database.run(sql, args).map(entry)
         }
-        return try database.run(sql, args).map(entry)
+        // The tier expression is spliced into the SELECT list, so its arguments come before the WHERE arguments.
+        args = [args[0], term, "\n" + term + "\n", term, Self.matchExpression(term, phrase: true), term] + args.dropFirst()
+        let rows = try database.run(sql + " ORDER BY " + order, args)
+        if let candidateSink { candidateSink(rows, term); return [] }
+        let ranked = try rankLexically(rows: rows, term: term)
+        let page = ranked.dropFirst(offset)
+        return Array(limit.map { page.prefix($0) } ?? page)
+    }
+
+    /// Orders full-text candidates: exact title and alias matches first, then lexical relevance.
+    private func rankLexically(rows: [[String: String]], term: String) throws -> [KnowledgeEntry] {
+        try lexicalCandidates(rows: rows, term: term).sorted(by: RankedMemory.precedes).map(\.entry)
+    }
+
+    /// Scores full-text candidates by a mix of each page's best passages and its whole-page BM25, both normalized to 0...1.
+    /// Passage scores let a long page rank by the paragraphs that answer the question instead of by its overall word counts.
+    func lexicalCandidates(rows: [[String: String]], term: String) throws -> [RankedMemory] {
+        let passageBM25 = try database.run("""
+            SELECT entry_id, bm25(memory_passage_search,0,0,5,1,1) AS score FROM memory_passage_search WHERE memory_passage_search MATCH ?
+            """, [Self.matchExpression(term)])
+        var passages: [String: [Double]] = [:]
+        for row in passageBM25 { if let id = row["entry_id"], let score = row["score"].flatMap(Double.init) { passages[id, default: []].append(-score) } }
+        let passageScores = rows.map { row -> Double in
+            let best = (passages[row["id"] ?? ""] ?? []).sorted(by: >).prefix(RankingConstants.passageDepth)
+            return best.enumerated().reduce(0) { $0 + $1.element * pow(RankingConstants.passageDecay, Double($1.offset)) }
+        }
+        let entryScores = rows.map { -(($0["entry_score"]).flatMap(Double.init) ?? 0) }
+        let passageMax = passageScores.max() ?? 0, entryMax = entryScores.max() ?? 0
+        return try rows.indices.map { index in
+            let passage = passageMax > 0 ? passageScores[index] / passageMax : 0
+            let page = entryMax > 0 ? entryScores[index] / entryMax : 0
+            return RankedMemory(entry: try entry(rows[index]), tier: rows[index]["tier"].flatMap(Int.init) ?? 4,
+                                score: RankingConstants.passageWeight * passage + (1 - RankingConstants.passageWeight) * page)
+        }
+    }
+}
+
+/// A memory with its ranking tier (exact title, exact alias, title contains, whole phrase, other) and relevance in 0...1.
+struct RankedMemory {
+    let entry: KnowledgeEntry
+    var tier: Int
+    var score: Double
+
+    static func precedes(_ left: RankedMemory, _ right: RankedMemory) -> Bool {
+        left.tier != right.tier ? left.tier < right.tier : left.score != right.score ? left.score > right.score : left.entry.updatedAt > right.entry.updatedAt
     }
 }
 
 extension KnowledgeEntry {
-    /// Returns an unmodified body slice; its character offset can be passed to read_memory.
+    /// Returns an unmodified body slice around the best match and its character offset in the body.
     public func searchExcerpt(query: String) -> (text: String, offset: Int) {
         guard let best = rankedPassages(query: query).first?.excerpt(query: query, limit: 360) else { return ("", 0) }
         return (best.text, best.startOffset)

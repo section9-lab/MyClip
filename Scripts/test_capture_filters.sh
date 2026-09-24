@@ -14,7 +14,8 @@ swiftc -parse-as-library -swift-version 6 \
     MyClip/Features/Library/AgentRuntime.swift \
     MyClip/Features/Library/FocusedCaptureService.swift \
     MyClip/Features/Library/WindowImageCapture.swift \
-    MyClip/Features/Library/MyClipModel.swift \
+    MyClip/Features/Library/AgentSessionCoordinator.swift \
+    MyClip/Features/Library/MyClipModel*.swift \
     Tests/MyClipAppTests/CaptureFilterModelTests.swift \
     -o "$myclip_test_build/CaptureFilterModelTests"
 "$myclip_test_build/CaptureFilterModelTests"

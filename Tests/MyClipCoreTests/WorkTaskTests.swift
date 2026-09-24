@@ -277,7 +277,7 @@ final class WorkTaskTests: XCTestCase {
         let after = try await upgraded.snapshot()
         XCTAssertEqual(after.captures.map(\.id), before.captures.map(\.id))
         XCTAssertEqual(after.entries.map(\.id), before.entries.map(\.id))
-        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "11")
+        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "15")
         _ = try await upgraded.createWorkTask(title: "升级后的新任务")
         let tasks = try await upgraded.workTasks()
         XCTAssertEqual(tasks.count, 1)

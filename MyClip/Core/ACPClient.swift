@@ -91,15 +91,15 @@ public enum ACPError: Error, LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .disconnected(let message): "Agent 连接已关闭。\(message)"
-        case .protocolError(let message): "Agent 通信错误：\(message)"
-        case .unsupportedImages: "此 Agent 未提供截图处理能力。"
-        case .timeout: "Agent 响应超时，可以重试。"
+        case .disconnected(let message): String(localized: "Agent 连接已关闭。\(message)")
+        case .protocolError(let message): String(localized: "Agent 通信错误：\(message)")
+        case .unsupportedImages: String(localized: "此 Agent 未提供截图处理能力。")
+        case .timeout: String(localized: "Agent 响应超时，可以重试。")
         case .remote(_, let message):
             if message.localizedCaseInsensitiveContains("connection refused") {
-                "无法连接 Agent 服务或代理，请检查 Claude Code / Codex 的网络配置。\n\(message)"
+                String(localized: "无法连接 Agent 服务或代理，请检查 Claude Code / Codex 的网络配置。\n\(message)")
             } else if message.contains("model_not_found") || message.contains("No available channel for model") {
-                "当前配置的模型不可用，请检查 Claude Code / Codex 的模型和登录配置。\n\(message)"
+                String(localized: "当前配置的模型不可用，请检查 Claude Code / Codex 的模型和登录配置。\n\(message)")
             } else { message }
         }
     }
@@ -191,8 +191,15 @@ public actor ACPClient {
     private var closed = false
     private let promptIdleTimeout: Duration
     private let promptMaximumDuration: Duration
+    /// Per-prompt ceilings that replace `promptMaximumDuration`, for turns known to run long.
+    private var promptLimits: [String: Duration] = [:]
 
-    public init(promptIdleTimeout: Duration = .seconds(300), promptMaximumDuration: Duration = .seconds(900)) {
+    /// A prompt fails after this long without any update from the agent, or once it runs past the maximum.
+    /// Tool-heavy turns over a large vault regularly take more than a quarter of an hour.
+    public static let promptIdleSeconds = 600
+    public static let promptMaximumSeconds = 1800
+
+    public init(promptIdleTimeout: Duration = .seconds(promptIdleSeconds), promptMaximumDuration: Duration = .seconds(promptMaximumSeconds)) {
         self.promptIdleTimeout = promptIdleTimeout
         self.promptMaximumDuration = promptMaximumDuration
         let stream = AsyncStream<ACPEvent>.makeStream()
@@ -201,7 +208,7 @@ public actor ACPClient {
     }
 
     public func connect(command: ACPCommand) async throws -> ACPHandshake {
-        guard process == nil, !closed else { throw ACPError.protocolError("连接已启动。") }
+        guard process == nil, !closed else { throw ACPError.protocolError(String(localized: "连接已启动。")) }
         let child = Process()
         let stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
         child.executableURL = command.executable
@@ -217,7 +224,7 @@ public actor ACPClient {
         let errors = Self.chunks(from: stderr.fileHandleForReading)
         reader = Task { [weak self] in
             for await chunk in chunks { await self?.receive(chunk) }
-            await self?.disconnect("进程已退出。")
+            await self?.disconnect(String(localized: "进程已退出。"))
         }
         errorReader = Task { [weak self] in
             for await chunk in errors { await self?.receiveDiagnostics(chunk) }
@@ -235,7 +242,7 @@ public actor ACPClient {
         ]))
         guard result["protocolVersion"].integer == 1 else {
             close()
-            throw ACPError.protocolError("此 ACP 版本不受支持。")
+            throw ACPError.protocolError(String(localized: "此 ACP 版本不受支持。"))
         }
         supportsImages = result["agentCapabilities"]["promptCapabilities"]["image"].boolean
         supportsSessionLoading = result["agentCapabilities"]["loadSession"].boolean
@@ -254,7 +261,7 @@ public actor ACPClient {
         // Codex persistence is enforced by EphemeralCodexCommand at the app-server boundary.
         let result = try await request("session/new", params: .object(parameters))
         guard let id = result["sessionId"].string, !id.isEmpty else {
-            throw ACPError.protocolError("缺少会话标识。")
+            throw ACPError.protocolError(String(localized: "缺少会话标识。"))
         }
         freshCostSessions.insert(id)
         return id
@@ -306,10 +313,10 @@ public actor ACPClient {
         else { fullAccessSessions.remove(sessionID) }
     }
 
-    public func prompt(sessionID: String, text: String, images: [Data],
+    public func prompt(sessionID: String, text: String, images: [Data], maximumDuration: Duration? = nil,
                        onUpdate: (@Sendable (ACPExecutionUpdate) async throws -> Void)? = nil) async throws -> ACPCompletion {
         guard images.isEmpty || supportsImages else { throw ACPError.unsupportedImages }
-        guard responses[sessionID] == nil else { throw ACPError.protocolError("此会话正在整理。") }
+        guard responses[sessionID] == nil else { throw ACPError.protocolError(String(localized: "此会话正在整理。")) }
         var blocks: [JSONValue] = [.object(["type": .string("text"), "text": .string(text)])]
         blocks += images.map { .object(["type": .string("image"), "mimeType": .string("image/png"), "data": .string($0.base64EncodedString())]) }
         responses[sessionID] = ""
@@ -318,7 +325,9 @@ public actor ACPClient {
         executions[sessionID] = ACPExecutionState(onUpdate: onUpdate, costBaseline: sessionCosts[sessionID],
             startsAtZero: fresh && sessionCosts[sessionID] == nil)
         lastPromptActivity[sessionID] = .now
+        promptLimits[sessionID] = maximumDuration
         defer {
+            promptLimits.removeValue(forKey: sessionID)
             responses.removeValue(forKey: sessionID)
             cancelledPrompts.remove(sessionID)
             if executions.removeValue(forKey: sessionID)?.reportedCost != true { sessionCosts.removeValue(forKey: sessionID) }
@@ -327,7 +336,7 @@ public actor ACPClient {
         let result = try await request("session/prompt", params: .object([
             "sessionId": .string(sessionID), "prompt": .array(blocks)
         ]), timeout: promptIdleTimeout)
-        guard let stopReason = result["stopReason"].string else { throw ACPError.protocolError("缺少结束状态。") }
+        guard let stopReason = result["stopReason"].string else { throw ACPError.protocolError(String(localized: "缺少结束状态。")) }
         return ACPCompletion(text: responses[sessionID] ?? "", stopReason: stopReason, usage: Self.tokenUsage(result), cost: executions[sessionID]?.cost)
     }
 
@@ -362,7 +371,7 @@ public actor ACPClient {
     public func respondToPermission(id: String, optionID: String?) throws {
         guard let permission = permissions[id] else { return }
         if let optionID, !permission.request.options.contains(where: { $0.id == optionID }) {
-            throw ACPError.protocolError("无效的权限选项。")
+            throw ACPError.protocolError(String(localized: "无效的权限选项。"))
         }
         let outcome: JSONValue = optionID.map {
             .object(["outcome": .string("selected"), "optionId": .string($0)])
@@ -427,7 +436,8 @@ public actor ACPClient {
         }
     }
 
-    private func request(_ method: String, params: JSONValue, timeout: Duration = .seconds(30)) async throws -> JSONValue {
+    /// Handshake and session calls: an agent adapter that is still starting (node, first login check) can take a while.
+    private func request(_ method: String, params: JSONValue, timeout: Duration = .seconds(60)) async throws -> JSONValue {
         guard !closed, process?.isRunning == true else { throw ACPError.disconnected("") }
         nextID += 1
         let id = nextID
@@ -450,7 +460,7 @@ public actor ACPClient {
 
     private func watchTimeout(_ id: Int, sessionID: String?, timeout: Duration) async {
         let clock = ContinuousClock(), started = ContinuousClock.now
-        let limit = started.advanced(by: sessionID == nil ? timeout : promptMaximumDuration)
+        let limit = started.advanced(by: sessionID.map { promptLimits[$0] ?? promptMaximumDuration } ?? timeout)
         while pending[id] != nil {
             let activity = sessionID.flatMap { lastPromptActivity[$0] } ?? started
             let deadline = min(limit, activity.advanced(by: timeout))
@@ -478,15 +488,15 @@ public actor ACPClient {
             let line = buffer.prefix(upTo: newline)
             buffer.removeSubrange(...newline)
             if line.isEmpty { continue }
-            if line.count > 16 * 1024 * 1024 { disconnect("消息超过大小限制。"); return }
+            if line.count > 16 * 1024 * 1024 { disconnect(String(localized: "消息超过大小限制。")); return }
             do { try await handle(JSONDecoder().decode(JSONValue.self, from: line)) }
             catch { disconnect(error.localizedDescription); return }
         }
-        if buffer.count > 16 * 1024 * 1024 { disconnect("消息超过大小限制。") }
+        if buffer.count > 16 * 1024 * 1024 { disconnect(String(localized: "消息超过大小限制。")) }
     }
 
     private func handle(_ message: JSONValue) async throws {
-        guard message["jsonrpc"].string == "2.0" else { throw ACPError.protocolError("无效的 JSON-RPC 消息。") }
+        guard message["jsonrpc"].string == "2.0" else { throw ACPError.protocolError(String(localized: "无效的 JSON-RPC 消息。")) }
         if let method = message["method"].string {
             let params = message["params"]
             if method == "session/update", let session = params["sessionId"].string {
@@ -501,7 +511,7 @@ public actor ACPClient {
                     if update["content"]["type"].string == "text", let text = update["content"]["text"].string,
                        !text.isEmpty, responses[session] != nil {
                         guard (responses[session]?.utf8.count ?? 0) + text.utf8.count < 2 * 1024 * 1024 else {
-                            throw ACPError.protocolError("整理结果过长。")
+                            throw ACPError.protocolError(String(localized: "整理结果过长。"))
                         }
                         responses[session, default: ""] += text
                         recordPromptActivity(session)
@@ -513,7 +523,7 @@ public actor ACPClient {
                     if let tool = try await recordTool(update, session: session) {
                         eventContinuation.yield(.tool(sessionID: session, title: tool.title, status: tool.status))
                     } else {
-                        eventContinuation.yield(.tool(sessionID: session, title: update["title"].string ?? "正在整理",
+                        eventContinuation.yield(.tool(sessionID: session, title: update["title"].string ?? String(localized: "正在整理"),
                                                       status: update["status"].string ?? "in_progress"))
                     }
                 case "usage_update":
@@ -535,7 +545,7 @@ public actor ACPClient {
                 }
             } else if method == "session/request_permission", let key = message["id"].key {
                 let request = ACPPermissionRequest(id: key, sessionID: params["sessionId"].string ?? "",
-                    title: params["toolCall"]["title"].string ?? "Agent 请求权限", options: params["options"].array.compactMap {
+                    title: params["toolCall"]["title"].string ?? String(localized: "Agent 请求权限"), options: params["options"].array.compactMap {
                         guard let id = $0["optionId"].string else { return nil }
                         return ACPPermissionOption(id: id, name: $0["name"].string ?? id, kind: $0["kind"].string ?? "")
                     })
@@ -556,14 +566,14 @@ public actor ACPClient {
         } else if let id = message["id"].integer, let continuation = pending.removeValue(forKey: id) {
             timeouts.removeValue(forKey: id)?.cancel()
             if let code = message["error"]["code"].integer {
-                continuation.resume(throwing: ACPError.remote(code: code, message: message["error"]["message"].string ?? "Agent 返回错误。"))
+                continuation.resume(throwing: ACPError.remote(code: code, message: message["error"]["message"].string ?? String(localized: "Agent 返回错误。")))
             } else { continuation.resume(returning: message["result"]) }
         }
     }
 
     private func recordTool(_ update: JSONValue, session: String) async throws -> ACPToolCall? {
         guard let id = update["toolCallId"].string, !id.isEmpty else { return nil }
-        var tool = executions[session]?.tools[id] ?? ACPToolCall(id: id, title: "工具调用", startedAt: .now, updatedAt: .now)
+        var tool = executions[session]?.tools[id] ?? ACPToolCall(id: id, title: String(localized: "工具调用"), startedAt: .now, updatedAt: .now)
         if let title = update["title"].string { tool.title = title }
         if let name = update["name"].string { tool.name = name }
         if let kind = update["kind"].string { tool.kind = kind }
@@ -584,8 +594,8 @@ public actor ACPClient {
                         oldText: item["oldText"].string, newText: item["newText"].string)
                 case "content":
                     ACPToolContent(type: "text", text: item["content"]["text"].string
-                        ?? item["content"]["resource"]["text"].string ?? "非文本结果（\(item["content"]["type"].string ?? "未知类型")）")
-                case "terminal": ACPToolContent(type: "terminal", text: "终端：\(item["terminalId"].string ?? "未回传标识")")
+                        ?? item["content"]["resource"]["text"].string ?? String(localized: "非文本结果（\(item["content"]["type"].string ?? String(localized: "未知类型"))）"))
+                case "terminal": ACPToolContent(type: "terminal", text: String(localized: "终端：\(item["terminalId"].string ?? String(localized: "未回传标识"))"))
                 default: ACPToolContent(type: "text", text: item.formatted)
                 }
             }
@@ -606,7 +616,7 @@ public actor ACPClient {
         // A timed-out prompt may still be running remotely; close it before another job can start.
         pending.removeValue(forKey: id)?.resume(throwing: ACPError.timeout)
         timeouts.removeValue(forKey: id)?.cancel()
-        disconnect("响应超时。")
+        disconnect(String(localized: "响应超时。"))
     }
 
     private func disconnect(_ message: String) {

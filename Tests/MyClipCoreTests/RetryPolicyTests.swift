@@ -20,7 +20,7 @@ final class RetryPolicyTests: XCTestCase {
         XCTAssertEqual(RetryPolicy.classify(ACPError.remote(code: -32000, message: "connect ECONNREFUSED 127.0.0.1:7890")), .transient)
         XCTAssertEqual(RetryPolicy.classify(ACPError.remote(code: 529, message: "overloaded_error")), .transient)
         XCTAssertEqual(RetryPolicy.classify(ACPError.remote(code: -32603, message: "Rate limit reached, please try again later")), .transient)
-        XCTAssertEqual(RetryPolicy.classify(LibraryError.invalidResult("Agent 在完成前停止，请重试。")), .transient)
+        XCTAssertEqual(RetryPolicy.classify(LibraryError.agentStopped), .transient)
         XCTAssertEqual(RetryPolicy.classify(LibraryError.rolledBack("Wiki/Projects/项目.md（正文过长）")), .transient)
         XCTAssertEqual(RetryPolicy.classify(URLError(.timedOut)), .transient)
     }
@@ -38,9 +38,12 @@ final class RetryPolicyTests: XCTestCase {
 
     func testAttemptsAreCappedWithGrowingBackoff() {
         XCTAssertTrue(RetryPolicy.canRetry(afterAttempt: 1))
-        XCTAssertTrue(RetryPolicy.canRetry(afterAttempt: 2))
-        XCTAssertFalse(RetryPolicy.canRetry(afterAttempt: 3))
-        XCTAssertLessThan(RetryPolicy.delay(afterAttempt: 1), RetryPolicy.delay(afterAttempt: 2))
+        XCTAssertTrue(RetryPolicy.canRetry(afterAttempt: 5))
+        XCTAssertFalse(RetryPolicy.canRetry(afterAttempt: 6))
+        for attempt in 1..<5 { XCTAssertLessThan(RetryPolicy.delay(afterAttempt: attempt), RetryPolicy.delay(afterAttempt: attempt + 1)) }
+        let window = (1..<RetryPolicy.maxAttempts).map(RetryPolicy.delay(afterAttempt:)).reduce(0, +)
+        XCTAssertGreaterThanOrEqual(window, 3600, "Retries span a network outage of at least an hour")
+        XCTAssertEqual(RetryPolicy.delay(afterAttempt: 99), 3600)
     }
 
     func testTransientFailureRequeuesWithoutPausingAndHonoursBackoff() async throws {
@@ -74,13 +77,53 @@ final class RetryPolicyTests: XCTestCase {
         XCTAssertNil(second.retryAt)
         XCTAssertEqual(second.error, "Agent 响应超时，可以重试。", "The retry carries the previous attempt's reason for its prompt")
 
-        // A newer capture behind the retry does not overtake it.
+        // A capture that is also due does not overtake the unfinished batch.
         try await store.record(image: fixtureImage(changed: true), context: fixtureContext(at: 500), agent: .claude, organize: true)
         try await store.scheduleRetry(id: second.id, error: "again", at: date(1300))
         snapshot = try await store.snapshot()
         XCTAssertEqual(snapshot.queue.pendingCount, 2)
         let thirdClaimed = try await store.claimNextJob(at: date(1300))
 
+        let third = try XCTUnwrap(thirdClaimed)
+        XCTAssertEqual(third.id, first.id)
+        XCTAssertEqual(third.attempts, 3)
+    }
+
+    func testDueRetryRunsBeforeOlderCapturesAndPendingBackoffLetsCapturesRun() async throws {
+        let store = try LibraryStore(root: directory)
+        for offset in 0..<9 {
+            try await store.record(image: fixtureImage(changed: true, x: offset), context: fixtureContext(at: 100 + TimeInterval(offset)), agent: .claude, organize: true)
+        }
+        let firstClaimed = try await store.claimNextJob(at: date(400))
+        let first = try XCTUnwrap(firstClaimed)
+        XCTAssertEqual(first.sourceIDs.count, 8, "One older capture stays behind the batch")
+
+        // Backoff shorter than the queue interval: the retry is due at the next start and goes before the older capture.
+        try await store.scheduleRetry(id: first.id, error: "Agent 响应超时，可以重试。", at: date(460))
+        var queue = try await store.organizationQueue(at: date(600))
+        XCTAssertEqual(queue.readyAt, date(700), "Nothing starts before the interval since the last start")
+        XCTAssertEqual(queue.pendingCount, 9)
+        let secondClaimed = try await store.claimNextJob(at: date(700))
+        let second = try XCTUnwrap(secondClaimed)
+        XCTAssertEqual(second.id, first.id)
+        XCTAssertEqual(second.attempts, 2)
+
+        // Backoff longer than the interval: the queue keeps working on fresh captures and picks the retry up afterwards.
+        try await store.scheduleRetry(id: first.id, error: "again", at: date(1180))
+        queue = try await store.organizationQueue(at: date(800))
+        XCTAssertEqual(queue.readyAt, date(1000), "The capture batch is due before the retry's backoff ends")
+        let early = try await store.claimNextJob(at: date(800))
+        XCTAssertNil(early)
+        let freshClaimed = try await store.claimNextJob(at: date(1000))
+        let fresh = try XCTUnwrap(freshClaimed)
+        XCTAssertNotEqual(fresh.id, first.id)
+        XCTAssertEqual(fresh.sourceIDs.count, 1)
+        try await store.commit(jobID: fresh.id, drafts: [])
+        queue = try await store.organizationQueue(at: date(1100))
+        XCTAssertEqual(queue.readyAt, date(1300), "The retry waits out both its backoff and the interval since the capture batch started")
+        let tooSoon = try await store.claimNextJob(at: date(1200))
+        XCTAssertNil(tooSoon)
+        let thirdClaimed = try await store.claimNextJob(at: date(1300))
         let third = try XCTUnwrap(thirdClaimed)
         XCTAssertEqual(third.id, first.id)
         XCTAssertEqual(third.attempts, 3)
@@ -116,11 +159,11 @@ final class RetryPolicyTests: XCTestCase {
         let jobClaimed = try await store.claimNextJob(at: date(400))
 
         let job = try XCTUnwrap(jobClaimed)
-        try await store.recoverInterruptedJobs(at: date(600))
+        try await store.recoverInterruptedJobs(at: date(800))
         var snapshot = try await store.snapshot()
         XCTAssertEqual(snapshot.jobs.first?.state, .queued)
         XCTAssertFalse(snapshot.queue.paused)
-        XCTAssertEqual(snapshot.queue.readyAt, date(600 + RetryPolicy.delay(afterAttempt: 1)))
+        XCTAssertEqual(snapshot.queue.readyAt, date(800 + RetryPolicy.delay(afterAttempt: 1)))
 
         for attempt in 2...RetryPolicy.maxAttempts {
             let claimedClaimed = try await store.claimNextJob(at: date(100_000 * Double(attempt)))

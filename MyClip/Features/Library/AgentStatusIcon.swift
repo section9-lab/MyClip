@@ -10,6 +10,23 @@ struct AgentBrandIcon: View {
     }
 }
 
+/// A queue row's icon: the Agent for a batch; a moon for a dream, which reorganizes all of memory, with its Agent as a badge.
+struct JobIcon: View {
+    let job: ClipJob
+    var size: CGFloat = 28
+    var body: some View {
+        if job.kind == .dream {
+            ZStack(alignment: .bottomTrailing) {
+                Image(systemName: "moon.stars.fill").font(.system(size: size * 0.48, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: size, height: size).background(Color.indigo.gradient, in: RoundedRectangle(cornerRadius: size * 0.3))
+                AgentBrandIcon(agent: job.agent, size: size * 0.5).offset(x: size * 0.2, y: size * 0.2)
+            }.padding(.trailing, size * 0.2).accessibilityHidden(true)
+        } else {
+            AgentBrandIcon(agent: job.agent, size: size)
+        }
+    }
+}
+
 struct AgentStatusIcon: View {
     let agent: ClipAgent
     let state: ClipAgentState

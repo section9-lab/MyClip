@@ -3,6 +3,10 @@ import Foundation
 public enum TaskComposer {
     private struct Response: Decodable { let tasks: [WorkTaskDraft] }
 
+    /// The task-discovery response contract, quoted into KnowledgeComposer.filePrompt's own turn
+    /// so the organizing agent returns task leads in the same response it edits Memory files in.
+    public static let responseContract = "整理完成后，同时识别属于用户的具体工作任务。最终只返回任务线索 JSON：{\"tasks\":[]}；每条任务包含 title、project、suggestedStatus（todo / doing / done）、evidence（简短原文依据）、sourceIDs（本批截图 UUID 数组）、memoryIDs（已有记忆 UUID 数组，可为空）。无明确线索时返回空数组。不要把截图整理作业、界面按钮、示例或他人的任务当成用户任务；没有操作不等于完成。"
+
     public static func parse(_ text: String) throws -> [WorkTaskDraft] {
         var json = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !json.isEmpty, json.utf8.count <= 256_000 else { throw LibraryError.invalidResult("任务识别结果为空或过长。") }

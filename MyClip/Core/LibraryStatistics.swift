@@ -59,7 +59,7 @@ extension LibraryStore {
 
     public func discardProposal(_ id: UUID) throws {
         try FileManager.default.removeItem(at: root.appendingPathComponent("Proposals/\(id.uuidString).json"))
-        try finishJob(id: id, state: .cancelled, error: "已保留原记忆，忽略修改建议")
+        try finishJob(id: id, state: .cancelled, error: String(localized: "已保留原记忆，忽略修改建议"))
     }
 
     public func acceptProposal(_ id: UUID, revisions: [UUID: Int]) throws {

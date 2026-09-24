@@ -46,12 +46,33 @@ final class MemoryLayoutTests: XCTestCase {
     func testNewLibraryCreatesThreeRootDocumentsAndFolders() async throws {
         let store = try LibraryStore(root: root)
         let snapshot = try await store.snapshot()
-        for name in ["Memory.md", "Profile.md", "Now.md", "Wiki/Projects", "Wiki/Topics", "Wiki/Workflows", "Daily", "Inbox"] {
+        for name in ["Memory.md", "Profile.md", "Now.md", "Wiki/Projects", "Wiki/Topics", "Wiki/People", "Wiki/Reading", "Wiki/Workflows", "Daily", "Inbox"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("Memory/" + name).path), name)
         }
         XCTAssertEqual(Set(snapshot.entries.map { $0.fileURL.lastPathComponent }), ["Memory.md", "Profile.md", "Now.md"])
         let again = try await store.snapshot()
         XCTAssertEqual(Set(snapshot.entries.map(\.id)), Set(again.entries.map(\.id)))
+    }
+
+    func testExistingLibraryGainsNewFoldersOnceAndKeepsRemovalsAfterward() async throws {
+        _ = try await LibraryStore(root: root).snapshot()
+        let directory = root.appendingPathComponent("Memory")
+        for folder in ["Wiki/People", "Wiki/Reading"] { try FileManager.default.removeItem(at: directory.appendingPathComponent(folder)) }
+        let database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
+        try database.run("UPDATE vault_meta SET value='1' WHERE key='layout'")
+        _ = try await LibraryStore(root: root).snapshot()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("Wiki/People").path), "A library laid out before v2 gains the folder")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("Wiki/Reading").path))
+        try FileManager.default.removeItem(at: directory.appendingPathComponent("Wiki/Reading"))
+        _ = try await LibraryStore(root: root).snapshot()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("Wiki/Reading").path), "A folder the user removed stays removed")
+    }
+
+    func testTypeFollowsTheNewFolders() throws {
+        XCTAssertEqual(MemoryDocument.kind(for: "Wiki/People/张三.md"), "person")
+        XCTAssertEqual(MemoryDocument.kind(for: "Wiki/Reading/帖子.md"), "reading")
+        XCTAssertEqual(MemoryDocument.kind(for: "Wiki/Archives/旧.md"), "archive")
+        XCTAssertEqual(MemoryDocument.kind(for: "Wiki/Other/x.md"), "memory")
     }
 
     func testSnapshotReflectsEmptyFoldersAndExternalDirectoryChanges() async throws {
@@ -93,7 +114,7 @@ final class MemoryLayoutTests: XCTestCase {
         _ = await service.respond("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}")
         let paths = ["Memory.md", "Profile.md", "Now.md", "Wiki/" + entry.fileURL.lastPathComponent]
         for path in paths {
-            let request: [String: Any] = ["jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": ["name": "read_memory", "arguments": ["path": path]]]
+            let request: [String: Any] = ["jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": ["name": "memory_get", "arguments": ["path": path]]]
             let response = await service.respond(String(data: try JSONSerialization.data(withJSONObject: request), encoding: .utf8)!)
             let decoded = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(XCTUnwrap(response).utf8)) as? [String: Any])
             let result = try XCTUnwrap(decoded["result"] as? [String: Any])
@@ -181,14 +202,6 @@ final class MemoryLayoutTests: XCTestCase {
         try FileManager.default.removeItem(at: copied)
         let current = try await store.readMemory(note.id)
         XCTAssertEqual(current.revision, note.revision)
-    }
-
-    func testComposerDescribesFolderRolesAndPathLinks() throws {
-        let prompt = KnowledgeComposer.prompt(captures: [], existing: [])
-        for path in ["Memory.md", "Profile.md", "Now.md", "Wiki/Projects", "Wiki/Topics", "Wiki/Workflows", "Daily", "Inbox"] {
-            XCTAssertTrue(prompt.contains(path), path)
-        }
-        XCTAssertTrue(prompt.contains("\"path\""))
     }
 
     func testMoveKeepsIdentityRepairsLinksAndRejectsStaleVersionOrRoot() async throws {

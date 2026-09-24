@@ -7,6 +7,60 @@ final class DirectMemoryEditingTests: XCTestCase {
     override func setUp() async throws { root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString) }
     override func tearDown() async throws { try? FileManager.default.removeItem(at: root) }
 
+    /// A page written under an older, larger cap keeps working: the vault reads it, no batch fails or rolls it back,
+    /// and the agent is told to trim it instead of the user being asked.
+    func testPageOverALoweredCapStaysReadableAndBecomesAnAgentInstruction() async throws {
+        let store = try LibraryStore(root: root)
+        let database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
+        let page = root.appendingPathComponent("Memory/Wiki/Archives/历史.md")
+        try FileManager.default.createDirectory(at: page.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "# 历史\n\n早期结论。".write(to: page, atomically: true, encoding: .utf8)
+        _ = try await store.snapshot()
+        let indexed = try await store.readMemory(path: "Wiki/Archives/历史.md")
+        let historyPath = try XCTUnwrap(database.run("SELECT path FROM entries WHERE id=?", [indexed.id.uuidString]).first?["path"])
+        // Simulate the old cap: the same oversized text sits on disk and in the last saved revision.
+        let saved = try String(contentsOf: page, encoding: .utf8)
+        let boundary = try XCTUnwrap(saved.range(of: "\n---\n"))
+        let legacy = String(saved[..<boundary.upperBound]) + String(repeating: "旧", count: MemoryDocument.maxBodyBytes / 3 + 10)
+        try legacy.write(to: page, atomically: true, encoding: .utf8)
+        try legacy.write(to: root.appendingPathComponent(historyPath), atomically: true, encoding: .utf8)
+        try database.run("UPDATE memory_files SET published_hash=? WHERE id=?", [LibraryStore.memoryHash(legacy), indexed.id.uuidString])
+
+        let reopened = try LibraryStore(root: root)
+        let snapshot = try await reopened.snapshot()
+        XCTAssertTrue(snapshot.entries.contains { $0.id == indexed.id }, "History over the cap is still readable")
+        XCTAssertEqual(snapshot.invalidMemoryFiles.count, 1)
+        XCTAssertTrue(snapshot.invalidMemoryFiles[0].contains("Wiki/Archives/历史.md"), snapshot.invalidMemoryFiles.description)
+
+        try await reopened.record(image: fixtureImage(), context: fixtureContext(), agent: .claude, organize: true)
+        let claimed = try await reopened.claimNextJob(immediately: true)
+        let job = try XCTUnwrap(claimed)
+        let before = try await reopened.beginMemoryEditing(jobID: job.id)
+        try "# 另一页\n\n本批正常改动。".write(to: root.appendingPathComponent("Memory/Wiki/Topics/另一页.md"), atomically: true, encoding: .utf8)
+        _ = try await reopened.finishMemoryEditing(jobID: job.id, previousRevisions: before)
+        XCTAssertEqual(try String(contentsOf: page, encoding: .utf8), legacy, "An untouched legacy page is not rolled back")
+        XCTAssertEqual(try database.run("SELECT state FROM jobs WHERE id=?", [job.id.uuidString]).first?["state"], "completed")
+        let handoff = try XCTUnwrap(database.run("SELECT value FROM vault_meta WHERE key='organization_handoff'").first?["value"])
+        XCTAssertTrue(handoff.contains("必须先处理"), handoff)
+        XCTAssertTrue(handoff.contains("Wiki/Archives/历史.md"), handoff)
+        XCTAssertTrue(handoff.contains("超过 \(MemoryDocument.maxBodyBytes / 1000) KB 上限"), handoff)
+
+        // Once the agent trims the page it is indexed again and the instruction disappears.
+        try await reopened.record(image: fixtureImage(changed: true), context: fixtureContext(at: 300, windowID: 2), agent: .claude, organize: true)
+        let secondClaimed = try await reopened.claimNextJob(immediately: true)
+        let second = try XCTUnwrap(secondClaimed)
+        let again = try await reopened.beginMemoryEditing(jobID: second.id)
+        try (String(saved[..<boundary.upperBound]) + "# 历史\n\n只留结论。").write(to: page, atomically: true, encoding: .utf8)
+        _ = try await reopened.finishMemoryEditing(jobID: second.id, previousRevisions: again)
+        let repaired = try await reopened.snapshot()
+        XCTAssertEqual(repaired.invalidMemoryFiles, [])
+        let entry = try await reopened.readMemory(path: "Wiki/Archives/历史.md")
+        XCTAssertEqual(entry.body, "# 历史\n\n只留结论。")
+        let next = try XCTUnwrap(database.run("SELECT value FROM vault_meta WHERE key='organization_handoff'").first?["value"])
+        XCTAssertFalse(next.contains("必须先处理"), next)
+        XCTAssertTrue(next.contains("更新：Wiki/Archives/历史.md"), next)
+    }
+
     func testHandoffOnlyReplacesPreviousSuccessAfterMemoryIsSaved() async throws {
         let store = try LibraryStore(root: root)
         let database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
@@ -141,9 +195,11 @@ final class DirectMemoryEditingTests: XCTestCase {
         XCTAssertEqual(memory.sourceIDs, [cited.id])
         let unrelatedResults = try await store.searchMemories(query: "精确来源", app: unrelated.bundleID)
         XCTAssertTrue(unrelatedResults.isEmpty, "Batch context must not be indexed as evidence")
+        XCTAssertTrue(memory.contextSourceIDs.contains(unrelated.id), "Keep batch provenance separate from citations")
         let text = try String(contentsOf: file, encoding: .utf8)
-        XCTAssertTrue(text.contains("context_source_ids:"))
-        XCTAssertTrue(text.contains(unrelated.id.uuidString), "Keep batch provenance separate from citations")
+        XCTAssertFalse(text.contains("context_source_ids:"), "Batch context stays in the revision history, not the published file")
+        XCTAssertFalse(text.contains(unrelated.id.uuidString))
+        XCTAssertTrue(text.contains("\nsource_ids: [\(cited.id.uuidString)]\n"), "Cited evidence is still published")
     }
 
     func testUncitedFileDoesNotInventEvidenceFromTheBatch() async throws {
@@ -158,8 +214,7 @@ final class DirectMemoryEditingTests: XCTestCase {
         _ = try await store.finishMemoryEditing(jobID: job.id, previousRevisions: before)
         let memory = try await store.readMemory(path: "Wiki/Topics/未引用.md")
         XCTAssertTrue(memory.sourceIDs.isEmpty)
-        let text = try String(contentsOf: file, encoding: .utf8)
-        XCTAssertTrue(text.contains(capture.id.uuidString), "The audit context must remain recoverable")
+        XCTAssertEqual(memory.contextSourceIDs, [capture.id], "The audit context must remain recoverable")
     }
 
     func testOlderBatchCannotReplaceCurrentFocusButCanAddHistory() async throws {
@@ -209,13 +264,15 @@ final class DirectMemoryEditingTests: XCTestCase {
         let restored = try LibraryStore(root: copy)
         let server = MemoryMCP(store: restored)
         _ = await server.respond("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}")
-        let response = await server.respond("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"read_memory\",\"arguments\":{\"path\":\"时间.md\",\"includeContext\":true}}}")
+        let response = await server.respond("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_get\",\"arguments\":{\"path\":\"时间.md\"}}}")
         let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(XCTUnwrap(response).utf8)) as? [String: Any])
         let result = try XCTUnwrap(json["result"] as? [String: Any])
         let document = try XCTUnwrap(result["structuredContent"] as? [String: Any])
         XCTAssertEqual(document["observedAt"] as? String, capture.date.ISO8601Format())
         XCTAssertNotEqual(document["observedAt"] as? String, document["updatedAt"] as? String)
-        XCTAssertEqual(document["contextSourceIDs"] as? [String], [capture.id.uuidString])
+        // Citations travel in the body; screenshot metadata stays behind in a bare copy, so the summary counts none.
+        XCTAssertTrue((document["content"] as? String)?.contains(capture.id.uuidString) == true)
+        XCTAssertEqual((document["sources"] as? [String: Any])?["count"] as? Int, 0)
     }
 
     func testCitationExtractionIgnoresCodeExamplesAndMemoryLinks() throws {

@@ -101,8 +101,8 @@ final class FocusedCaptureService {
                 Task { @MainActor in self?.setScreenLocked(locked) }
             })
         }
-        guard monitors.count == 2 else { stop(); onStatus?("无法启动输入监听，请重新开启辅助功能权限后重启 MyClip"); return false }
-        onStatus?("采集已开启，等待其他应用中的活动")
+        guard monitors.count == 2 else { stop(); onStatus?(String(localized: "无法启动输入监听，请重新开启辅助功能权限后重启 MyClip")); return false }
+        onStatus?(String(localized: "采集已开启，等待其他应用中的活动"))
         return true
     }
 
@@ -120,7 +120,7 @@ final class FocusedCaptureService {
         observers.removeAll()
         lockObservers.forEach(DistributedNotificationCenter.default().removeObserver)
         lockObservers.removeAll()
-        onStatus?("采集已暂停")
+        onStatus?(String(localized: "采集已暂停"))
     }
 
     private func setScreenLocked(_ value: Bool) {
@@ -130,7 +130,7 @@ final class FocusedCaptureService {
         trigger.reset()
         keyboardFocus = nil
         lastPointer = NSEvent.mouseLocation
-        onStatus?(value ? "屏幕已锁定，等待解锁" : "等待应用中的活动")
+        onStatus?(value ? String(localized: "屏幕已锁定，等待解锁") : String(localized: "等待应用中的活动"))
     }
 
     private func suspend(_ value: Bool) {
@@ -140,7 +140,7 @@ final class FocusedCaptureService {
         trigger.reset()
         keyboardFocus = nil
         lastPointer = NSEvent.mouseLocation
-        onStatus?(value ? "屏幕休眠，等待恢复" : "等待应用中的活动")
+        onStatus?(value ? String(localized: "屏幕休眠，等待恢复") : String(localized: "等待应用中的活动"))
     }
 
     private func activity(type: NSEvent.EventType, at time: TimeInterval, clickCount: Int) {
@@ -149,7 +149,7 @@ final class FocusedCaptureService {
         case .scrollWheel:
             guard settings.mouseTriggers.contains(.scroll) else { return }
             trigger.scroll(at: time)
-            onStatus?("已检测到上下滚动，停止 2 秒后截图")
+            onStatus?(String(localized: "已检测到上下滚动，停止 2 秒后截图"))
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
             guard settings.mouseTriggers.contains(.click) else { return }
             updatePointer(at: time)
@@ -159,7 +159,7 @@ final class FocusedCaptureService {
             guard settings.mouseTriggers.contains(.click) else { return }
             updatePointer(at: time)
             guard trigger.click(at: time, doubleClickInterval: NSEvent.doubleClickInterval) else { return }
-            onStatus?("已检测到静止 1 秒后的点击，等待单击或双击结束后截图")
+            onStatus?(String(localized: "已检测到静止 1 秒后的点击，等待单击或双击结束后截图"))
         default:
             guard settings.mouseTriggers.contains(.click) else { return }
             lastPointer = NSEvent.mouseLocation
@@ -182,7 +182,7 @@ final class FocusedCaptureService {
         updateKeyboardFocus()
         guard keyboardFocus != nil, let reason = trigger.keyDown(keyCode: code, isRepeat: isRepeat, isShortcut: isShortcut) else { return }
         lastPointer = NSEvent.mouseLocation
-        onStatus?("已检测到回车，正在读取截图")
+        onStatus?(String(localized: "已检测到回车，正在读取截图"))
         capture(reason: reason)
     }
 
@@ -190,7 +190,7 @@ final class FocusedCaptureService {
         guard enabled, !suspended, !screenLocked else { return }
         guard hasScreenPermission, hasAccessibilityPermission else {
             stop()
-            onStatus?("采集权限已关闭，请在设置中恢复")
+            onStatus?(String(localized: "采集权限已关闭，请在设置中恢复"))
             return
         }
         let time = ProcessInfo.processInfo.systemUptime
@@ -246,15 +246,15 @@ final class FocusedCaptureService {
     }
 
     private func capture(reason: CaptureReason) {
-        guard let focused = focus() else { onStatus?("本次跳过：当前为 MyClip、排除的应用或没有可识别的焦点窗口"); return }
+        guard let focused = focus() else { onStatus?(String(localized: "本次跳过：当前为 MyClip、排除的应用或没有可识别的焦点窗口")); return }
         if reason != .enter, reason != .manual, let last = lastWindowCapture[Self.windowKey(focused)],
            Date.now.timeIntervalSinceReferenceDate - last < Self.mouseCooldown {
-            onStatus?("本次跳过：\(focused.app.localizedName ?? "应用") 刚截过图")
+            onStatus?(String(localized: "本次跳过：\(focused.app.localizedName ?? String(localized: "应用")) 刚截过图"))
             return
         }
         if busy {
-            if pendingCaptures.count < 16 { pendingCaptures.append((reason, focused, generation)); onStatus?("截图正在读取，另有 \(pendingCaptures.count) 次触发等待") }
-            else { onStatus?("采集较繁忙，已跳过过密的触发") }
+            if pendingCaptures.count < 16 { pendingCaptures.append((reason, focused, generation)); onStatus?(String(localized: "截图正在读取，另有 \(pendingCaptures.count) 次触发等待")) }
+            else { onStatus?(String(localized: "采集较繁忙，已跳过过密的触发")) }
             return
         }
         capture(reason: reason, focused: focused, startedGeneration: generation)
@@ -272,14 +272,14 @@ final class FocusedCaptureService {
             }
             guard enabled, !suspended, !screenLocked, startedGeneration == generation, stillFocused(focused) else { return }
             do {
-                onStatus?("正在确认 \(focused.app.localizedName ?? "应用") 的焦点窗口")
+                onStatus?(String(localized: "正在确认 \(focused.app.localizedName ?? String(localized: "应用")) 的焦点窗口"))
                 let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
                 let candidates = content.windows.filter { $0.windowLayer == 0 }.map {
                     WindowCandidate(id: $0.windowID, processID: $0.owningApplication?.processID ?? 0, frame: $0.frame, title: $0.title ?? "")
                 }
                 guard let id = FocusedWindowMatcher.match(processID: focused.app.processIdentifier, frame: focused.frame, title: focused.title, candidates: candidates),
                       let window = content.windows.first(where: { $0.windowID == id }),
-                      enabled, !suspended, !screenLocked, generation == startedGeneration, stillFocused(focused) else { onStatus?("本次跳过：焦点窗口发生变化或无法匹配"); return }
+                      enabled, !suspended, !screenLocked, generation == startedGeneration, stillFocused(focused) else { onStatus?(String(localized: "本次跳过：焦点窗口发生变化或无法匹配")); return }
                 let filter: SCContentFilter
                 let title: String
                 let captureFrame: CGRect
@@ -288,7 +288,7 @@ final class FocusedCaptureService {
                 let focusedDisplay = content.displays.first { $0.displayID == displayID }
                 if settings.scope == .focusedDisplay {
                     guard let display = focusedDisplay else {
-                        onStatus?("本次跳过：无法确认焦点窗口所在的显示器")
+                        onStatus?(String(localized: "本次跳过：无法确认焦点窗口所在的显示器"))
                         return
                     }
                     let excluded = content.applications.filter {
@@ -296,7 +296,7 @@ final class FocusedCaptureService {
                     }
                     filter = SCContentFilter(display: display, excludingApplications: excluded, exceptingWindows: [])
                     captureFrame = display.frame
-                    title = focused.title.isEmpty ? "显示器全屏" : focused.title + " · 显示器全屏"
+                    title = focused.title.isEmpty ? String(localized: "显示器全屏") : focused.title + String(localized: " · 显示器全屏")
                 } else {
                     filter = SCContentFilter(desktopIndependentWindow: window)
                     captureFrame = window.frame
@@ -317,17 +317,17 @@ final class FocusedCaptureService {
                 config.width = max(1, Int(bounds.width * scale))
                 config.height = max(1, Int(bounds.height * scale))
                 config.showsCursor = false
-                onStatus?("正在读取 \(focused.app.localizedName ?? "应用") 的截图")
+                onStatus?(String(localized: "正在读取 \(focused.app.localizedName ?? String(localized: "应用")) 的截图"))
                 let image = try await WindowImageCapture.capture(filter: filter, configuration: config)
-                guard enabled, !suspended, !screenLocked, generation == startedGeneration, stillFocused(focused) else { onStatus?("本次跳过：焦点窗口发生变化或无法匹配"); return }
+                guard enabled, !suspended, !screenLocked, generation == startedGeneration, stillFocused(focused) else { onStatus?(String(localized: "本次跳过：焦点窗口发生变化或无法匹配")); return }
                 let captured = try await Task.detached(priority: .utility) { try CapturedImage(image: image) }.value
                 guard enabled, generation == startedGeneration else { return }
-                let context = CaptureContext(appName: focused.app.localizedName ?? "应用", bundleID: focused.app.bundleIdentifier ?? "",
+                let context = CaptureContext(appName: focused.app.localizedName ?? String(localized: "应用"), bundleID: focused.app.bundleIdentifier ?? "",
                                              windowTitle: title, windowID: id, reason: reason)
                 lastWindowCapture[Self.windowKey(focused)] = Date.now.timeIntervalSinceReferenceDate
                 await onCapture?(captured, context)
 
-            } catch { onStatus?("本次采集未完成：\(error.localizedDescription)") }
+            } catch { onStatus?(String(localized: "本次采集未完成：\(error.localizedDescription)")) }
         }
     }
 }

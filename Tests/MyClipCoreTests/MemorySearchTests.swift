@@ -23,7 +23,7 @@ final class MemorySearchTests: XCTestCase {
         return service
     }
 
-    private func call(_ service: MemoryMCP, _ args: [String: Any], name: String = "search_memories") async throws -> [String: Any] {
+    private func call(_ service: MemoryMCP, _ args: [String: Any], name: String = "memory_search") async throws -> [String: Any] {
         let data = try JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": ["name": name, "arguments": args]])
         let reply = await service.respond(String(decoding: data, as: UTF8.self))
         let response = try XCTUnwrap(reply)
@@ -32,9 +32,41 @@ final class MemorySearchTests: XCTestCase {
     }
 
     private func memories(_ result: [String: Any]) throws -> [[String: Any]] {
-        XCTAssertEqual(result["isError"] as? Bool, false)
+        XCTAssertEqual(result["isError"] as? Bool, false, "\(result)")
         let content = try XCTUnwrap(result["structuredContent"] as? [String: Any])
-        return try XCTUnwrap(content["memories"] as? [[String: Any]])
+        return try XCTUnwrap(content["results"] as? [[String: Any]])
+    }
+
+    /// Memory IDs of results; test memories live at `Wiki/<id>.md`.
+    private func ids(_ results: [[String: Any]]) -> [String] {
+        results.compactMap { ($0["path"] as? String).map { ($0 as NSString).lastPathComponent.replacingOccurrences(of: ".md", with: "") } }
+    }
+
+    func testDeclaredAliasesFindThePageAndRankAheadOfIncidentalMentions() async throws {
+        let store = try LibraryStore(root: root)
+        let id = UUID(), path = "Wiki/Topics/ACP.md"
+        let url = root.appendingPathComponent("Memory/\(path)")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try MemoryDocument.encode(id: id, title: "ACP", body: "编辑器与 Agent 之间的协议。", revision: 1, agent: .codex, sourceIDs: [], path: path,
+                                  extraMetadata: "aliases: [Agent Client Protocol, \"代理客户端协议\"]\n").write(to: url, atomically: true, encoding: .utf8)
+        let incidental = try writeMemory(title: "Daily notes", body: "Read about the agent client protocol today.", updatedAt: 300)
+        let english = try await store.searchMemories(query: "Agent Client Protocol")
+        XCTAssertEqual(english.first?.id, id, "An exact alias outranks a newer incidental mention")
+        XCTAssertTrue(english.map(\.id).contains(incidental))
+        let chinese = try await store.searchMemories(query: "代理客户端")
+        XCTAssertEqual(chinese.map(\.id), [id], "CJK aliases match by substring like titles do")
+        let memory = try await store.readMemory(id)
+        XCTAssertEqual(memory.aliases, ["Agent Client Protocol", "代理客户端协议"])
+        let text = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertTrue(text.contains("aliases: [Agent Client Protocol, \"代理客户端协议\"]\n"), "Aliases are kept as written")
+    }
+
+    func testBlockListAliasesAreParsedAndCapped() throws {
+        let lines = (1...20).map { "  - 别名\($0)" }.joined(separator: "\n")
+        let text = "---\nid: \(UUID())\nrevision: 1\ntitle: \"T\"\naliases:\n\(lines)\n  - 别名1\n---\n正文。"
+        let document = try MemoryDocument(text)
+        XCTAssertEqual(document.aliases.count, MemoryDocument.aliasLimit)
+        XCTAssertEqual(document.aliases.first, "别名1")
     }
 
     func testExtraQueryWordDoesNotHideRelevantMemory() async throws {
@@ -55,10 +87,10 @@ final class MemorySearchTests: XCTestCase {
         let snapshot = try await store.snapshot(query: "compiler")
         XCTAssertEqual(snapshot.entries.map(\.id), [relevant, incidental])
         let service = await service(store)
-        let first = try memories(await call(service, ["query": "compiler", "limit": 1]))
-        let second = try memories(await call(service, ["query": "compiler", "limit": 1, "offset": 1]))
-        XCTAssertEqual(first.first?["id"] as? String, relevant.uuidString)
-        XCTAssertEqual(second.first?["id"] as? String, incidental.uuidString)
+        let two = try memories(await call(service, ["query": "compiler", "limit": 2]))
+        let one = try memories(await call(service, ["query": "compiler", "limit": 1]))
+        XCTAssertEqual(ids(two), [relevant.uuidString, incidental.uuidString])
+        XCTAssertEqual(ids(one), [relevant.uuidString])
     }
 
     func testMatchingMoreTermsRanksAheadOfSingleTerm() async throws {
@@ -69,30 +101,26 @@ final class MemorySearchTests: XCTestCase {
         XCTAssertEqual(found.map(\.id), [relevant, partial])
     }
 
-    func testSearchSummaryContainsDeepMatchWithReadableCharacterOffset() async throws {
+    func testSnippetShowsTheDeepMatchAndGetReadsItsLine() async throws {
         let store = try LibraryStore(root: root)
         let body = String(repeating: "周记🏙️：今天处理日常工作。\n", count: 90) + "\n编译失败的原因是依赖版本不一致，需要更新依赖。\n" + String(repeating: "后续记录。", count: 90)
         let id = try writeMemory(title: "工作记录", body: body)
         let service = await service(store)
         let found = try memories(await call(service, ["query": "编译失败"]))
-        let match = try XCTUnwrap(found.first)
-        let excerpt = try XCTUnwrap(match["summary"] as? String)
-        XCTAssertTrue(excerpt.contains("编译失败的原因是依赖版本不一致"))
-        XCTAssertTrue(excerpt.hasPrefix("编译失败"), "A two-line preview must not start with unrelated preceding paragraphs")
-        XCTAssertLessThanOrEqual(excerpt.count, 360)
-        let offset = try XCTUnwrap(match["summaryOffset"] as? Int)
-        XCTAssertGreaterThan(offset, 360)
-        let read = try await call(service, ["id": id.uuidString, "offset": offset, "limit": excerpt.count], name: "read_memory")
-        let content = try XCTUnwrap(read["structuredContent"] as? [String: Any])
-        XCTAssertEqual(content["body"] as? String, excerpt)
+        let snippet = try XCTUnwrap(found.first?["snippet"] as? String)
+        XCTAssertTrue(snippet.hasPrefix("编译失败的原因是依赖版本不一致，需要更新依赖。"), "The snippet starts at the matching paragraph, not the page start")
+        XCTAssertLessThanOrEqual(snippet.count, 300)
+        let read = try await call(service, ["path": "Wiki/\(id).md", "from": 92, "lines": 1], name: "memory_get")
+        XCTAssertEqual((read["structuredContent"] as? [String: Any])?["content"] as? String, "编译失败的原因是依赖版本不一致，需要更新依赖。")
     }
 
-    func testSearchSummaryFollowsCaseAndDiacriticInsensitiveMatch() async throws {
+    func testSnippetFollowsCaseAndDiacriticInsensitiveMatch() async throws {
         let store = try LibraryStore(root: root)
         try writeMemory(title: "Places", body: String(repeating: "Earlier notes. ", count: 90) + "Meet at Café demain.")
         let service = await service(store)
         let found = try memories(await call(service, ["query": "CAFE"]))
-        XCTAssertTrue((found.first?["summary"] as? String)?.contains("Café demain") == true)
+        XCTAssertTrue((found.first?["snippet"] as? String)?.contains("Café demain") == true)
+        XCTAssertLessThanOrEqual((found.first?["snippet"] as? String)?.count ?? .max, 300)
     }
 
     func testCapturedTimeAndAppMustMatchTheSameCitedScreenshot() async throws {
@@ -108,32 +136,36 @@ final class MemorySearchTests: XCTestCase {
         let end = try writeMemory(title: "Meeting later", body: "区间外的会议", updatedAt: 1000, sources: [boundary.id])
         let unknown = try writeMemory(title: "Meeting unknown", body: "没有截图时间", updatedAt: 1000)
         let service = await service(store)
-        let args: [String: Any] = ["query": "meeting", "since": "1970-01-01T00:03:20Z", "until": "1970-01-01T00:05:00Z", "timeField": "captured", "app": "com.apple.Notes"]
+        let args: [String: Any] = ["query": "meeting", "since": "1970-01-01T00:03:20Z", "until": "1970-01-01T00:05:00Z", "app": "com.apple.Notes"]
         let captured = try memories(await call(service, args))
-        XCTAssertEqual(captured.compactMap { $0["id"] as? String }, [expected.uuidString])
-        let modified = try memories(await call(service, ["query": "meeting", "since": "1970-01-01T00:03:20Z"]))
-        XCTAssertEqual(Set(modified.compactMap { $0["id"] as? String }), Set([stale, mixed, expected, end, unknown].map(\.uuidString)), "Existing since requests continue to filter file edit time")
+        XCTAssertEqual(ids(captured), [expected.uuidString], "Range and app must hold for the same screenshot")
+        let since = try memories(await call(service, ["query": "meeting", "since": "1970-01-01T00:03:20Z"]))
+        XCTAssertEqual(Set(ids(since)), Set([mixed, expected, end, unknown].map(\.uuidString)),
+                       "Pages with screenshots are dated by them; pages without fall back to the edit time")
+        XCTAssertFalse(ids(since).contains(stale.uuidString))
     }
 
-    func testTimeFiltersRejectUnknownMeaningAndInvalidRanges() async throws {
+    func testSearchRejectsUnknownArgumentsAndInvalidRanges() async throws {
         let store = try LibraryStore(root: root)
         let service = await service(store)
         for extra: [String: Any] in [
-            ["timeField": "happened"], ["until": "yesterday"],
+            ["timeField": "event"], ["queries": ["a"]], ["offset": 1], ["until": "yesterday"],
             ["since": "2026-09-20T00:00:00Z", "until": "2026-09-19T00:00:00Z"]
         ] {
             let result = try await call(service, ["query": ""].merging(extra) { _, new in new })
-            XCTAssertEqual(result["isError"] as? Bool, true, "Do not silently ignore invalid time filters: \(extra)")
+            XCTAssertEqual(result["isError"] as? Bool, true, "Do not silently ignore arguments or invalid time filters: \(extra)")
         }
+        let get = try await call(service, ["path": "Memory.md", "offset": 3], name: "memory_get")
+        XCTAssertEqual(get["isError"] as? Bool, true)
     }
 
-    func testUpdatedTimeRangeAcceptsFractionalISO8601Bounds() async throws {
+    func testTimeRangeAcceptsFractionalISO8601Bounds() async throws {
         let store = try LibraryStore(root: root)
         let first = try writeMemory(title: "Meeting A", body: "上午会议", updatedAt: 250)
         try writeMemory(title: "Meeting B", body: "下午会议", updatedAt: 300)
         let service = await service(store)
-        let found = try memories(await call(service, ["query": "meeting", "since": "1970-01-01T00:03:20.000Z", "until": "1970-01-01T00:05:00.000Z", "timeField": "updated"]))
-        XCTAssertEqual(found.compactMap { $0["id"] as? String }, [first.uuidString])
+        let found = try memories(await call(service, ["query": "meeting", "since": "1970-01-01T00:03:20.000Z", "until": "1970-01-01T00:05:00.000Z"]))
+        XCTAssertEqual(ids(found), [first.uuidString])
     }
 
     func testLiteralPunctuationDoesNotBecomeFTSOperators() async throws {
@@ -157,16 +189,18 @@ final class MemorySearchTests: XCTestCase {
         XCTAssertEqual(page.map(\.id), Array(snapshot.entries.dropFirst().prefix(2).map(\.id)))
     }
 
-    func testSearchCanExpandExplicitWikilinksWithoutPullingThemIntoMatches() async throws {
+    func testLinkedMemoryJoinsResultsBehindTheDirectMatch() async throws {
         let store = try LibraryStore(root: root)
         let hotel = try writeMemory(title: "Hotel reservation", body: "预订已确认。")
         let trip = try writeMemory(title: "Shanghai trip", body: "住宿：[[\(hotel.uuidString)|酒店]]。")
         let service = await service(store)
         let found = try memories(await call(service, ["query": "Shanghai"]))
-        XCTAssertEqual(found.compactMap { $0["id"] as? String }, [trip.uuidString])
-        let related = try await call(service, ["id": trip.uuidString], name: "get_related_memories")
-        let links = try XCTUnwrap(related["structuredContent"] as? [String: Any])
-        XCTAssertEqual((links["outgoing"] as? [[String: Any]])?.compactMap { $0["id"] as? String }, [hotel.uuidString])
+        XCTAssertEqual(ids(found), [trip.uuidString, hotel.uuidString])
+        XCTAssertNil(found[0]["via"])
+        XCTAssertEqual((found[1]["via"] as? [[String: Any]])?.first?["fact"] as? String, "住宿：酒店。")
+        let read = try await call(service, ["path": "Wiki/\(trip).md"], name: "memory_get")
+        let links = try XCTUnwrap((read["structuredContent"] as? [String: Any])?["links"] as? [[String: Any]])
+        XCTAssertEqual((links.first?["links"] as? [[String: Any]])?.first?["page"] as? String, "Wiki/\(hotel).md")
     }
 
     func testCompleteBodyPhraseOutranksRepeatedScatteredWords() async throws {
@@ -177,7 +211,7 @@ final class MemorySearchTests: XCTestCase {
         XCTAssertEqual(found.map(\.id), [phrase, scattered])
     }
 
-    func testBestPassageKeepsItsOwnEvidenceAndExactBodyRange() async throws {
+    func testBestPassageKeepsItsOwnEvidence() async throws {
         let store = try LibraryStore(root: root)
         let first = UUID(), second = UUID()
         let important = "Compiler reports a dependency mismatch after the package update. 来源：截图 `\(second)`。"
@@ -186,19 +220,12 @@ final class MemorySearchTests: XCTestCase {
         let service = await service(store)
         let found = try memories(await call(service, ["query": "compiler dependency mismatch"]))
         let memory = try XCTUnwrap(found.first)
-        let matches = try XCTUnwrap(memory["matches"] as? [[String: Any]])
-        let best = try XCTUnwrap(matches.first)
-        XCTAssertEqual(best["text"] as? String, important)
-        XCTAssertEqual(best["sourceIDs"] as? [String], [second.uuidString])
-        XCTAssertEqual(best["sourceScope"] as? String, "passage")
-        XCTAssertEqual(best["path"] as? String, "Wiki/\(id).md")
-        XCTAssertEqual(best["revision"] as? Int, 1)
-        let start = try XCTUnwrap(best["startOffset"] as? Int), end = try XCTUnwrap(best["endOffset"] as? Int)
-        XCTAssertEqual(String(body.dropFirst(start).prefix(end - start)), important)
-        let read = try await call(service, ["id": id.uuidString, "offset": start, "limit": end - start, "revision": 1], name: "read_memory")
-        XCTAssertEqual((read["structuredContent"] as? [String: Any])?["body"] as? String, important)
-        let stale = try await call(service, ["id": id.uuidString, "offset": start, "revision": 999], name: "read_memory")
-        XCTAssertEqual(stale["isError"] as? Bool, true, "Offsets must not silently read a different document revision")
+        let snippet = try XCTUnwrap(memory["snippet"] as? String)
+        XCTAssertTrue(snippet.hasPrefix("Compiler reports a dependency mismatch after the package update.\n"), "Citations leave the snippet: \(snippet)")
+        XCTAssertFalse(snippet.contains("来源"))
+        let shown = [second] + (snippet.contains("Compiler reading list") ? [first] : [])
+        XCTAssertEqual(memory["sourceIDs"] as? [String], shown.map(\.uuidString).sorted(), "Only the shown passages' evidence")
+        XCTAssertEqual(memory["path"] as? String, "Wiki/\(id).md")
     }
 
     func testUncitedPassageDoesNotInheritDocumentEvidence() async throws {
@@ -207,12 +234,8 @@ final class MemorySearchTests: XCTestCase {
         try writeMemory(title: "Notes", body: "Compiler failure requires investigation.\n\n另一段的来源：截图 `\(source)`。", sources: [source])
         let service = await service(store)
         let found = try memories(await call(service, ["query": "compiler"]))
-        let best = try XCTUnwrap((found.first?["matches"] as? [[String: Any]])?.first)
-        XCTAssertEqual(best["sourceIDs"] as? [String], [])
-        XCTAssertEqual(best["sourceScope"] as? String, "document")
-        XCTAssertNil(best["documentSourceIDs"], "Provenance lists are not repeated per passage")
-        XCTAssertEqual(found.first?["sourceCount"] as? Int, 1)
-        XCTAssertNil(found.first?["contextSourceIDs"], "Listings carry counts, not context ID lists")
+        XCTAssertEqual(found.first?["sourceIDs"] as? [String], [])
+        XCTAssertNil(found.first?["contextSourceIDs"], "Listings carry no context ID lists")
     }
 
     private func eventParagraph(_ date: String, text: String, source: UUID) -> String {
@@ -221,29 +244,23 @@ final class MemorySearchTests: XCTestCase {
         return "<!-- myclip-event {\"start\":\"\(date)T00:00:00+08:00\",\"end\":\"\(end)\",\"precision\":\"day\",\"evidence\":\"\(date)\"} -->\n\(date)：\(text) 来源：截图 `\(source)`。"
     }
 
-    func testEventTimeIsIndependentOfCaptureAndEditDates() async throws {
+    func testEventTimeTakesPrecedenceOverCaptureAndEditDates() async throws {
         let store = try LibraryStore(root: root)
         let source = fixtureContext(at: ISO8601DateFormatter().date(from: "2026-09-18T10:00:00+08:00")!.timeIntervalSince1970)
         try await store.record(image: fixtureImage(), context: source, agent: .codex, organize: false)
         let id = try writeMemory(title: "项目记录", body: eventParagraph("2026-09-10", text: "预算审批已完成。", source: source.id),
                                  updatedAt: ISO8601DateFormatter().date(from: "2026-09-20T10:00:00+08:00")!.timeIntervalSince1970, sources: [source.id])
         let service = await service(store)
-        for (field, day) in [("event", "10"), ("captured", "18"), ("updated", "20")] {
-            let result = try memories(await call(service, ["query": "预算审批", "timeField": field, "since": "2026-09-\(day)T00:00:00+08:00", "until": "2026-09-\(day)T23:59:59+08:00"]))
-            XCTAssertEqual(result.compactMap { $0["id"] as? String }, [id.uuidString])
+        for (day, expected) in [("10", [id.uuidString]), ("18", []), ("20", [])] {
+            let result = try memories(await call(service, ["query": "预算审批", "since": "2026-09-\(day)T00:00:00+08:00", "until": "2026-09-\(day)T23:59:59+08:00"]))
+            XCTAssertEqual(ids(result), expected, "day \(day)")
         }
-        let wrongDay = try memories(await call(service, ["query": "预算审批", "timeField": "event", "since": "2026-09-18T00:00:00+08:00"]))
-        XCTAssertTrue(wrongDay.isEmpty)
-        let eventResult = try memories(await call(service, ["query": "预算审批", "timeField": "event"]))
-        let best = try XCTUnwrap((eventResult.first?["matches"] as? [[String: Any]])?.first)
-        let time = try XCTUnwrap(best["eventTime"] as? [String: Any])
-        XCTAssertEqual(time["precision"] as? String, "day")
-        XCTAssertEqual(time["evidence"] as? String, "2026-09-10")
-        XCTAssertEqual(time["timeZoneOffset"] as? String, "+08:00")
-        XCTAssertFalse((best["text"] as? String)?.contains("myclip-event") == true)
+        let found = try memories(await call(service, ["query": "预算审批"]))
+        XCTAssertEqual(found.first?["time"] as? String, "2026-09-09T16:00:00Z", "time is the annotated event, not the screenshot or edit date")
+        XCTAssertFalse((found.first?["snippet"] as? String)?.contains("myclip-event") == true)
     }
 
-    func testEventDateQueryAndAppBelongToTheSamePassage() async throws {
+    func testEventRangeAndAppBelongToTheSamePassage() async throws {
         let store = try LibraryStore(root: root)
         let notes = fixtureContext(at: 100)
         let safari = CaptureContext(appName: "Safari", bundleID: "com.apple.Safari", windowTitle: "Budget", windowID: 2, reason: .enter, date: Date(timeIntervalSince1970: 200))
@@ -251,14 +268,13 @@ final class MemorySearchTests: XCTestCase {
         let body = eventParagraph("2026-09-10", text: "预算审批已完成。", source: safari.id) + "\n\n" + eventParagraph("2026-09-18", text: "发布部署已完成。", source: notes.id)
         let id = try writeMemory(title: "项目日志", body: body, sources: [notes.id, safari.id])
         let service = await service(store)
-        let args: [String: Any] = ["query": "预算审批", "timeField": "event", "since": "2026-09-18T00:00:00+08:00", "until": "2026-09-19T00:00:00+08:00"]
-        let wrongDate = try memories(await call(service, args))
-        XCTAssertTrue(wrongDate.isEmpty)
-        let wrongApp = try memories(await call(service, ["query": "预算审批", "timeField": "event", "app": "Notes"]))
-        XCTAssertTrue(wrongApp.isEmpty)
-        let correct = try memories(await call(service, ["query": "预算审批", "timeField": "event", "app": "Safari"]))
-        XCTAssertEqual(correct.first?["id"] as? String, id.uuidString)
-        XCTAssertEqual((correct.first?["matches"] as? [[String: Any]])?.count, 1)
+        let range = ["since": "2026-09-18T00:00:00+08:00", "until": "2026-09-19T00:00:00+08:00"]
+        let wrongApp = try memories(await call(service, ["query": "预算审批", "app": "Safari"].merging(range) { $1 }))
+        XCTAssertTrue(wrongApp.isEmpty, "The Safari passage is dated 09-10, the 09-18 passage cites Notes")
+        let correct = try memories(await call(service, ["query": "预算审批", "app": "Notes"].merging(range) { $1 }))
+        XCTAssertEqual(ids(correct), [id.uuidString])
+        let byApp = try memories(await call(service, ["query": "预算审批", "app": "Safari"]))
+        XCTAssertEqual(ids(byApp), [id.uuidString])
     }
 
     func testUnknownMalformedAndExampleEventTimesAreNotInvented() async throws {
@@ -274,10 +290,11 @@ final class MemorySearchTests: XCTestCase {
             valid.replacingOccurrences(of: "来源：截图 `\(source)`。", with: "没有明确来源。")
         ] { try writeMemory(title: "会议", body: body, sources: [source]) }
         let service = await service(store)
-        let event = try memories(await call(service, ["query": "会议", "timeField": "event"]))
-        XCTAssertTrue(event.isEmpty)
+        let dated = try memories(await call(service, ["query": "会议", "since": "2026-09-10T00:00:00+08:00", "until": "2026-09-11T00:00:00+08:00"]))
+        XCTAssertTrue(dated.isEmpty)
         let ordinary = try memories(await call(service, ["query": "会议"]))
         XCTAssertEqual(ordinary.count, 6, "Undated and malformed notes remain searchable")
+        XCTAssertTrue(ordinary.allSatisfy { $0["time"] is NSNull }, "No time is invented")
     }
 
     func testEventIntervalsUseOverlapAndExclusiveUpperBound() async throws {
@@ -285,10 +302,10 @@ final class MemorySearchTests: XCTestCase {
         let source = UUID()
         let id = try writeMemory(title: "会议", body: eventParagraph("2026-09-10", text: "客户会议。", source: source), sources: [source])
         let service = await service(store)
-        let insideDay = try memories(await call(service, ["query": "会议", "timeField": "event", "since": "2026-09-10T12:00:00+08:00", "until": "2026-09-10T13:00:00+08:00"]))
-        XCTAssertEqual(insideDay.first?["id"] as? String, id.uuidString)
-        let before = try memories(await call(service, ["query": "会议", "timeField": "event", "until": "2026-09-10T00:00:00+08:00"]))
-        let after = try memories(await call(service, ["query": "会议", "timeField": "event", "since": "2026-09-11T00:00:00+08:00"]))
+        let insideDay = try memories(await call(service, ["query": "会议", "since": "2026-09-10T12:00:00+08:00", "until": "2026-09-10T13:00:00+08:00"]))
+        XCTAssertEqual(ids(insideDay), [id.uuidString])
+        let before = try memories(await call(service, ["query": "会议", "until": "2026-09-10T00:00:00+08:00"]))
+        let after = try memories(await call(service, ["query": "会议", "since": "2026-09-11T00:00:00+08:00"]))
         XCTAssertTrue(before.isEmpty)
         XCTAssertTrue(after.isEmpty)
     }
@@ -298,19 +315,19 @@ final class MemorySearchTests: XCTestCase {
         let source = UUID()
         let id = try writeMemory(title: "会议", body: eventParagraph("2026-09-10", text: "客户会议。", source: source), sources: [source])
         let service = await service(store)
-        let first = try memories(await call(service, ["query": "会议", "timeField": "event"]))
-        XCTAssertEqual(first.first?["id"] as? String, id.uuidString)
+        let first = try memories(await call(service, ["query": "会议", "since": "2026-09-10T00:00:00+08:00", "until": "2026-09-11T00:00:00+08:00"]))
+        XCTAssertEqual(ids(first), [id.uuidString])
         let url = root.appendingPathComponent("Memory/Wiki/\(id).md")
         let restoredRoot = root.appendingPathComponent("Restored")
         try FileManager.default.createDirectory(at: restoredRoot.appendingPathComponent("Memory"), withIntermediateDirectories: true)
         try FileManager.default.copyItem(at: url, to: restoredRoot.appendingPathComponent("Memory/Meeting.md"))
         let restored = try LibraryStore(root: restoredRoot)
         let restoredService = await self.service(restored)
-        let copied = try memories(await call(restoredService, ["query": "会议", "timeField": "event"]))
-        XCTAssertEqual(copied.first?["id"] as? String, id.uuidString)
+        let copied = try memories(await call(restoredService, ["query": "会议", "since": "2026-09-10T00:00:00+08:00", "until": "2026-09-11T00:00:00+08:00"]))
+        XCTAssertEqual(copied.first?["path"] as? String, "Meeting.md")
         let revised = try MemoryDocument.encode(id: id, title: "会议", body: "日期待确认。来源：截图 `\(source)`。", revision: 1, agent: .codex, sourceIDs: [source], path: "Wiki/\(id).md")
         try revised.write(to: url, atomically: true, encoding: .utf8)
-        let edited = try memories(await call(service, ["query": "会议", "timeField": "event"]))
+        let edited = try memories(await call(service, ["query": "会议", "since": "2026-09-10T00:00:00+08:00", "until": "2026-09-11T00:00:00+08:00"]))
         XCTAssertTrue(edited.isEmpty)
         try await store.rebuildSearchIndex()
         try FileManager.default.removeItem(at: url)
@@ -319,12 +336,11 @@ final class MemorySearchTests: XCTestCase {
     }
 
     func testOrganizerSeparatesObservationFromEventTime() {
-        for prompt in [KnowledgeComposer.filePrompt(captures: []), KnowledgeComposer.prompt(captures: [], existing: [])] {
-            XCTAssertFalse(prompt.contains("截图时间是事实发生的时间"))
-            XCTAssertTrue(prompt.contains("myclip-event"))
-            XCTAssertTrue(prompt.contains("相对日期"))
-            XCTAssertTrue(prompt.contains("未知"))
-        }
+        let prompt = KnowledgeComposer.filePrompt(captures: [])
+        XCTAssertFalse(prompt.contains("截图时间是事实发生的时间"))
+        XCTAssertTrue(prompt.contains("myclip-event"))
+        XCTAssertTrue(prompt.contains("相对日期"))
+        XCTAssertTrue(prompt.contains("未知"))
     }
 
     func testUUIDMentionDoesNotBecomePassageEvidence() async throws {
@@ -333,9 +349,7 @@ final class MemorySearchTests: XCTestCase {
         try writeMemory(title: "Records", body: "Compiler log includes identifier `\(source)` as sample data.\n\n实际来源：截图 `\(source)`。", sources: [source])
         let service = await service(store)
         let found = try memories(await call(service, ["query": "compiler"]))
-        let best = try XCTUnwrap((found.first?["matches"] as? [[String: Any]])?.first)
-        XCTAssertEqual(best["sourceIDs"] as? [String], [])
-        XCTAssertEqual(best["sourceScope"] as? String, "document")
+        XCTAssertEqual(found.first?["sourceIDs"] as? [String], [])
     }
 
     func testInstantAndRangeEventBoundaries() async throws {
@@ -346,12 +360,12 @@ final class MemorySearchTests: XCTestCase {
         let instantID = try writeMemory(title: "会议", body: instant, sources: [source])
         let rangeID = try writeMemory(title: "会议", body: range, sources: [source])
         let service = await service(store)
-        let atStart = try memories(await call(service, ["query": "会议", "timeField": "event", "since": "2026-09-10T10:00:00+08:00", "until": "2026-09-10T11:00:00+08:00"]))
-        XCTAssertEqual(atStart.first?["id"] as? String, instantID.uuidString)
+        let atStart = try memories(await call(service, ["query": "会议", "since": "2026-09-10T10:00:00+08:00", "until": "2026-09-10T11:00:00+08:00"]))
+        XCTAssertEqual(ids(atStart), [instantID.uuidString])
         XCTAssertEqual(atStart.count, 1)
-        let inside = try memories(await call(service, ["query": "会议", "timeField": "event", "since": "2026-09-10T11:30:00+08:00", "until": "2026-09-10T11:45:00+08:00"]))
-        XCTAssertEqual(inside.first?["id"] as? String, rangeID.uuidString)
-        let after = try memories(await call(service, ["query": "会议", "timeField": "event", "since": "2026-09-10T12:00:00+08:00"]))
+        let inside = try memories(await call(service, ["query": "会议", "since": "2026-09-10T11:30:00+08:00", "until": "2026-09-10T11:45:00+08:00"]))
+        XCTAssertEqual(ids(inside), [rangeID.uuidString])
+        let after = try memories(await call(service, ["query": "会议", "since": "2026-09-10T12:00:00+08:00"]))
         XCTAssertTrue(after.isEmpty)
     }
 
@@ -366,12 +380,12 @@ final class MemorySearchTests: XCTestCase {
         try database.run("DELETE FROM memory_passage_search")
         let reopened = try LibraryStore(root: root)
         let service = await service(reopened)
-        let found = try memories(await call(service, ["query": "会议", "timeField": "event"]))
-        XCTAssertEqual(found.first?["id"] as? String, id.uuidString)
+        let found = try memories(await call(service, ["query": "会议", "since": "2026-09-10T00:00:00+08:00", "until": "2026-09-11T00:00:00+08:00"]))
+        XCTAssertEqual(ids(found), [id.uuidString])
         XCTAssertEqual(try Data(contentsOf: memory.fileURL), before)
         try await reopened.rebuildSearchIndex()
-        let rebuilt = try memories(await call(service, ["query": "会议", "timeField": "event"]))
-        XCTAssertEqual(rebuilt.first?["id"] as? String, id.uuidString)
+        let rebuilt = try memories(await call(service, ["query": "会议", "since": "2026-09-10T00:00:00+08:00", "until": "2026-09-11T00:00:00+08:00"]))
+        XCTAssertEqual(ids(rebuilt), [id.uuidString])
     }
 
     func testHeadingMatchIncludesParagraphContext() async throws {
@@ -379,8 +393,7 @@ final class MemorySearchTests: XCTestCase {
         try writeMemory(title: "Compiler", body: "# Compiler\n\n依赖版本不一致，更新后构建恢复正常。")
         let service = await service(store)
         let found = try memories(await call(service, ["query": "compiler"]))
-        let best = try XCTUnwrap((found.first?["matches"] as? [[String: Any]])?.first)
-        XCTAssertEqual(best["text"] as? String, "依赖版本不一致，更新后构建恢复正常。")
+        XCTAssertEqual(found.first?["snippet"] as? String, "依赖版本不一致，更新后构建恢复正常。")
     }
 
     func testImpossibleOrConflictingEventAnnotationsStayUnknown() async throws {
@@ -391,7 +404,7 @@ final class MemorySearchTests: XCTestCase {
         let second = eventParagraph("2026-09-18", text: "会议。", source: source)
         for body in [invalid, first + "\n" + second] { try writeMemory(title: "会议", body: body, sources: [source]) }
         let service = await service(store)
-        let found = try memories(await call(service, ["query": "会议", "timeField": "event"]))
+        let found = try memories(await call(service, ["query": "会议", "since": "2026-09-10T00:00:00+08:00", "until": "2026-09-11T00:00:00+08:00"]))
         XCTAssertTrue(found.isEmpty, "Invalid dates and competing annotations must not silently pick a time")
     }
 
