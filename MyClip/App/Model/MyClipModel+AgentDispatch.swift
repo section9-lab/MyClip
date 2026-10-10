@@ -362,7 +362,6 @@ extension MyClipModel {
             if !immediately {
                 guard !queue.paused, let readyAt = queue.readyAt, Date() >= readyAt else { return }
             }
-            if jobID == nil { try await store.prepareOrganizationText() }
             guard target == preferences.enabledAgent, !state(target).busy, state(target).phase != .failed,
                   let job = try await store.claimNextJob(immediately: immediately, jobID: jobID) else { return }
             currentJob = job
@@ -386,16 +385,16 @@ extension MyClipModel {
                     agents[job.agent]?.phase = .working
                     agents[job.agent]?.detail = String(localized: "正在整理 \(job.sourceIDs.count) 条记录")
                     activityText = String(localized: "正在读取 \(job.sourceIDs.count) 条记录…")
-                    let inputs = try await store.organizationInputs(jobID: job.id)
+                    let captures = try await store.organizationCaptures(jobID: job.id)
                     let data = try await Task.detached(priority: .utility) {
-                        try inputs.filter(\.usesImage).map { try Data(contentsOf: $0.capture.imageURL) }
+                        try captures.map { try Data(contentsOf: $0.imageURL) }
                     }.value
                     activityText = String(localized: "正在准备 \(job.agent.name) 会话…")
                     let existingTasks = try await store.workTasks()
                     let handoff = try await store.organizationHandoff()
-                    activityText = String(localized: "已提交 \(data.count) 张图片、\(inputs.count - data.count) 条文本，等待 \(job.agent.name) 回复…")
+                    activityText = String(localized: "已提交 \(data.count) 张图片，等待 \(job.agent.name) 回复…")
                     let result = try await trackedPrompt(client, agent: job.agent, session: session,
-                        text: MemoryPrompt.organizeBatchPrompt(inputs: inputs, handoff: handoff, previousAttempt: job.attempts > 1 ? job.error : nil, tasks: existingTasks),
+                        text: MemoryPrompt.organizeBatchPrompt(captures: captures, handoff: handoff, previousAttempt: job.attempts > 1 ? job.error : nil, tasks: existingTasks),
                         images: data, jobID: job.id)
                     if cancelledJobs.contains(job.id) || result.stopReason == "cancelled" { throw CancellationError() }
                     guard result.stopReason == "end_turn" else { throw LibraryError.agentStopped }

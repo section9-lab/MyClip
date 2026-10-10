@@ -106,7 +106,7 @@ struct KnowledgeLibraryView: View {
                     Image(systemName: "pencil.badge.clock").foregroundStyle(.orange)
                     Menu("\(model.proposals.count) 项修改待确认") {
                         ForEach(model.proposals) { item in Button(item.drafts.first?.title ?? String(localized: "修改建议")) { proposal = item } }
-                    }.menuStyle(.borderlessButton).fixedSize()
+                    }.menuStyle(.borderedButton).fixedSize()
                     Spacer()
                 }.padding(.horizontal, 32).padding(.vertical, 12)
                 Divider()
@@ -160,7 +160,7 @@ private struct MemoryFolderView: View {
                         model.memoryFolder = path.split(separator: "/").dropLast().joined(separator: "/")
                     } label: {
                         Label(String(localized: "上一级"), systemImage: "chevron.left")
-                    }.buttonStyle(.borderless)
+                    }.buttonStyle(.bordered)
                 }
                 Text(MemoryPresentation.folder(path)).font(.system(size: 30, weight: .bold))
                 let items = MemoryFileNode.tree(model.library, at: path)

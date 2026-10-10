@@ -62,7 +62,7 @@ struct TaskReportsView: View {
                                 .onTapGesture { sharing = false }.accessibilityHidden(true)
                             ReportSharePanel(document: document) { sharing = false }
                                 .frame(width: min(360, max(1, available.size.width - 32)),
-                                       height: min(520, max(1, available.size.height - 32)))
+                                       height: min(480, max(1, available.size.height - 32)))
                                 .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 20))
                                 .clipShape(RoundedRectangle(cornerRadius: 20))
                                 .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.primary.opacity(0.1)))
@@ -120,7 +120,7 @@ struct TaskReportsView: View {
                 .disabled(loading || loadError != nil || document.taskIDs.isEmpty)
             Button(String(localized: "分享"), systemImage: "square.and.arrow.up") { sharing.toggle() }
                 .disabled(loading || loadError != nil || document.taskIDs.isEmpty)
-        }.buttonStyle(ReportToolbarButtonStyle()).fixedSize(horizontal: true, vertical: false)
+        }.buttonStyle(.bordered).controlSize(.regular).fixedSize(horizontal: true, vertical: false)
     }
 
     private var dateControls: some View {
@@ -154,23 +154,6 @@ struct TaskReportsView: View {
         if let next = Calendar.current.date(byAdding: period.component, value: offset, to: report.interval.start) { date = next }
     }
 
-}
-
-private struct ReportToolbarButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
-    @State private var hovering = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 13, weight: .medium))
-            .padding(.horizontal, 14).frame(height: 34)
-            .foregroundStyle(.primary)
-            .background(Color(nsColor: .controlBackgroundColor), in: Capsule())
-            .overlay(Capsule().fill(Color.primary.opacity(configuration.isPressed ? 0.08 : hovering && isEnabled ? 0.04 : 0)))
-            .overlay(Capsule().strokeBorder(Color.primary.opacity(hovering && isEnabled ? 0.18 : 0.1)))
-            .clipShape(Capsule()).contentShape(Capsule()).opacity(isEnabled ? 1 : 0.45)
-            .onHover { hovering = $0 }
-    }
 }
 
 struct ReportStatusIcon: View {

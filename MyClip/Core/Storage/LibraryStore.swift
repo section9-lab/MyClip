@@ -7,15 +7,23 @@ public actor LibraryStore {
 
     public init(root: URL) throws {
         self.root = root
-        try FileManager.default.createDirectory(at: root.appendingPathComponent("Images"), withIntermediateDirectories: true)
+        let images = root.appendingPathComponent("Images")
+        try FileManager.default.createDirectory(at: images, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: root.appendingPathComponent("Entries"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: root.appendingPathComponent("Memory"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: root.appendingPathComponent("Proposals"), withIntermediateDirectories: true)
+        if let files = try? FileManager.default.contentsOfDirectory(at: images, includingPropertiesForKeys: [.isRegularFileKey]) {
+            for file in files where [".ax.json", ".ax.status", ".vision.json"].contains(where: file.lastPathComponent.hasSuffix) {
+                if (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true {
+                    try? FileManager.default.removeItem(at: file)
+                }
+            }
+        }
         database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
         try Self.prepareDatabase(database)
         for row in try database.run("SELECT image_id,body FROM image_text JOIN images ON images.id=image_text.image_id WHERE available=1") {
             guard let id = row["image_id"], let text = row["body"] else { continue }
-            let url = root.appendingPathComponent("Images/\(id).txt")
+            let url = images.appendingPathComponent("\(id).txt")
             if !FileManager.default.fileExists(atPath: url.path) {
                 try text.write(to: url, atomically: true, encoding: .utf8)
             }

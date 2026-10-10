@@ -12,7 +12,8 @@ public enum CaptureTextRecognizer {
             request.usesLanguageCorrection = true
             do {
                 try VNImageRequestHandler(data: data).perform([request])
-                return String((request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n").prefix(128_000))
+                return String((request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+                    .joined(separator: "\n").prefix(128_000))
             } catch { return nil }
         }
     }

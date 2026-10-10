@@ -13,7 +13,7 @@ struct PermissionRequestView: View {
                 Button(option.name) { model.resolve(permission, optionID: option.id) }.focusable()
                     .onActivationKey { model.resolve(permission, optionID: option.id) }
             }
-            Button("取消此次请求", role: .cancel) { model.resolve(permission, optionID: nil) }.buttonStyle(.borderless).focusable()
+            Button("取消此次请求", role: .cancel) { model.resolve(permission, optionID: nil) }.buttonStyle(.bordered).focusable()
                 .onActivationKey { model.resolve(permission, optionID: nil) }
         }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
     }

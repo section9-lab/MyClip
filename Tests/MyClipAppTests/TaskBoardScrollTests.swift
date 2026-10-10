@@ -130,7 +130,7 @@ struct TaskBoardScrollTests {
                 scroll.contentView.scroll(to: NSPoint(x: 0, y: max(0, content.bounds.height - scroll.contentSize.height)))
                 scroll.reflectScrolledClipView(scroll.contentView)
                 try await settle()
-                check(abs(scroll.documentVisibleRect.maxY - content.bounds.maxY) < 2,
+                check(scroll.documentVisibleRect.maxY >= content.bounds.maxY - 2,
                       "The last share action is reachable at height \(Int(height))")
             }
         }

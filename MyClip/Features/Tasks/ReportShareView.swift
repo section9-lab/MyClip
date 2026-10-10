@@ -16,13 +16,12 @@ struct ReportSharePanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("分享报告").font(.system(size: 17, weight: .semibold))
                 Spacer()
                 Button(action: shared) {
                     Image(systemName: "xmark").font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary).frame(width: 24, height: 24).contentShape(Circle())
                 }
-                .buttonStyle(.plain).accessibilityLabel(String(localized: "关闭"))
+                .buttonStyle(.bordered).controlSize(.small).accessibilityLabel(String(localized: "关闭"))
                 .keyboardShortcut(.cancelAction).help(String(localized: "关闭"))
             }
             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 8)
@@ -56,8 +55,6 @@ struct ReportSharePanel: View {
                             .background(ViewAnchorView(anchor: moreAnchor))
                         }
                     }
-                    Text("报告会带格式复制并打开所选应用，在会话、邮件或文档中粘贴（⌘V）即可。")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }.padding(.horizontal, 20).padding(.bottom, 20)
             }
         }
@@ -125,21 +122,17 @@ private struct ShareTile<Icon: View>: View {
     let help: String
     @ViewBuilder let icon: () -> Icon
     let action: () -> Void
-    @State private var hovering = false
-
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
+        VStack(spacing: 8) {
+            Button(action: action) {
                 icon()
                     .accessibilityHidden(true)
-                    .frame(width: 48, height: 48)
-                    .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Color.primary.opacity(hovering ? 0.08 : 0.035)))
-                Text(title).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                    .frame(width: 34, height: 34)
             }
-            .frame(maxWidth: .infinity).contentShape(Rectangle())
-        }
-        .buttonStyle(.plain).help(help)
-        .onHover { hovering = $0 }
+            .buttonStyle(.bordered).controlSize(.large).help(help).accessibilityLabel(title)
+            Text(title).font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                .accessibilityHidden(true)
+        }.frame(maxWidth: .infinity)
     }
 }
 

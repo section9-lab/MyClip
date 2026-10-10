@@ -4,7 +4,7 @@ import MyClipCore
 
 struct MyClipRootView: View {
     @ObservedObject var model: MyClipModel
-    @FocusState private var searchFocused: Bool
+    @State private var searchFocused = false
     @State private var showingOnboarding = false
 
     var body: some View {
@@ -14,6 +14,10 @@ struct MyClipRootView: View {
             }
             else { libraryContent }
         }
+        .buttonStyle(.bordered)
+        .menuStyle(.borderedButton)
+        .textFieldStyle(.roundedBorder)
+        .scrollIndicators(.automatic)
         .alert("MyClip", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
             Button("好", role: .cancel) { model.notice = nil }
         } message: { Text(model.notice ?? "") }
@@ -51,21 +55,9 @@ struct MyClipRootView: View {
     private var libraryContent: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                HStack(spacing: 7) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                    TextField("搜索任务、记忆与截图", text: $model.search).textFieldStyle(.plain)
-                        .focused($searchFocused)
-                        .onExitCommand {
-                            if model.search.isEmpty { searchFocused = false }
-                            else { model.search = "" }
-                        }
-                    if !model.search.isEmpty {
-                        Button { model.search = ""; searchFocused = true } label: { Image(systemName: "xmark.circle.fill") }
-                            .buttonStyle(.plain).foregroundStyle(.secondary).help("清除搜索").accessibilityLabel("清除搜索")
-                    }
-                }
-                .padding(9).background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 9))
-                .padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 14)
+                LibrarySearchField(text: $model.search, focused: $searchFocused)
+                    .frame(height: 28)
+                    .padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 14)
                 List(selection: $model.page) {
                     Section("资料库") {
                         sidebarRow(.memory)
@@ -81,11 +73,11 @@ struct MyClipRootView: View {
                         ForEach(ClipAgent.allCases.filter { model.preferences.enabledAgent == $0 || model.state($0).phase == .working || model.state($0).phase == .permission }) { agent in
                             Button { model.open(.agents) } label: {
                                 AgentStatusIcon(agent: agent, state: model.state(agent))
-                            }.buttonStyle(.plain).help("\(agent.name) · \(model.state(agent).detail)")
+                            }.buttonStyle(.borderless).help("\(agent.name) · \(model.state(agent).detail)")
                         }
                         if model.preferences.enabledAgent == nil, !model.agents.values.contains(where: { $0.phase == .working }) {
                             Button { model.open(.agents) } label: { Image(systemName: "person.crop.circle.dashed").font(.system(size: 22)).foregroundStyle(.secondary) }
-                                .buttonStyle(.plain).help("还没有选择整理 Agent")
+                                .buttonStyle(.borderless).help("还没有选择整理 Agent")
                         }
                         Spacer()
                         settingsButton

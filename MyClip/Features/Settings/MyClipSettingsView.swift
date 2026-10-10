@@ -30,12 +30,12 @@ struct MyClipSettingsView: View {
         @ObservedObject var preferences = model.preferences
         return SettingsSection(symbol: "camera.viewfinder", tint: .blue, title: String(localized: "截图"),
                                description: String(localized: "应用打开后自动采集，退出后停止。MyClip、锁屏和排除的应用不会被记录。")) {
-            SettingsRow(String(localized: "采集范围"), subtitle: String(localized: "全屏仅记录焦点窗口所在的显示器")) {
+            SettingsRow(String(localized: "采集范围")) {
                 Picker("采集范围", selection: $preferences.captureSettings.scope) {
                     ForEach(CaptureScope.allCases) { Text($0.label).tag($0) }
                 }.labelsHidden().fixedSize()
             }
-            SettingsRow(String(localized: "鼠标触发"), subtitle: String(localized: "两项可独立勾选")) {
+            SettingsRow(String(localized: "鼠标触发")) {
                 Menu {
                     ForEach(MouseCaptureTrigger.allCases) { option in
                         Toggle(option.label, isOn: Binding(get: { preferences.captureSettings.mouseTriggers.contains(option) }, set: { selected in
@@ -48,10 +48,24 @@ struct MyClipSettingsView: View {
                     .accessibilityLabel("鼠标触发")
                     .accessibilityValue(preferences.captureSettings.mouseSummary)
             }
-            SettingsRow(String(localized: "键盘触发"), subtitle: String(localized: "忽略长按回车"), last: true) {
+            SettingsRow(String(localized: "键盘触发")) {
                 Picker("键盘触发", selection: $preferences.captureSettings.keyboard) {
                     ForEach(KeyboardCaptureMode.allCases) { Text($0.label).tag($0) }
                 }.labelsHidden().fixedSize()
+            }
+            SettingsRow(String(localized: "过滤策略"), last: true) {
+                Menu {
+                    ForEach(CaptureFilterStrategy.allCases) { option in
+                        Toggle(option.label, isOn: Binding(get: { preferences.captureSettings.filterStrategies.contains(option) }, set: { selected in
+                            if selected { preferences.captureSettings.filterStrategies.insert(option) }
+                            else { preferences.captureSettings.filterStrategies.remove(option) }
+                        }))
+                    }
+                } label: { Text(preferences.captureSettings.filterSummary) }
+                    .fixedSize()
+                    .accessibilityLabel("过滤策略")
+                    .accessibilityValue(preferences.captureSettings.filterSummary)
+                    .help("近纯色过滤会跳过内容区域至少 98% 接近同一背景色的自动截图。相似画面在同一窗口的 5 分钟内复用原图，并保留每次出现的时间。")
             }
         }
     }
@@ -67,7 +81,7 @@ struct MyClipSettingsView: View {
                             Button(app.localizedName ?? app.bundleIdentifier!) { addExcludedApp(app.bundleIdentifier!) }
                         }
                     } label: { Label(String(localized: "添加正在运行的应用"), systemImage: "plus") }
-                        .menuStyle(.borderlessButton).fixedSize()
+                        .menuStyle(.borderedButton).fixedSize()
                 }
             }.padding(14)
         }
@@ -333,7 +347,7 @@ private struct ExcludedAppChips<Trailing: View>: View {
                     Button { remove(id) } label: {
                         Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
                             .frame(width: 18, height: 18)
-                    }.buttonStyle(.plain).accessibilityLabel("移除 \(app.name)")
+                    }.buttonStyle(.borderless).accessibilityLabel("移除 \(app.name)")
                 }
                 .padding(.leading, 10).padding(.trailing, 6).frame(height: 30)
                 .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))

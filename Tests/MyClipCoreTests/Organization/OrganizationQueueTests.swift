@@ -23,7 +23,42 @@ final class OrganizationQueueTests: XCTestCase {
         XCTAssertTrue(snapshot.jobs.isEmpty, "An execution batch should only be created when dispatching")
     }
 
-    func testMouseTextAllowsThirtyTwoRecordsInChronologicalOrder() async throws {
+    func testMouseAndKeyboardSendImagesEvenWhenOCRExists() async throws {
+        let store = try LibraryStore(root: directory)
+        for (index, reason) in [CaptureReason.clickAfterIdle, .enter].enumerated() {
+            var context = fixtureContext(at: 100 + Double(index))
+            context.reason = reason
+            try await store.record(image: fixtureImage(changed: true, x: index), context: context,
+                agent: .codex, organize: true, extractedText: "OCR \(index)")
+        }
+        let job = try await claim(store, at: 400)
+        let captures = try await store.organizationCaptures(jobID: job.id)
+        XCTAssertEqual(captures.count, 2)
+        let prompt = MemoryPrompt.filePrompt(captures: captures)
+        XCTAssertEqual(prompt.components(separatedBy: "content=image · 图片附件").count, 3)
+        XCTAssertFalse(prompt.contains("OCR 0"))
+        XCTAssertFalse(prompt.contains("OCR 1"))
+    }
+
+    func testLegacyFrozenOCRIsNotSentOnRetry() async throws {
+        let store = try LibraryStore(root: directory)
+        let context = fixtureContext()
+        try await store.record(image: fixtureImage(), context: context, agent: .codex, organize: true,
+            extractedText: "Legacy OCR")
+        let job = try await claim(store, at: 400)
+        let database = try SQLiteConnection(url: directory.appendingPathComponent("Library.sqlite"))
+        try database.run("INSERT INTO job_inputs(job_id,capture_id,ocr_text) VALUES(?,?,?) ON CONFLICT(job_id,capture_id) DO UPDATE SET ocr_text=excluded.ocr_text",
+            [job.id.uuidString, context.id.uuidString, "Legacy OCR"])
+        try await store.finishJob(id: job.id, state: .failed)
+        let reopened = try LibraryStore(root: directory)
+        try await reopened.retryJob(id: job.id)
+        _ = try await reopened.claimNextJob(at: date(700), immediately: true, jobID: job.id)
+        let captures = try await reopened.organizationCaptures(jobID: job.id)
+        XCTAssertEqual(captures.count, 1)
+        XCTAssertFalse(MemoryPrompt.filePrompt(captures: captures).contains("Legacy OCR"))
+    }
+
+    func testMouseCapturesUseEightImageBatchLimitInChronologicalOrder() async throws {
         let store = try LibraryStore(root: directory)
         var sources: [UUID] = []
         for index in 0..<35 {
@@ -34,10 +69,10 @@ final class OrganizationQueueTests: XCTestCase {
                 agent: .codex, organize: true, extractedText: "OCR \(index)")
         }
         let job = try await claim(store, at: 400)
-        XCTAssertEqual(job.sourceIDs, Array(sources.prefix(32)))
+        XCTAssertEqual(job.sourceIDs, Array(sources.prefix(8)))
     }
 
-    func testTextBudgetStopsBeforeNextRecordWithoutSkippingIt() async throws {
+    func testLongOCRDoesNotLimitImageBatch() async throws {
         let store = try LibraryStore(root: directory)
         var sources: [UUID] = []
         for index in 0..<3 {
@@ -48,34 +83,32 @@ final class OrganizationQueueTests: XCTestCase {
                 agent: .codex, organize: true, extractedText: String(repeating: "文", count: 7_000))
         }
         let job = try await claim(store, at: 400)
-        XCTAssertEqual(job.sourceIDs, [sources[0]])
+        XCTAssertEqual(job.sourceIDs, sources)
     }
 
-    func testMixedInputsUseIndependentLimitsAndRemainFrozenOnRetry() async throws {
+    func testMixedTriggersKeepSameImageSourcesOnRetry() async throws {
         let store = try LibraryStore(root: directory)
         var sources: [UUID] = []
-        for index in 0..<41 {
+        for index in 0..<9 {
             var context = fixtureContext(at: 100 + Double(index))
-            context.reason = index < 8 || index == 40 ? .enter : .scrollIdle
+            context.reason = index.isMultiple(of: 2) ? .enter : .scrollIdle
             sources.append(context.id)
             try await store.record(image: fixtureImage(changed: true, x: index), context: context,
                 agent: .codex, organize: true, extractedText: "OCR \(index)")
         }
         let first = try await claim(store, at: 400)
-        XCTAssertEqual(first.sourceIDs, Array(sources.prefix(40)))
-        let original = try await store.organizationInputs(jobID: first.id)
-        XCTAssertEqual(original.filter(\.usesImage).count, 8)
-        XCTAssertEqual(original.compactMap(\.text).count, 32)
-        try await store.indexImageText(id: original[8].capture.imageID, text: "Changed OCR")
+        XCTAssertEqual(first.sourceIDs, Array(sources.prefix(8)))
+        let original = try await store.organizationCaptures(jobID: first.id)
+        try await store.indexImageText(id: original[1].imageID, text: "Changed OCR")
         try await store.finishJob(id: first.id, state: .failed)
         let reopened = try LibraryStore(root: directory)
         try await reopened.retryJob(id: first.id)
         let retried = try await reopened.claimNextJob(at: date(700), immediately: true, jobID: first.id)
         let retry = try XCTUnwrap(retried)
-        let inputs = try await reopened.organizationInputs(jobID: retry.id)
+        let captures = try await reopened.organizationCaptures(jobID: retry.id)
         XCTAssertEqual(retry.id, first.id)
-        XCTAssertEqual(inputs.map(\.text), original.map(\.text))
-        XCTAssertEqual(inputs.map { $0.capture.id }, first.sourceIDs)
+        XCTAssertEqual(captures.map(\.id), first.sourceIDs)
+        XCTAssertFalse(MemoryPrompt.filePrompt(captures: captures).contains("Changed OCR"))
     }
 
     func testMouseFallbackAndManualReorganizationUseImages() async throws {
@@ -85,12 +118,12 @@ final class OrganizationQueueTests: XCTestCase {
                 agent: .codex, organize: true, extractedText: text)
         }
         let job = try await claim(store, at: 400)
-        let inputs = try await store.organizationInputs(jobID: job.id)
-        XCTAssertEqual(inputs.map(\.usesImage), [true, true, true, false])
+        let captures = try await store.organizationCaptures(jobID: job.id)
+        XCTAssertEqual(captures.count, 4)
         try await store.finishJob(id: job.id, state: .cancelled)
-        let manual = try await store.enqueue(sourceIDs: [inputs[3].capture.id], agent: .codex)
-        let manualInputs = try await store.organizationInputs(jobID: manual)
-        XCTAssertTrue(try XCTUnwrap(manualInputs.first).usesImage)
+        let manual = try await store.enqueue(sourceIDs: [captures[3].id], agent: .codex)
+        let manualCaptures = try await store.organizationCaptures(jobID: manual)
+        XCTAssertEqual(manualCaptures.map(\.id), [captures[3].id])
     }
 
     func testVersionSevenMigrationKeepsLegacyJobImagesAndBlocksOlderReaders() async throws {
@@ -101,9 +134,8 @@ final class OrganizationQueueTests: XCTestCase {
         let database = try SQLiteConnection(url: directory.appendingPathComponent("Library.sqlite"))
         try database.script("DROP TABLE job_inputs; PRAGMA user_version=7;")
         let migrated = try LibraryStore(root: directory)
-        let inputs = try await migrated.organizationInputs(jobID: job)
-        XCTAssertEqual(inputs.map { $0.capture.id }, [context.id])
-        XCTAssertTrue(try XCTUnwrap(inputs.first).usesImage)
+        let captures = try await migrated.organizationCaptures(jobID: job)
+        XCTAssertEqual(captures.map(\.id), [context.id])
         let migratedVersion = try XCTUnwrap(database.run("PRAGMA user_version").first?["user_version"].flatMap(Int.init))
         XCTAssertGreaterThanOrEqual(migratedVersion, 9, "Version 9 added the retry columns")
         let columns = Set(try database.run("PRAGMA table_info(jobs)").compactMap { $0["name"] })

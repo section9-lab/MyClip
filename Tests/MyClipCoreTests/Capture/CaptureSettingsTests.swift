@@ -6,7 +6,7 @@ final class CaptureSettingsTests: XCTestCase {
         let settings = CaptureSettings(scope: .focusedDisplay, mouseTriggers: [.scroll], keyboard: .afterLetters)
         let explanation = String(describing: settings)
         XCTAssertTrue(explanation.contains("焦点窗口所在的显示器"))
-        XCTAssertTrue(explanation.contains("上下滚动停止 2 秒"))
+        XCTAssertTrue(explanation.contains("scroll向下滚动后静止3秒"))
         XCTAssertTrue(explanation.contains("字母键后再回车"))
         XCTAssertFalse(explanation.contains("点击"))
         XCTAssertFalse(explanation.contains("只记录"))
@@ -42,6 +42,29 @@ final class CaptureSettingsTests: XCTestCase {
         let options = CaptureSettings(scope: .focusedDisplay, mouseTriggers: [], keyboard: .returnKey)
         options.save(to: defaults)
         XCTAssertEqual(CaptureSettings.load(from: UserDefaults(suiteName: name)!), options)
+    }
+
+    func testImageFilteringIsEnabledForOldPreferences() {
+        let name = "MyClip.CaptureTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        CaptureSettings.load(from: defaults).save(to: defaults)
+        XCTAssertEqual(defaults.stringArray(forKey: "myclip.captureFilterStrategies"), ["similarImages"])
+        XCTAssertEqual(CaptureFilterStrategy.allCases, [.similarImages, .nearUniformImages])
+    }
+
+    func testFilteringSelectionsSurviveReloadIncludingAllDisabled() {
+        let name = "MyClip.CaptureTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        for values in [[], ["mouseCooldown"], ["similarImages"], ["mouseCooldown", "similarImages"], ["similarImages", "unknown"],
+                       ["nearUniformImages"], ["similarImages", "nearUniformImages"]] {
+            defaults.set(values, forKey: "myclip.captureFilterStrategies")
+            let settings = CaptureSettings.load(from: defaults)
+            defaults.removeObject(forKey: "myclip.captureFilterStrategies")
+            settings.save(to: defaults)
+            XCTAssertEqual(defaults.stringArray(forKey: "myclip.captureFilterStrategies"), values.filter { ["similarImages", "nearUniformImages"].contains($0) }.sorted())
+        }
     }
 
     func testFocusedDisplayUsesLargestWindowOverlapAcrossMultipleScreens() {

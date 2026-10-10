@@ -16,13 +16,14 @@ final class FocusedCaptureService {
     var isRunning: Bool { running }
     var canStart = true
     var configured = false
+    var configuredSettings: CaptureSettings?
 
     init() {
         hasScreenPermission = Self.initialScreenPermission
         hasAccessibilityPermission = Self.initialAccessibilityPermission
         Self.latest = self
     }
-    func configure(settings: CaptureSettings, excludedBundleIDs: Set<String>) { configured = true }
+    func configure(settings: CaptureSettings, excludedBundleIDs: Set<String>) { configured = true; configuredSettings = settings }
     func requestScreenPermission() { hasScreenPermission = true }
     func requestAccessibilityPermission() { hasAccessibilityPermission = true }
     func start() -> Bool {
@@ -118,6 +119,46 @@ struct CaptureLifecycleTests {
         retry.refreshPermissions()
         check(retry.capturing && retryCapture.running, "Capture resumes if the service stopped between permission checks")
         retry.stop()
+
+        func frame(cursor: Bool) throws -> CapturedImage {
+            let canvas = CGContext(data: nil, width: 320, height: 320, bitsPerComponent: 8, bytesPerRow: 1280,
+                                   space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            canvas.setFillColor(CGColor(gray: 0.95, alpha: 1))
+            canvas.fill(CGRect(x: 0, y: 0, width: 320, height: 320))
+            canvas.setFillColor(CGColor(gray: 0.15, alpha: 1))
+            for y in stride(from: 40, to: 280, by: 20) { canvas.fill(CGRect(x: 20, y: y, width: 200, height: 8)) }
+            if cursor { canvas.fill(CGRect(x: 240, y: 150, width: 2, height: 12)) }
+            return try CapturedImage(image: canvas.makeImage()!)
+        }
+        let original = try frame(cursor: false), withCursor = try frame(cursor: true)
+        for (strategies, images, pending) in [([], 2, 3), (["mouseCooldown"], 2, 3), (["similarImages"], 1, 1)] {
+            UserDefaults.standard.setVolatileDomain(["myclip.autoOrganize": true, "myclip.captureFilterStrategies": strategies], forName: UserDefaults.argumentDomain)
+            let filtering = try MyClipModel(root: root.appendingPathComponent("filtering-\(strategies.joined())"), preview: false)
+            let service = FocusedCaptureService.latest!
+            filtering.applyCaptureSettings()
+            check(service.configuredSettings?.filterStrategies == Set(strategies.compactMap(CaptureFilterStrategy.init(rawValue:))), "Capture receives the selected filtering strategies")
+            for (index, image) in [original, withCursor, withCursor].enumerated() {
+                let context = CaptureContext(appName: "Notes", bundleID: "test.notes", windowTitle: "Document", windowID: 7,
+                                             reason: .enter, date: Date(timeIntervalSince1970: 100 + Double(index) * 30))
+                await service.onCapture?(image, context)
+            }
+            let snapshot = try await filtering.store.snapshot()
+            check(snapshot.captureCount == 3, "Filtering preserves every capture occurrence")
+            check(snapshot.imageCount == images, "The capture callback applies image filtering selection \(strategies)")
+            check(snapshot.queue.pendingCount == pending, "The capture callback applies duplicate queue filtering selection \(strategies)")
+            if strategies == ["similarImages"] {
+                filtering.preferences.captureSettings.filterStrategies = []
+                filtering.applyCaptureSettings()
+                check(service.configuredSettings?.filterStrategies.isEmpty == true, "Capture receives filtering changes without restarting")
+                let context = CaptureContext(appName: "Notes", bundleID: "test.notes", windowTitle: "Document", windowID: 7,
+                                             reason: .enter, date: Date(timeIntervalSince1970: 200))
+                await service.onCapture?(withCursor, context)
+                let updated = try await filtering.store.snapshot()
+                check(updated.imageCount == 2 && updated.queue.pendingCount == 2, "The next capture uses changed filtering preferences")
+                check(Set(updated.captures.map(\.sceneID)).count == 1, "Disabling image filtering keeps timeline grouping")
+            }
+            filtering.stop()
+        }
 
         let preview = try makeModel("preview", preview: true, screen: false, accessibility: false)
         let previewCapture = FocusedCaptureService.latest!

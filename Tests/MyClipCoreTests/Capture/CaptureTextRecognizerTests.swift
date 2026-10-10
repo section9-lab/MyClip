@@ -22,6 +22,7 @@ final class CaptureTextRecognizerTests: XCTestCase {
         let captures = try await store.captures(ids: [context.id])
         let capture = try XCTUnwrap(captures.first)
         XCTAssertEqual(try String(contentsOf: capture.textURL, encoding: .utf8), text)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: capture.imageURL.deletingPathExtension().appendingPathExtension("vision.json").path))
         let results = try await store.snapshot(query: "MyClip")
         XCTAssertEqual(results.captures.map(\.id), [context.id])
         let next = try await store.nextImageForTextIndex()
@@ -50,6 +51,28 @@ final class CaptureTextRecognizerTests: XCTestCase {
         try image.pngData.write(to: url)
         let retried = try await store.recognizeImageText(id: image.fingerprint)
         XCTAssertEqual(retried, "")
+    }
+
+    func testCancellingOneWaiterKeepsSharedRecognitionAvailable() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let image = try textImage()
+        let store = try LibraryStore(root: root)
+        try await store.record(image: image, context: fixtureContext(), agent: .codex, organize: false)
+        let first = Task { try await store.recognizeImageText(id: image.fingerprint) }
+        for _ in 0..<50 {
+            if await store.textRecognitionTasks[image.fingerprint] != nil { break }
+            await Task.yield()
+        }
+        let second = Task { try await store.recognizeImageText(id: image.fingerprint) }
+        first.cancel()
+        let text = try await second.value
+        XCTAssertTrue(text.contains("MyClip"))
+        do {
+            _ = try await first.value
+            XCTFail("The cancelled waiter should stop waiting for its own result")
+        } catch is CancellationError { }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("Images/\(image.fingerprint).vision.json").path))
     }
 
     func testExpiredScreenshotDoesNotProduceDocument() async throws {

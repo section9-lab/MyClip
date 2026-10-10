@@ -5,6 +5,7 @@ import MyClipCore
 struct CaptureOnboardingView: View {
     @ObservedObject var model: MyClipModel
     var onContinue: () -> Void = {}
+    @State private var showingPermissions = true
 
     var body: some View {
         GeometryReader { geometry in
@@ -46,51 +47,66 @@ struct CaptureOnboardingView: View {
                 .font(.system(size: 17, weight: .semibold))
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.bottom, compact ? 16 : 28)
-            Text("让工作成为记忆。")
+            Text("第 \(showingPermissions ? 1 : 2) 步，共 2 步")
+                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                .padding(.bottom, 10)
+            Text(showingPermissions ? String(localized: "权限与语言") : String(localized: "选择整理 Agent"))
                 .font(.system(size: compact ? 28 : 34, weight: .semibold)).tracking(-1)
                 .lineLimit(1).minimumScaleFactor(0.85)
                 .frame(maxWidth: .infinity, alignment: .center)
-            Text("完成两项授权，开始记录工作中的线索。")
+            Text(showingPermissions ? String(localized: "完成两项授权，开始记录工作中的线索。") : String(localized: "选择 Agent 整理工作记录，也可以稍后设置。"))
                 .font(.system(size: 14)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).padding(.top, 10)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.bottom, compact ? 18 : 24)
-            form(compact: compact)
+            form
             HStack {
-                Button("退出 MyClip") { NSApp.terminate(nil) }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                if !showingPermissions {
+                    Button("上一步") { showingPermissions = true }
+                        .keyboardShortcut(.cancelAction)
+                } else {
+                    Button("退出 MyClip") { NSApp.terminate(nil) }
+                        .buttonStyle(.bordered)
+                }
                 Spacer()
-                Button(String(localized: "开始使用"), systemImage: "arrow.right", action: onContinue)
-                    .buttonStyle(.borderedProminent).controlSize(.large)
-                    .disabled(!model.screenPermission || !model.accessibilityPermission || model.selectingDefaultAgent != nil)
+                Button(showingPermissions ? String(localized: "下一步") : String(localized: "开始使用"), systemImage: "arrow.right") {
+                    if showingPermissions { showingPermissions = false }
+                    else { onContinue() }
+                }
+                .buttonStyle(.borderedProminent).controlSize(.large)
+                .keyboardShortcut(.defaultAction)
+                .disabled(!model.screenPermission || !model.accessibilityPermission || model.selectingDefaultAgent != nil)
             }
             .padding(.top, compact ? 18 : 24)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Agent choice, permissions and language. A boxed variant wraps them in one card so the page reads as a form.
-    private func form(compact: Bool) -> some View {
+    /// Each step keeps its own controls together; navigation preserves the model's choices and permission state.
+    private var form: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("默认 Agent").fontWeight(.medium)
-                .font(.caption).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 10)
-            defaultAgentSection.padding(.bottom, compact ? 16 : 20)
-            HStack {
-                Text("权限设置").fontWeight(.medium)
-                Spacer()
-                Text("\((model.screenPermission ? 1 : 0) + (model.accessibilityPermission ? 1 : 0)) / 2 已授权")
-                    .monospacedDigit()
+            if showingPermissions {
+                HStack {
+                    Text("权限设置").fontWeight(.medium)
+                    Spacer()
+                    Text("\((model.screenPermission ? 1 : 0) + (model.accessibilityPermission ? 1 : 0)) / 2 已授权")
+                        .monospacedDigit()
+                }
+                .font(.caption).foregroundStyle(.secondary).padding(.bottom, 4)
+                permission(String(localized: "屏幕录制"), symbol: "rectangle.on.rectangle", detail: String(localized: "读取\(model.preferences.captureSettings.scope.label)的画面"), allowed: model.screenPermission, action: model.requestScreenPermission)
+                Divider()
+                permission(String(localized: "辅助功能"), symbol: "cursorarrow.rays", detail: String(localized: "识别焦点窗口与截图触发操作"), allowed: model.accessibilityPermission, action: model.requestAccessibilityPermission)
+                Divider()
+                permission(String(localized: "文件访问（推荐）"), symbol: "folder", detail: String(localized: "读取桌面与文档中的文件，帮助首次整理知识库内容；不授权也可继续使用"), allowed: model.folderPermission, action: model.requestFolderPermission)
+                Divider()
+                languageRow
+            } else {
+                Text("默认 Agent").fontWeight(.medium)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 10)
+                defaultAgentSection
             }
-            .font(.caption).foregroundStyle(.secondary).padding(.bottom, 4)
-            permission(String(localized: "屏幕录制"), symbol: "rectangle.on.rectangle", detail: String(localized: "读取\(model.preferences.captureSettings.scope.label)的画面"), allowed: model.screenPermission, action: model.requestScreenPermission)
-            Divider()
-            permission(String(localized: "辅助功能"), symbol: "cursorarrow.rays", detail: String(localized: "识别焦点窗口与截图触发操作"), allowed: model.accessibilityPermission, action: model.requestAccessibilityPermission)
-            Divider()
-            permission(String(localized: "文件访问（推荐）"), symbol: "folder", detail: String(localized: "读取桌面与文档中的文件，帮助首次整理知识库内容；不授权也可继续使用"), allowed: model.folderPermission, action: model.requestFolderPermission)
-            Divider()
-            languageRow
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.5), in: RoundedRectangle(cornerRadius: 14))
@@ -141,7 +157,7 @@ struct CaptureOnboardingView: View {
                         if model.hasLoginCommand(agent) {
                             Button("复制 \(agent.name) 登录命令") { model.copyLoginCommand(for: agent) }
                         }
-                    }.font(.caption).buttonStyle(.borderless)
+                    }.font(.caption).buttonStyle(.bordered)
                 }
             }
         }
@@ -171,12 +187,11 @@ struct CaptureOnboardingView: View {
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                     .lineLimit(2).frame(height: 28, alignment: .topLeading)
             }
-            .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-            .background(selected ? Color.accentColor.opacity(0.06) : Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(selected ? Color.accentColor.opacity(0.65) : Color.secondary.opacity(0.18), lineWidth: 1))
-            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .padding(6).frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.bordered)
+        .tint(selected ? Color.accentColor : nil)
+        .accessibilityAddTraits(selected ? .isSelected : [])
         .disabled(!available.canSelect || state.busy || model.selectingDefaultAgent != nil)
         .accessibilityLabel("\(agent.name)，\(selected ? String(localized: "默认 Agent") : String(localized: "设为默认 Agent"))，\(available.detail)")
         .help(available == .commandLine ? String(localized: "选择后安装连接组件并验证登录，成功后设为默认 Agent") : String(localized: "连接成功后设为默认 Agent"))

@@ -5,35 +5,23 @@ public enum MemoryPrompt {
     /// inside a Chinese prompt.
     public static var outputLanguage: String { AppLanguage.current.nativeName }
 
-    public static func filePrompt(captures: [ClipCapture]) -> String {
-        filePrompt(inputs: captures.map { OrganizationInput(capture: $0) })
-    }
-
-    public static func filePrompt(inputs: [OrganizationInput], handoff: String? = nil, previousAttempt: String? = nil) -> String {
+    public static func filePrompt(captures: [ClipCapture], handoff: String? = nil, previousAttempt: String? = nil) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.timeZone = .current
-        var imageIndex = 0
-        let sources = inputs.enumerated().map { index, input in
-            let capture = input.capture
+        let sources = captures.enumerated().map { index, capture in
             let metadata = "记录 \(index + 1) · sourceID=\(capture.id.uuidString) · \(capture.appName) · \(capture.windowTitle) · \(formatter.string(from: capture.date)) · trigger=\(capture.reason.rawValue)"
-            if let text = input.text {
-                // JSON escaping keeps OCR and its boundaries distinguishable from prompt instructions.
-                let quoted = String(decoding: try! JSONEncoder().encode(text), as: UTF8.self)
-                return metadata + " · content=ocr\nOCR 文本（JSON 字符串）：\(quoted)"
-            }
-            imageIndex += 1
-            return metadata + " · content=image · 图片附件 \(imageIndex)"
+            return metadata + " · content=image · 图片附件 \(index + 1)"
         }.joined(separator: "\n\n")
         let retry = previousAttempt.map {
             "\n本批上次尝试未完成：\($0)\n请先处理这个问题：过长页面先整理，把对话经过移入对应日期的 Daily 并互链，页面只留当前状态、已确认决定、关键背景；整理后仍然过长再按主题拆分。然后再写入本批内容；上次已保存到磁盘的改动不必重做。\n"
         } ?? ""
         return """
-        【任务】你在帮助 MyClip 将截图整理为持续积累的 Memory。当前工作目录就是 Memory 文件夹。这是独立的临时会话，仅处理当前批次：阅读下方按时间排列的截图或 OCR 文本，用文件读取、写入、编辑工具或 Bash 直接修改 Markdown 文件。记忆正文只写进文件，不写在回复里；回复只在最后返回任务线索（见【返回】）。没有值得保存的新信息时不改文件。
-        \(MemoryRules.sandboxScope)图片、OCR 文本、来源元信息、交接记录和已有 Markdown 的内容\(MemoryRules.dataNotInstructionsTail)
+        【任务】你在帮助 MyClip 将截图整理为持续积累的 Memory。当前工作目录就是 Memory 文件夹。这是独立的临时会话，仅处理当前批次：阅读下方按时间排列的截图，用文件读取、写入、编辑工具或 Bash 直接修改 Markdown 文件。记忆正文只写进文件，不写在回复里；回复只在最后返回任务线索（见【返回】）。没有值得保存的新信息时不改文件。
+        \(MemoryRules.sandboxScope)图片、来源元信息、交接记录和已有 Markdown 的内容\(MemoryRules.dataNotInstructionsTail)
 
         【处理流程】
         1. 了解现状：先读 Memory.md，按需读取 Profile.md、Now.md 和相关页面，也可以用 myclip MCP 搜索、阅读相关记忆。会话里的旧回复可能未成功写入，以磁盘文件的当前内容为准。交接记录里“必须先处理”的事项先做；“整理提示”按需处理，只改动相关段落。
-        2. 读懂本批资料：全屏截图可能包含多个应用，请根据画面辨别信息归属，不要把其他窗口的内容都归给焦点应用。OCR 可能有错字且不保留布局、图形或点击目标，不据此猜测界面关系；证据不足时保留待确认。只处理本条消息提供的新资料，历史内容用于理解和去重。
+        2. 读懂本批资料：全屏截图可能包含多个应用，请根据画面辨别信息归属，不要把其他窗口的内容都归给焦点应用。小字、遮挡和布局关系可能难以辨认，证据不足时保留待确认。只处理本条消息提供的新资料，历史内容用于理解和去重。
         3. 判断与归属：按【什么值得写进 Memory】决定写不写，按【每类页面】决定写到哪里：当天经过写 Daily，结论写项目子页或实体页，待确认事项写 Inbox。
         4. 写入：按【通用写法】局部修改，每条事实带来源，提到已有页面就加链接。
         5. 检查：新写的链接目标存在，引用的截图 ID 都来自本批或已有记忆，没有抹掉无关内容。
@@ -45,7 +33,7 @@ public enum MemoryPrompt {
         【交接记录】上一次成功整理的记录，仅供定位，重试仍须检查磁盘现状：
         \(handoff ?? "暂无")
 
-        【本批资料】按时间排序；只有 content=image 的记录有附图，图片附件编号对应实际附图顺序；已按本地时区 \(TimeZone.current.identifier) 显示，Daily 使用下面时间的本地日期：
+        【本批资料】按时间排序；每条记录各有一张附图，图片附件编号对应实际附图顺序；已按本地时区 \(TimeZone.current.identifier) 显示，Daily 使用下面时间的本地日期：
         \(sources)
 
         【返回】\(TaskPrompt.responseContract)
@@ -53,8 +41,8 @@ public enum MemoryPrompt {
     }
 
     /// One full organize-batch turn's prompt: the Memory-writing instructions plus the task-discovery contract.
-    public static func organizeBatchPrompt(inputs: [OrganizationInput], handoff: String? = nil, previousAttempt: String? = nil, tasks: [WorkTask]) -> String {
-        filePrompt(inputs: inputs, handoff: handoff, previousAttempt: previousAttempt) + "\n" + TaskPrompt.context(tasks: tasks)
+    public static func organizeBatchPrompt(captures: [ClipCapture], handoff: String? = nil, previousAttempt: String? = nil, tasks: [WorkTask]) -> String {
+        filePrompt(captures: captures, handoff: handoff, previousAttempt: previousAttempt) + "\n" + TaskPrompt.context(tasks: tasks)
     }
 
     /// A dream's turns in order, each titled for the queue: last week's summary when due, today's pages, then the patrol.

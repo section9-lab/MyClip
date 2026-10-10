@@ -1,6 +1,14 @@
 import Foundation
 
 extension LibraryStore {
+    public func organizationCaptures(jobID: UUID) throws -> [ClipCapture] {
+        guard let row = try database.run("SELECT * FROM jobs WHERE id=?", [jobID.uuidString]).first else {
+            throw LibraryError.invalidResult(String(localized: "任务不存在"))
+        }
+        // Older jobs may retain frozen OCR in job_inputs; only their source images are sent now.
+        return try captures(ids: job(row).sourceIDs)
+    }
+
     public func recoverInterruptedJobs(at date: Date = Date()) throws {
         try database.transaction {
             let running = try database.run("SELECT id,attempts,kind FROM jobs WHERE state='running'")

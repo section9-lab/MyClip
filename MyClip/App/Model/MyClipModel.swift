@@ -185,7 +185,8 @@ final class MyClipModel: ObservableObject {
             guard let self else { return }
             do {
                 let repeated = self.library.captures.first?.imageID == image.fingerprint
-                try await self.store.record(image: image, context: context, agent: self.preferences.enabledAgent ?? .codex, organize: self.preferences.autoOrganize)
+                try await self.store.record(image: image, context: context, agent: self.preferences.enabledAgent ?? .codex, organize: self.preferences.autoOrganize,
+                                            filterStrategies: self.preferences.captureSettings.filterStrategies)
                 await self.refresh()
                 self.captureStatus = repeated ? String(localized: "已记录本次出现，相同画面共用原图") : String(localized: "已保存 \(context.appName) · \(context.date.formatted(date: .omitted, time: .standard))")
             } catch { self.captureStatus = String(localized: "保存失败：\(error.localizedDescription)"); self.notice = error.localizedDescription }

@@ -1,5 +1,54 @@
 import SwiftUI
 
+struct LibrarySearchField: NSViewRepresentable {
+    @Binding var text: String
+    @Binding var focused: Bool
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> NSSearchField {
+        let field = NSSearchField()
+        field.placeholderString = String(localized: "搜索任务、记忆与截图")
+        field.setAccessibilityLabel(field.placeholderString)
+        field.sendsSearchStringImmediately = true
+        field.sendsWholeSearchString = false
+        field.delegate = context.coordinator
+        field.target = context.coordinator
+        field.action = #selector(Coordinator.changed(_:))
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        return field
+    }
+
+    func updateNSView(_ field: NSSearchField, context: Context) {
+        context.coordinator.parent = self
+        if field.stringValue != text { field.stringValue = text }
+        if focused, field.currentEditor() == nil {
+            DispatchQueue.main.async {
+                if context.coordinator.parent.focused { field.window?.makeFirstResponder(field) }
+            }
+        }
+    }
+
+    @MainActor final class Coordinator: NSObject, NSSearchFieldDelegate {
+        var parent: LibrarySearchField
+        init(_ parent: LibrarySearchField) { self.parent = parent }
+        @objc func changed(_ field: NSSearchField) { parent.text = field.stringValue }
+        func controlTextDidBeginEditing(_ notification: Notification) { parent.focused = true }
+        func controlTextDidEndEditing(_ notification: Notification) { parent.focused = false }
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy command: Selector) -> Bool {
+            guard command == #selector(NSResponder.cancelOperation(_:)) else { return false }
+            if parent.text.isEmpty {
+                parent.focused = false
+                control.window?.makeFirstResponder(nil)
+            } else {
+                (control as? NSSearchField)?.stringValue = ""
+                parent.text = ""
+            }
+            return true
+        }
+    }
+}
+
 // The system-image convenience initializer was introduced in macOS 14.
 extension Button where Label == SwiftUI.Label<Text, Image> {
     init(_ title: String, systemImage: String, role: ButtonRole? = nil, action: @escaping () -> Void) {
@@ -56,6 +105,7 @@ struct MemoryScrollView<Content: View>: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
         scroll.drawsBackground = false
         let host = NSHostingView(rootView: DocumentContent(content: content(), width: scroll.contentSize.width))
         host.sizingOptions = [.intrinsicContentSize]
