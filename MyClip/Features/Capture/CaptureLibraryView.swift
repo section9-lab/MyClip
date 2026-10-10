@@ -138,7 +138,7 @@ struct CaptureLibraryView: View {
             }.labelsHidden().frame(width: 100, alignment: .trailing).help("按触发事件筛选").accessibilityLabel("触发事件筛选")
             if model.captureFilter.isActive {
                 Button { model.captureFilter = CaptureFilter() } label: { Image(systemName: "arrow.counterclockwise") }
-                    .buttonStyle(.borderless).help("清除筛选").accessibilityLabel("清除筛选")
+                    .buttonStyle(.bordered).help("清除筛选").accessibilityLabel("清除筛选")
             }
         }
     }
@@ -182,12 +182,16 @@ struct CaptureThumbnail: View {
 }
 
 struct CaptureDetailView: View {
+    private enum PreviewMode: String, CaseIterable {
+        case image, raw
+    }
+
     @ObservedObject var model: MyClipModel
     /// Newest first; a single element for an unfolded capture.
     let frames: [ClipCapture]
     @Environment(\.dismiss) private var dismiss
     @State private var index = 0
-    @State private var showText = false
+    @State private var previewMode: PreviewMode = .image
     @State private var extractedText: String?
     @State private var textError: String?
     @State private var recognizing = false
@@ -216,7 +220,7 @@ struct CaptureDetailView: View {
                         Text("第 \(frames.count - index) / \(frames.count) 次").font(.callout).monospacedDigit().foregroundStyle(.secondary)
                         Button { index = max(0, index - 1) } label: { Image(systemName: "chevron.right") }
                             .disabled(index == 0).help("更晚一次").keyboardShortcut(.rightArrow, modifiers: [])
-                    }.buttonStyle(.borderless)
+                    }.buttonStyle(.bordered)
                 }
                 Button("完成") { dismiss() }.keyboardShortcut(.cancelAction)
             }
@@ -225,15 +229,15 @@ struct CaptureDetailView: View {
                 HStack {
                     Text("关联记忆").font(.caption).foregroundStyle(.secondary)
                     ForEach(model.library.entries.filter { $0.sourceIDs.contains(capture.id) }) { entry in
-                        Button(entry.title) { dismiss(); model.open(.memory); Task { @MainActor in model.selectedEntry = entry.id } }.buttonStyle(.borderless)
+                        Button(entry.title) { dismiss(); model.open(.memory); Task { @MainActor in model.selectedEntry = entry.id } }.buttonStyle(.bordered)
                     }
                 }
             }
-            Picker("截图附件", selection: $showText) {
-                Text("截图").tag(false)
-                Text("OCR 文档").tag(true)
+            Picker("截图附件", selection: $previewMode) {
+                Text("截图").tag(PreviewMode.image)
+                Text("OCR").tag(PreviewMode.raw)
             }.pickerStyle(.segmented).frame(width: 220)
-            if showText {
+            if previewMode != .image {
                 textDocument
             } else {
                 CaptureThumbnail(capture: capture).frame(maxWidth: .infinity, maxHeight: .infinity).clipShape(RoundedRectangle(cornerRadius: 12))
@@ -250,12 +254,13 @@ struct CaptureDetailView: View {
                 Button(String(localized: "显示原图"), systemImage: "folder") { NSWorkspace.shared.activateFileViewerSelecting([capture.imageURL]) }
                     .disabled(!FileManager.default.fileExists(atPath: capture.imageURL.path))
                 Button("按图片重新整理") { model.enqueue(capture); dismiss() }
-                    .help("将原图交给 Agent，适合图表、布局等 OCR 无法保留的内容")
                     .disabled(!model.canStartOrganization || !FileManager.default.fileExists(atPath: capture.imageURL.path))
                     .help(model.preferences.enabledAgent.map { String(localized: "使用已启用的 \($0.name) 整理") } ?? String(localized: "请先连接并启用 Agent"))
             }
         }.padding(24).frame(minWidth: 640, idealWidth: 840, maxWidth: 1000, minHeight: 500, idealHeight: 680, maxHeight: 800)
-        .task(id: capture.imageID) { await recognizeText() }
+        .task(id: capture.imageID) {
+            await recognizeText()
+        }
     }
 
     /// Every look at the window, oldest on the left.
@@ -284,12 +289,12 @@ struct CaptureDetailView: View {
     private var textDocument: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label(String(localized: "提取的文字"), systemImage: "doc.text").font(.headline)
+                Label(String(localized: "原始 OCR"), systemImage: "doc.text").font(.headline)
                 Spacer()
-                Button(String(localized: "复制文字"), systemImage: "doc.on.doc") {
-                    guard let extractedText else { return }
+                Button(String(localized: "复制原文"), systemImage: "doc.on.doc") {
+                    guard let text = extractedText else { return }
                     NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(extractedText, forType: .string)
+                    NSPasteboard.general.setString(text, forType: .string)
                 }.disabled(extractedText?.isEmpty != false)
                 Button(String(localized: "打开文档"), systemImage: "arrow.up.right.square") { NSWorkspace.shared.open(capture.textURL) }
                     .disabled(extractedText == nil)
@@ -309,20 +314,26 @@ struct CaptureDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
-                LibraryUnavailableView(String(localized: "未识别到文字"), systemImage: "doc.text", description: Text("已为这张截图保存空白文档。"))
+                LibraryUnavailableView(String(localized: "未识别到文字"), systemImage: "doc.text", description: Text("原始 OCR 未识别到文字；请核对原图。"))
             }
-            Text("文字在本机提取，与原图一同保存和到期清理。").font(.caption).foregroundStyle(.secondary)
+            Text(String(localized: "文字在本机提取，与原图一同保存和到期清理。"))
+                .font(.caption).foregroundStyle(.secondary)
         }.padding(18).frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private func recognizeText() async {
+        let imageID = capture.imageID
         recognizing = true
         textError = nil
         extractedText = nil
-        defer { recognizing = false }
-        do { extractedText = try await model.store.recognizeImageText(id: capture.imageID) }
+        defer { if imageID == capture.imageID { recognizing = false } }
+        do {
+            let text = try await model.store.recognizeImageText(id: imageID)
+            if imageID == capture.imageID { extractedText = text }
+        }
         catch is CancellationError { return }
-        catch { textError = error.localizedDescription }
+        catch { if imageID == capture.imageID { textError = error.localizedDescription } }
     }
+
 }

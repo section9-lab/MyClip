@@ -18,9 +18,9 @@ struct TaskDetailView: View {
                         Text(task.title).font(.title2.weight(.semibold)).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
                         Text("\(task.projectTitle) · \(task.status.title)").font(.callout).foregroundStyle(.secondary)
                     }.frame(maxWidth: .infinity, alignment: .leading)
-                    Button("编辑") { editing = true }.buttonStyle(.borderless)
+                    Button("编辑") { editing = true }.buttonStyle(.bordered)
                     Button(String(localized: "关闭详情"), systemImage: "xmark") { dismiss() }
-                        .labelStyle(.iconOnly).buttonStyle(.borderless).keyboardShortcut(.cancelAction)
+                        .labelStyle(.iconOnly).buttonStyle(.bordered).keyboardShortcut(.cancelAction)
                 }.padding(24)
                 Divider()
                 ScrollView { details(task).padding(24).frame(maxWidth: .infinity, alignment: .leading) }
@@ -47,7 +47,7 @@ struct TaskDetailView: View {
                 HStack {
                     Label(String(localized: "AI 建议调整为\(suggestion.title)"), systemImage: "sparkle").foregroundStyle(.orange)
                     Button("确认\(suggestion.title)") { model.setTaskStatus(task.id, suggestion) }
-                    Button("保留当前状态") { model.setTaskStatus(task.id, task.status) }.buttonStyle(.borderless)
+                    Button("保留当前状态") { model.setTaskStatus(task.id, task.status) }.buttonStyle(.bordered)
                 }.font(.callout)
             }
             if let first = task.evidence.first {
@@ -86,14 +86,14 @@ struct TaskDetailView: View {
                     Button(memory.title, systemImage: "doc.text") {
                         dismiss()
                         model.search = ""; model.selectedEntry = id; model.page = .memory
-                    }.buttonStyle(.borderless)
+                    }.buttonStyle(.bordered)
                 } else { Text("来源 Memory 已移除，保留原依据。").font(.caption).foregroundStyle(.secondary) }
             }
             ForEach(item.sourceIDs, id: \.self) { id in
                 if let capture = sources.first(where: { $0.id == id }) {
                     Button { source = capture } label: {
                         Label("\(capture.appName) · \(capture.date.formatted(date: .abbreviated, time: .shortened))", systemImage: "photo")
-                    }.buttonStyle(.borderless)
+                    }.buttonStyle(.bordered)
                 } else { Text("来源截图记录不可用，保留原依据。").font(.caption).foregroundStyle(.secondary) }
             }
         }.padding(12).frame(maxWidth: .infinity, alignment: .leading)

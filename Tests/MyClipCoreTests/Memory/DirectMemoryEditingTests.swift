@@ -355,21 +355,22 @@ final class DirectMemoryEditingTests: XCTestCase {
         }
         let claimed = try await store.claimNextJob(immediately: true)
         let job = try XCTUnwrap(claimed)
-        let inputs = try await store.organizationInputs(jobID: job.id)
-        let prompt = MemoryPrompt.filePrompt(inputs: inputs, handoff: "previous-success-marker")
+        let sources = try await store.organizationCaptures(jobID: job.id)
+        let prompt = MemoryPrompt.filePrompt(captures: sources, handoff: "previous-success-marker")
         let lines = prompt.components(separatedBy: "\n").filter { $0.hasPrefix("记录 ") }
         XCTAssertEqual(lines.count, 4)
-        XCTAssertTrue(lines[0].contains("content=ocr"))
-        XCTAssertTrue(lines[1].contains("content=image · 图片附件 1"))
-        XCTAssertTrue(lines[2].contains("content=ocr"))
-        XCTAssertTrue(lines[3].contains("content=image · 图片附件 2"))
+        XCTAssertTrue(lines[0].contains("content=image · 图片附件 1"))
+        XCTAssertTrue(lines[1].contains("content=image · 图片附件 2"))
+        XCTAssertTrue(lines[2].contains("content=image · 图片附件 3"))
+        XCTAssertTrue(lines[3].contains("content=image · 图片附件 4"))
         for (index, capture) in captures.enumerated() {
             XCTAssertTrue(lines[index].contains(capture.id.uuidString))
             XCTAssertTrue(lines[index].contains("trigger=\(capture.reason.rawValue)"))
         }
         XCTAssertEqual(prompt.components(separatedBy: "previous-success-marker").count, 2)
         XCTAssertTrue(prompt.contains("独立的临时会话"))
-        XCTAssertFalse(prompt.contains("OCR 1"), "Keyboard OCR must not be sent in addition to its image")
+        XCTAssertFalse(prompt.contains("OCR 0"))
+        XCTAssertFalse(prompt.contains("OCR 1"))
     }
 
     func testHandoffStaysWithinFourKiBEvenWithManyLongPaths() {

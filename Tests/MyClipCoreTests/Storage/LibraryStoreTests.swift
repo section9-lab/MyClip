@@ -35,6 +35,36 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: document, encoding: .utf8), text)
     }
 
+    func testReopeningLibraryRemovesLegacyStructureFilesButKeepsScreenshotAndOCR() async throws {
+        let store = try LibraryStore(root: directory)
+        let image = try fixtureImage()
+        let context = fixtureContext()
+        try await store.record(image: image, context: context, agent: .codex, organize: false,
+                               extractedText: "保留这段 OCR")
+        let imageURL = directory.appendingPathComponent("Images/\(image.fingerprint).png")
+        let sidecars = ["ax.json", "ax.status", "vision.json"].map {
+            imageURL.deletingPathExtension().appendingPathExtension($0)
+        }
+        for url in sidecars { try Data("old structure".utf8).write(to: url) }
+
+        let reopened = try LibraryStore(root: directory)
+        XCTAssertTrue(sidecars.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
+        XCTAssertEqual(try Data(contentsOf: imageURL), image.pngData)
+        XCTAssertEqual(try String(contentsOf: imageURL.deletingPathExtension().appendingPathExtension("txt"), encoding: .utf8), "保留这段 OCR")
+        let results = try await reopened.snapshot(query: "保留")
+        XCTAssertEqual(results.captures.map(\.id), [context.id])
+    }
+
+    func testNextIdenticalCaptureRepairsAnInterruptedImageWrite() async throws {
+        let store = try LibraryStore(root: directory)
+        let image = try fixtureImage()
+        try await store.record(image: image, context: fixtureContext(), agent: .codex, organize: false)
+        let imageURL = directory.appendingPathComponent("Images/\(image.fingerprint).png")
+        try FileManager.default.removeItem(at: imageURL)
+        try await store.record(image: image, context: fixtureContext(at: 120), agent: .codex, organize: false)
+        XCTAssertEqual(try Data(contentsOf: imageURL), image.pngData)
+    }
+
     func testBackgroundIndexCreatesDocumentForRepeatedCaptures() async throws {
         let store = try LibraryStore(root: directory)
         let image = try fixtureImage()

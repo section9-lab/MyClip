@@ -4406,6 +4406,46 @@
         }
       }
     },
+    "上一步": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zurück"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atrás"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retour"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "戻る"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전"
+          }
+        }
+      }
+    },
     "上一级": {
       "localizations": {
         "de": {
@@ -4722,6 +4762,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "다음 기간"
+          }
+        }
+      }
+    },
+    "下一步": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weiter"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siguiente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suivant"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次へ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다음"
           }
         }
       }
@@ -9006,6 +9086,46 @@
         }
       }
     },
+    "原图": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "元画像"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "원본 이미지"
+          }
+        }
+      }
+    },
     "原图与识别文本一同到期清理": {
       "localizations": {
         "de": {
@@ -9046,6 +9166,86 @@
         }
       }
     },
+    "原始 OCR": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OCR-Rohtext"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raw OCR"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OCR original"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OCR brut"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "元の OCR"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "원본 OCR"
+          }
+        }
+      }
+    },
+    "原始 OCR 未识别到文字；请核对原图。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die OCR hat keinen Text erkannt. Bitte das Originalbild prüfen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raw OCR found no text. Check the original image."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El OCR no encontró texto. Revisa la imagen original."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’OCR n’a détecté aucun texte. Vérifiez l’image d’origine."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OCR で文字を認識できませんでした。元画像を確認してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OCR이 텍스트를 찾지 못했습니다. 원본 이미지를 확인하세요."
+          }
+        }
+      }
+    },
     "原始截图保留": {
       "localizations": {
         "de": {
@@ -9082,6 +9282,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "원본 스크린샷 보관"
+          }
+        }
+      }
+    },
+    "原文": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rohtext"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raw text"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Texto original"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Texte brut"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "元のテキスト"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "원본 텍스트"
           }
         }
       }
@@ -10086,42 +10326,42 @@
         }
       }
     },
-    "回车和手动截图直接用图片；鼠标事件优先用 OCR 文本，文字不可用或过长时改用原图。": {
+    "回车、鼠标和手动截图都将原图交给 Agent；OCR 文字只用于本机搜索和原文查看。": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zeilenschalter und manuelle Aufnahmen verwenden direkt das Bild; Mausereignisse bevorzugen OCR-Text und greifen auf das Originalbild zurück, wenn kein Text verfügbar oder er zu lang ist."
+            "value": "Aufnahmen per Eingabetaste, Maus oder manuell senden das Originalbild an den Agenten; OCR-Text dient nur der lokalen Suche und der Anzeige des Originaltexts."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Return-key and manual captures use the image directly. Mouse events prefer OCR text and fall back to the original image when text is unavailable or too long."
+            "value": "Return-key, mouse, and manual captures send the original image to the Agent; OCR text is used only for local search and raw-text viewing."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Con Retorno y capturas manuales se usa la imagen directamente; con eventos de ratón se prefiere el texto OCR y se recurre a la imagen original si el texto no está disponible o es demasiado largo."
+            "value": "Las capturas por Retorno, ratón o acción manual envían la imagen original al Agent; el texto OCR solo se usa para la búsqueda local y la vista de texto original."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les captures par touche Retour et manuelles utilisent directement l'image ; les événements souris privilégient le texte OCR et reviennent à l'image originale si le texte est indisponible ou trop long."
+            "value": "Les captures par Retour, souris ou action manuelle envoient l’image originale à l’Agent ; le texte OCR sert uniquement à la recherche locale et à l’affichage du texte brut."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Return キーと手動のスクリーンショットは画像をそのまま使用します。マウスイベントでは OCR テキストを優先し、テキストが使えないか長すぎる場合は元の画像を使用します。"
+            "value": "Return キー、マウス、手動のスクリーンショットはいずれも元画像を Agent に送ります。OCR テキストはローカル検索と原文表示にのみ使用します。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Return 키와 수동 스크린샷은 이미지를 직접 사용합니다. 마우스 이벤트는 OCR 텍스트를 우선 사용하고, 텍스트를 사용할 수 없거나 너무 길면 원본 이미지를 사용합니다."
+            "value": "Return 키, 마우스, 수동 스크린샷은 모두 원본 이미지를 Agent에 보냅니다. OCR 텍스트는 로컬 검색과 원문 보기에만 사용합니다."
           }
         }
       }
@@ -10482,6 +10722,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "복사"
+          }
+        }
+      }
+    },
+    "复制原文": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rohtext kopieren"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy raw text"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copiar texto original"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier le texte brut"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "元のテキストをコピー"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "원본 텍스트 복사"
           }
         }
       }
@@ -12566,42 +12846,42 @@
         }
       }
     },
-    "已提交 %lld 张图片、%lld 条文本，等待 %@ 回复…": {
+    "已提交 %lld 张图片，等待 %@ 回复…": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$lld Bilder und %2$lld Texte übermittelt, warte auf Antwort von %3$@ …"
+            "value": "%1$lld Bilder übermittelt, warte auf Antwort von %2$@ …"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sent %1$lld images and %2$lld text items, waiting for %3$@ to reply…"
+            "value": "Sent %1$lld images, waiting for %2$@ to reply…"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Se enviaron %1$lld imágenes y %2$lld textos; esperando la respuesta de %3$@…"
+            "value": "Se enviaron %1$lld imágenes; esperando la respuesta de %2$@…"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$lld images et %2$lld textes envoyés, en attente de la réponse de %3$@…"
+            "value": "%1$lld images envoyées, en attente de la réponse de %2$@…"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "画像 %1$lld 枚、テキスト %2$lld 件を送信しました。%3$@ の応答を待っています…"
+            "value": "画像 %1$lld 枚を送信しました。%2$@ の応答を待っています…"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이미지 %1$lld장, 텍스트 %2$lld개를 제출했습니다. %3$@ 응답 대기 중…"
+            "value": "이미지 %1$lld장을 제출했습니다. %2$@ 응답 대기 중…"
           }
         }
       }
@@ -14762,6 +15042,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "서류 열기"
+          }
+        }
+      }
+    },
+    "执行记录": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausführungsverlauf"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Execution History"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historial de ejecución"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historique d’exécution"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "実行履歴"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 기록"
           }
         }
       }
@@ -18246,42 +18566,42 @@
         }
       }
     },
-    "最多 8 张图片、32 条 OCR 文本，文本合计不超过 12,000 字符。": {
+    "最多 8 张截图。": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Höchstens 8 Bilder und 32 OCR-Texte, insgesamt nicht mehr als 12.000 Zeichen Text."
+            "value": "Höchstens 8 Screenshots."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Up to 8 images and 32 OCR texts, with no more than 12,000 characters of text in total."
+            "value": "Up to 8 screenshots."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Máximo 8 imágenes y 32 textos OCR, con un total de texto no superior a 12.000 caracteres."
+            "value": "Hasta 8 capturas de pantalla."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Au maximum 8 images et 32 textes OCR, pour un total de texte inférieur à 12 000 caractères."
+            "value": "Jusqu’à 8 captures d’écran."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "画像は最大 8 枚、OCR テキストは最大 32 件、テキストの合計は 12,000 文字以内です。"
+            "value": "スクリーンショットは最大 8 枚です。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "최대 이미지 8장, OCR 텍스트 32개, 텍스트 합계 12,000자 이하."
+            "value": "스크린샷은 최대 8장입니다."
           }
         }
       }
@@ -19242,6 +19562,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "이번 캡처가 완료되지 않았습니다: %@"
+          }
+        }
+      }
+    },
+    "权限与语言": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berechtigungen und Sprache"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permissions and Language"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permisos e idioma"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisations et langue"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "権限と言語"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "권한 및 언어"
           }
         }
       }
@@ -22326,6 +22686,86 @@
         }
       }
     },
+    "近纯色画面过滤（≥98%）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter near-uniform images (≥98%)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ほぼ単色の画面を除外（98%以上）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단색에 가까운 화면 필터링(98% 이상)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrar imágenes casi uniformes (≥98%)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrer les images presque unies (≥98 %)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast einfarbige Bilder filtern (≥98 %)"
+          }
+        }
+      }
+    },
+    "近纯色画面": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Near-uniform images"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ほぼ単色の画面"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단색에 가까운 화면"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imágenes casi uniformes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Images presque unies"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast einfarbige Bilder"
+          }
+        }
+      }
+    },
     "已过滤近纯色画面（背景比例 ≥98%）": {
       "localizations": {
         "en": {
@@ -22442,86 +22882,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ähnliche Bilder deduplizieren"
-          }
-        }
-      }
-    },
-    "近纯色画面": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Near-uniform images"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ほぼ単色の画面"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "단색에 가까운 화면"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Imágenes casi uniformes"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Images presque unies"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fast einfarbige Bilder"
-          }
-        }
-      }
-    },
-    "近纯色画面过滤（≥98%）": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filter near-uniform images (≥98%)"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ほぼ単色の画面を除外（98%以上）"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "단색에 가까운 화면 필터링(98% 이상)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtrar imágenes casi uniformes (≥98%)"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtrer les images presque unies (≥98 %)"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fast einfarbige Bilder filtern (≥98 %)"
           }
         }
       }
@@ -23882,6 +24242,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld번째 시도 성공"
+          }
+        }
+      }
+    },
+    "第 %lld 步，共 2 步": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schritt %lld von 2"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Step %lld of 2"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paso %lld de 2"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Étape %lld sur 2"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ステップ %lld / 2"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2단계 중 %lld단계"
           }
         }
       }
@@ -28486,6 +28886,46 @@
         }
       }
     },
+    "选择 Agent 整理工作记录，也可以稍后设置。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wähle einen Agent, der deine Arbeit organisiert. Du kannst ihn auch später einrichten."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose an Agent to organize your work, or set it up later."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige un Agent para organizar tu trabajo. También puedes configurarlo más tarde."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez un Agent pour organiser votre travail, ou configurez-le plus tard."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作業記録を整理する Agent を選択します。後で設定することもできます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "작업 기록을 정리할 Agent를 선택하세요. 나중에 설정할 수도 있습니다."
+          }
+        }
+      }
+    },
     "选择一篇记忆": {
       "localizations": {
         "de": {
@@ -28562,6 +29002,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "선택하면 연결 구성요소를 설치하고 로그인을 확인하며, 성공하면 기본 Agent로 설정합니다"
+          }
+        }
+      }
+    },
+    "选择整理 Agent": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent auswählen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose an Agent"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige un Agent"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez un Agent"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理用の Agent を選択"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "정리할 Agent 선택"
           }
         }
       }

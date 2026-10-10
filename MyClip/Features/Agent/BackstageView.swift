@@ -8,7 +8,7 @@ struct BackstageView: View {
     @State private var selectedJob: ClipJob?
     @State private var jobFilter = JobFilter.all
     @State private var usageRange = UsageRange.month
-    @State private var usageAsTable = false
+    @State private var usageExpanded = false
     /// Fixed row height so the history shows exactly five batches; older ones scroll inside the card.
     private let jobRowHeight: CGFloat = 58
     private let visibleJobRows = 5
@@ -17,9 +17,9 @@ struct BackstageView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 ForEach(model.permissions) { permission in PermissionRequestView(model: model, permission: permission) }
+                usageSection
                 agentsSection
                 jobsSection
-                usageSection
             }.padding(32).frame(maxWidth: 920).frame(maxWidth: .infinity)
         }
         .onAppear { model.refreshAgentAvailability() }
@@ -30,70 +30,94 @@ struct BackstageView: View {
 
     private var agentsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader(String(localized: "整理 Agent"), hint: String(localized: "只会有一个在工作，切换后对等待中的截图生效"))
-            BackstageCard {
-                ForEach(Array(ClipAgent.allCases.enumerated()), id: \.element) { index, agent in
-                    if index > 0 { Divider().padding(.leading, 18) }
-                    agentRow(agent)
-                }
-                cardFooter(String(localized: "Agent 以 Full 权限运行，读写文件、运行工具和访问网络都不需要逐次确认；使用各自已有的登录。"), symbol: "checkmark.shield")
+            Text("整理 Agent").font(.title3.weight(.semibold))
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 144), spacing: 8)], spacing: 8) {
+                ForEach(ClipAgent.allCases) { agent in agentCard(agent) }
+                workBuddyCard
             }
         }
     }
 
-    private func agentRow(_ agent: ClipAgent) -> some View {
+    private func agentCard(_ agent: ClipAgent) -> some View {
         let state = model.state(agent)
         let enabled = model.preferences.enabledAgent == agent
         let availability = model.localAgents[agent] ?? .missing
         let installing = model.agents.values.contains { $0.phase == .installing }
         let selecting = model.selectingDefaultAgent != nil
-        return HStack(alignment: .center, spacing: 14) {
-            Image(systemName: enabled ? "largecircle.fill.circle" : "circle")
-                .font(.system(size: 17)).foregroundStyle(enabled ? Color.accentColor : Color.secondary.opacity(0.5))
-                .accessibilityHidden(true)
-            AgentBrandIcon(agent: agent, size: 36)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(agent.name).font(.headline)
-                    if enabled { StatusChip(String(localized: "当前使用"), tone: .accent) }
-                    phaseChip(state, enabled: enabled, availability: availability)
-                }
-                Text(agentDescription(agent, state: state, enabled: enabled, availability: availability))
+        return VStack(spacing: 6) {
+            AgentBrandIcon(agent: agent, size: 28).frame(height: 28)
+            Text(agent.name).font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.85)
+            phaseChip(state, enabled: enabled, availability: availability).frame(height: 20)
+            if let description = agentDescription(agent, state: state, enabled: enabled, availability: availability) {
+                Text(description)
                     .font(.caption).foregroundStyle(state.phase == .failed ? .orange : .secondary)
                     .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
-                if !state.available, !state.authMethods.isEmpty {
-                    HStack(spacing: 8) {
-                        Text("登录方式").font(.caption).foregroundStyle(.secondary)
-                        ForEach(state.authMethods) { method in
-                            Button(method.name) { model.authenticate(agent, method: method) }.disabled(state.busy)
-                        }
-                    }.controlSize(.small)
-                }
             }
-            Spacer(minLength: 12)
-            if enabled {
-                Menu {
-                    if state.phase == .failed { Button("重试连接") { model.connect(agent) } }
-                    else { Button("重新连接") { model.connect(agent) }.disabled(state.busy) }
-                    if model.hasLoginCommand(agent) { Button("复制登录命令") { model.copyLoginCommand(for: agent) } }
-                    Divider()
-                    Button("停用", role: .destructive) { model.disableAgent() }
-                } label: { Image(systemName: "ellipsis") }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 28)
-                    .disabled(model.preview).help("重新连接、复制登录命令或停用")
-            } else if state.busy || model.selectingDefaultAgent == agent {
-                ProgressView().controlSize(.small)
-            } else {
-                Button(useLabel(state, availability: availability)) { Task { await model.selectDefaultAgent(agent) } }
-                    .controlSize(.small)
+            if !state.available, !state.authMethods.isEmpty {
+                VStack(spacing: 6) {
+                    Text("登录方式").font(.caption).foregroundStyle(.secondary)
+                    ForEach(state.authMethods) { method in
+                        Button(method.name) { model.authenticate(agent, method: method) }.disabled(state.busy)
+                    }
+                }.controlSize(.small)
+            }
+            Spacer(minLength: 2)
+            Group {
+                if enabled {
+                    Menu {
+                        if state.phase == .failed { Button("重试连接") { model.connect(agent) } }
+                        else { Button("重新连接") { model.connect(agent) }.disabled(state.busy) }
+                        if model.hasLoginCommand(agent) { Button("复制登录命令") { model.copyLoginCommand(for: agent) } }
+                        Divider()
+                        Button("停用", role: .destructive) { model.disableAgent() }
+                    } label: { Text("当前使用").foregroundStyle(Color.accentColor) }
+                        .menuStyle(.borderedButton).fixedSize()
+                        .disabled(model.preview).help("重新连接、复制登录命令或停用")
+                } else if state.busy || model.selectingDefaultAgent == agent {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button { Task { await model.selectDefaultAgent(agent) } } label: {
+                        Text(useLabel(state, availability: availability)).lineLimit(1).minimumScaleFactor(0.8)
+                    }
                     .disabled(model.preview || !availability.canSelect || installing || selecting)
                     .help(availability.canSelect ? String(localized: "把后续截图交给 \(agent.name) 整理") : String(localized: "先安装 \(agent.name) 命令行"))
+                }
+            }.controlSize(.small).frame(height: 24)
+        }
+        .multilineTextAlignment(.center)
+        .padding(10)
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 132, maxHeight: .infinity)
+        .background {
+            RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor))
+            if enabled { RoundedRectangle(cornerRadius: 12).fill(Color.accentColor.opacity(0.04)) }
+        }
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(enabled ? Color.accentColor.opacity(0.5) : Color.primary.opacity(0.1)))
+        .overlay(alignment: .topTrailing) {
+            if enabled {
+                Image(systemName: "checkmark.circle.fill").font(.system(size: 11)).foregroundStyle(Color.accentColor)
+                    .padding(7).accessibilityHidden(true)
             }
         }
-        .padding(.horizontal, 18).padding(.vertical, 14)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(agent.name)
         .accessibilityValue(state.detail)
+        .accessibilityAddTraits(enabled ? .isSelected : [])
+    }
+
+    private var workBuddyCard: some View {
+        VStack(spacing: 6) {
+            Image("WorkBuddyIcon").resizable().scaledToFit().frame(width: 28, height: 28).accessibilityHidden(true)
+            Text(verbatim: "WorkBuddy").font(.subheadline.weight(.semibold)).lineLimit(1)
+            Text(verbatim: "Coming soon").font(.caption).foregroundStyle(.secondary).frame(height: 20)
+            Spacer(minLength: 2)
+            Color.clear.frame(height: 24)
+        }
+        .foregroundStyle(.secondary)
+        .padding(10)
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 132, maxHeight: .infinity)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08)))
+        .accessibilityElement(children: .combine)
     }
 
     private func useLabel(_ state: ClipAgentState, availability: LocalAgentAvailability) -> String {
@@ -115,7 +139,7 @@ struct BackstageView: View {
         }
     }
 
-    private func agentDescription(_ agent: ClipAgent, state: ClipAgentState, enabled: Bool, availability: LocalAgentAvailability) -> String {
+    private func agentDescription(_ agent: ClipAgent, state: ClipAgentState, enabled: Bool, availability: LocalAgentAvailability) -> String? {
         if state.phase == .failed {
             if let job = model.latestFailedJob, job.agent == agent, let error = job.error { return error }
             return state.detail.hasSuffix("。") ? state.detail : state.detail + "。"
@@ -127,12 +151,7 @@ struct BackstageView: View {
         case (.missing, .codex): return String(localized: "没有找到 Codex 命令行。安装 Codex 桌面端或命令行后再来连接。")
         case (.missing, _): return String(localized: "没有找到 \(agent.cliName) 命令行。安装后再来连接。")
         case (.desktopOnly, _): return String(localized: "只检测到桌面端。整理需要 \(agent.name) 命令行。")
-        case (.commandLine, .codex): return String(localized: "会安装 ACP 连接组件，使用 Codex / ChatGPT 的现有登录。")
-        case (.commandLine, _): return String(localized: "会安装 ACP 连接组件，使用 \(agent.name) 的现有登录和网络设置。")
-        case (.connector, .codex): return String(localized: "使用 Codex / ChatGPT 的现有登录。")
-        case (.connector, .claude): return String(localized: "使用 Claude Code 命令行的现有登录和网络设置。首次使用需先在终端完成登录。")
-        case (.connector, .opencode): return String(localized: "通过 opencode acp 连接，使用 OpenCode 已登录的模型和服务商。首次使用需先运行 opencode auth login。")
-        case (.connector, .cursor): return String(localized: "通过 cursor-agent acp 连接，使用 Cursor 的现有登录。首次使用需先运行 cursor-agent login。")
+        case (.commandLine, _), (.connector, _): return nil
         }
     }
 
@@ -162,19 +181,9 @@ struct BackstageView: View {
 
     private var jobsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("整理记录").font(.title3.weight(.semibold))
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(model.organizationStatus(at: context.date)).font(.callout)
-                        .foregroundStyle(model.library.queue.pauseReason != nil ? Color.orange : .secondary)
-                }
-                Spacer()
-                queueActions
-                Picker("筛选", selection: $jobFilter) {
-                    ForEach(JobFilter.allCases) { filter in
-                        Text(filter == .open && openJobCount > 0 ? "\(filter.title) \(openJobCount)" : filter.title).tag(filter)
-                    }
-                }.pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(width: 190)
+            ViewThatFits(in: .horizontal) {
+                HStack { jobHeading; Spacer(minLength: 16); jobControls }
+                VStack(alignment: .leading, spacing: 10) { jobHeading; jobControls }
             }
             BackstageCard {
                 if let reason = model.library.queue.pauseReason {
@@ -207,8 +216,8 @@ struct BackstageView: View {
                 DisclosureGroup {
                     Grid(alignment: .topLeading, horizontalSpacing: 16, verticalSpacing: 6) {
                         GridRow { Text("顺序").foregroundStyle(.tertiary); Text("按截图时间先后整理，自动整理之间至少间隔 5 分钟。") }
-                        GridRow { Text("每批上限").foregroundStyle(.tertiary); Text("最多 8 张图片、32 条 OCR 文本，文本合计不超过 12,000 字符。") }
-                        GridRow { Text("用图还是用文字").foregroundStyle(.tertiary); Text("回车和手动截图直接用图片；鼠标事件优先用 OCR 文本，文字不可用或过长时改用原图。") }
+                        GridRow { Text("每批上限").foregroundStyle(.tertiary); Text("最多 8 张截图。") }
+                        GridRow { Text("用图还是用文字").foregroundStyle(.tertiary); Text("回车、鼠标和手动截图都将原图交给 Agent；OCR 文字只用于本机搜索和原文查看。") }
                         GridRow { Text("超时与重试").foregroundStyle(.tertiary); Text("连续 \(ACPClient.promptIdleSeconds / 60) 分钟没有新进度就停止等待，单批最长 \(ACPClient.promptMaximumSeconds / 60) 分钟。超时、断线等临时故障会自动重试，最多 \(RetryPolicy.maxAttempts) 次，间隔从 1 分钟逐步拉长到 1 小时；之后停下等你处理。") }
                         GridRow { Text("做梦").foregroundStyle(.tertiary); Text("每天一次回头整理已有记忆：归位、合并、清理过期状态、补别名，并轮流巡检旧页面。凌晨 \(MemoryDream.dayStartHour) 点后、队列空闲且 \(Int(MemoryDream.idleInterval / 60)) 分钟没有新截图时自动开始，也可以点“整理记忆”手动开始。失败不会暂停队列，第二天会再做。") }
                     }.font(.caption).foregroundStyle(.secondary).padding(.top, 8).fixedSize(horizontal: false, vertical: true)
@@ -217,6 +226,27 @@ struct BackstageView: View {
                 }.padding(.horizontal, 18).padding(.vertical, 10)
             }
         }
+    }
+
+    private var jobHeading: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("执行记录").font(.title3.weight(.semibold)).fixedSize()
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Text(model.organizationStatus(at: context.date)).font(.callout).lineLimit(1)
+                    .foregroundStyle(model.library.queue.pauseReason != nil ? Color.orange : .secondary)
+            }
+        }
+    }
+
+    private var jobControls: some View {
+        HStack(spacing: 10) {
+            queueActions
+            Picker("筛选", selection: $jobFilter) {
+                ForEach(JobFilter.allCases) { filter in
+                    Text(filter == .open && openJobCount > 0 ? "\(filter.title) \(openJobCount)" : filter.title).tag(filter)
+                }
+            }.pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(width: 190)
+        }.fixedSize()
     }
 
     /// What the dream button does, since “dream” alone does not say it.
@@ -243,7 +273,7 @@ struct BackstageView: View {
             Button("立即整理", action: model.organizeNow).controlSize(.small).disabled(!model.canOrganizeNow)
                 .help("不等间隔，马上整理下一批")
             Button(String(localized: "暂停"), systemImage: "pause.fill") { model.processingPaused = true }
-                .buttonStyle(.borderless).controlSize(.small).disabled(model.preview || model.preferences.enabledAgent == nil)
+                .buttonStyle(.bordered).controlSize(.small).disabled(model.preview || model.preferences.enabledAgent == nil)
                 .help("停止分配新批次，当前批次会先完成")
         }
     }
@@ -271,7 +301,7 @@ struct BackstageView: View {
                 Button(String(localized: "重试"), systemImage: "arrow.clockwise") { model.retry(job) }.controlSize(.small).disabled(!model.canRetry(job))
                     .help(model.canRetry(job) ? (job.kind == .dream ? String(localized: "重新做梦") : String(localized: "重新整理这批素材")) : String(localized: "请先选择并连接 \(job.agent.name)，重试会继续使用原 Agent"))
             } else if job.state == .running || job.state == .queued {
-                Button("取消") { model.cancel(job) }.buttonStyle(.borderless).controlSize(.small)
+                Button("取消") { model.cancel(job) }.buttonStyle(.bordered).controlSize(.small)
             }
         }
         .padding(.horizontal, 18).frame(height: jobRowHeight)
@@ -340,35 +370,22 @@ struct BackstageView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text("Token 用量").font(.title3.weight(.semibold))
-                Text("只统计 Agent 回传的部分").font(.callout).foregroundStyle(.secondary)
+                    .help("只统计 Agent 回传的部分")
                 Spacer()
                 Picker("范围", selection: $usageRange) {
                     ForEach(UsageRange.allCases) { Text($0.title).tag($0) }
                 }.pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(width: 170)
-                Toggle(usageAsTable ? String(localized: "图表") : String(localized: "表格"), isOn: $usageAsTable).toggleStyle(.button).controlSize(.small)
+                Button {
+                    usageExpanded.toggle()
+                } label: {
+                    Label(usageExpanded ? String(localized: "收起") : String(localized: "展开"),
+                          systemImage: usageExpanded ? "chevron.up" : "chevron.down")
+                }.buttonStyle(.bordered).controlSize(.small)
             }
-            BackstageCard { UsageDashboard(statistics: model.tokenUsage, days: usageRange.days, asTable: usageAsTable) }
+            BackstageCard { UsageDashboard(statistics: model.tokenUsage, days: usageRange.days, expanded: usageExpanded) }
         }
     }
 
-    // MARK: - Pieces
-
-    private func sectionHeader(_ title: String, hint: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(title).font(.title3.weight(.semibold))
-            Text(hint).font(.callout).foregroundStyle(.secondary)
-        }
-    }
-
-    private func cardFooter<Trailing: View>(_ text: String, symbol: String, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: symbol).foregroundStyle(.secondary)
-            Text(text).fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            trailing()
-        }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 18).padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading).background(.quaternary.opacity(0.25))
-    }
 }
 
 /// White-on-grey grouped surface with a hairline; sections stack their rows inside.
@@ -458,7 +475,8 @@ func jobLabel(_ state: ClipJobState) -> String {
 private struct UsageDashboard: View {
     let statistics: TokenUsageStatistics
     let days: Int?
-    let asTable: Bool
+    let expanded: Bool
+    @State private var asTable = false
 
     private var calendar: Calendar { .current }
     private var summary: TokenUsageSummary { statistics.summary(days: days) }
@@ -479,21 +497,31 @@ private struct UsageDashboard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             tiles
-            Divider()
-            if summary.calls == 0 {
-                Text(days == nil ? String(localized: "还没有回传过用量。任务结束后会在这里汇总。") : String(localized: "这段时间没有整理任务。"))
-                    .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 36)
-            } else if asTable {
-                table
-            } else {
-                chart.padding(.horizontal, 18).padding(.vertical, 14)
+            if expanded {
                 Divider()
-                composition.padding(.horizontal, 18).padding(.vertical, 14)
+                HStack {
+                    Text("只统计 Agent 回传的部分").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("Token 用量", selection: $asTable) {
+                        Text("图表").tag(false)
+                        Text("表格").tag(true)
+                    }.pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(width: 110)
+                }.padding(.horizontal, 14).padding(.vertical, 10)
+                if summary.calls == 0 {
+                    Text(days == nil ? String(localized: "还没有回传过用量。任务结束后会在这里汇总。") : String(localized: "这段时间没有整理任务。"))
+                        .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 24)
+                } else if asTable {
+                    table
+                } else {
+                    chart.padding(.horizontal, 14).padding(.bottom, 12)
+                    Divider()
+                    composition.padding(.horizontal, 14).padding(.vertical, 12)
+                }
+                Divider()
+                Text("含截图整理、任务识别和重试。旧任务和没有回传用量的请求不计入；缓存明细为已回传部分。")
+                    .font(.caption).foregroundStyle(.tertiary).padding(.horizontal, 14).padding(.vertical, 10)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Divider()
-            Text("含截图整理、任务识别和重试。旧任务和没有回传用量的请求不计入；缓存明细为已回传部分。")
-                .font(.caption).foregroundStyle(.tertiary).padding(.horizontal, 18).padding(.vertical, 10)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -515,10 +543,11 @@ private struct UsageDashboard: View {
 
     private func tile(_ label: String, value: String, detail: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.system(size: 22, weight: .semibold)).monospacedDigit().tracking(-0.3)
-            Text(detail).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
-        }.padding(.horizontal, 18).padding(.vertical, 14).frame(maxWidth: .infinity, alignment: .leading)
+            Text(label).font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.85)
+            Text(value).font(.system(size: 20, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.8)
+            if expanded { Text(detail).font(.caption).foregroundStyle(.tertiary).lineLimit(1) }
+        }.padding(.horizontal, 14).padding(.vertical, 12).frame(maxWidth: .infinity, alignment: .leading)
+            .help(detail).accessibilityElement(children: .combine).accessibilityHint(detail)
     }
 
     private struct Bar: Identifiable {
@@ -538,14 +567,15 @@ private struct UsageDashboard: View {
 
     private var chart: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 16) {
-                Text(weekly ? String(localized: "每周用量，按 Agent") : String(localized: "每天用量，按 Agent")).font(.caption).foregroundStyle(.secondary)
+            Text(weekly ? String(localized: "每周用量，按 Agent") : String(localized: "每天用量，按 Agent")).font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 8) {
                 ForEach(ClipAgent.allCases) { agent in
-                    HStack(spacing: 6) {
+                    HStack(spacing: 4) {
                         RoundedRectangle(cornerRadius: 2).fill(UsageDashboard.color(for: agent)).frame(width: 10, height: 10)
                         Text(agent.name)
                         Text(compact(agentTotal(agent))).monospacedDigit().foregroundStyle(.primary)
                     }.font(.caption).foregroundStyle(.secondary)
+                        .lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             Chart(bars) { bar in
@@ -568,7 +598,7 @@ private struct UsageDashboard: View {
                     AxisValueLabel(format: .dateTime.month(.defaultDigits).day(), centered: true).font(.caption2)
                 }
             }
-            .frame(height: 170)
+            .frame(height: 130)
             .accessibilityLabel("按\(weekly ? String(localized: "周") : String(localized: "天"))的 Token 用量柱状图")
         }
     }
@@ -619,7 +649,7 @@ private struct UsageDashboard: View {
     }
 
     private var table: some View {
-        ScrollView {
+        ScrollView([.horizontal, .vertical]) {
             Grid(alignment: .trailing, horizontalSpacing: 18, verticalSpacing: 6) {
                 GridRow {
                     Text("日期").gridColumnAlignment(.leading)
@@ -636,7 +666,7 @@ private struct UsageDashboard: View {
                     }.font(.caption).monospacedDigit()
                 }
             }.padding(.horizontal, 18).padding(.vertical, 12)
-        }.frame(maxHeight: 320)
+        }.frame(maxHeight: 240)
     }
 
     static func color(for agent: ClipAgent) -> Color {

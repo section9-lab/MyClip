@@ -2,8 +2,6 @@ import Foundation
 
 public struct OrganizationQueue: Sendable {
     public static let batchSize = 8
-    public static let textBatchSize = 32
-    public static let textCharacterLimit = 12_000
     public static let interval: TimeInterval = 300
     public var pendingCounts: [ClipAgent: Int] = [:]
     public var pendingCount: Int { pendingCounts.values.reduce(0, +) }
@@ -100,25 +98,9 @@ extension LibraryStore {
                 if case .job(let queuedID) = head.item {
                     id = queuedID
                 } else {
-                    let candidates = try captures(ids: pendingInputIDs(agent: agent)).map(organizationInput)
-                    var inputs: [OrganizationInput] = []
-                    var images = 0, texts = 0, characters = 0
-                    for input in candidates {
-                        if let text = input.text {
-                            guard texts < OrganizationQueue.textBatchSize,
-                                  characters + text.count <= OrganizationQueue.textCharacterLimit else { break }
-                            texts += 1
-                            characters += text.count
-                        } else {
-                            guard images < OrganizationQueue.batchSize else { break }
-                            images += 1
-                        }
-                        inputs.append(input)
-                    }
-                    let sources = inputs.map { $0.capture.id }
+                    let sources = try pendingInputIDs(agent: agent)
                     guard !sources.isEmpty else { return nil }
                     let jobID = try insertJob(sourceIDs: sources, agent: agent, date: date)
-                    try freezeOrganizationInputs(inputs, jobID: jobID)
                     id = jobID.uuidString
                     for source in sources { try database.run("DELETE FROM pending_captures WHERE capture_id=? AND agent=?", [source.uuidString, agent.rawValue]) }
                 }
@@ -131,19 +113,9 @@ extension LibraryStore {
         }
     }
 
-    public func prepareOrganizationText(at date: Date = Date()) async throws {
-        guard let head = try queueHead(at: date), head.item == .captures else { return }
-        for capture in try captures(ids: pendingInputIDs(agent: head.agent)) where capture.reason.prefersText {
-            try Task.checkCancellation()
-            do { _ = try await recognizeImageText(id: capture.imageID) }
-            catch is CancellationError { throw CancellationError() }
-            catch { continue } // Recognition failures use the original image when the job is claimed.
-        }
-    }
-
     private func pendingInputIDs(agent: ClipAgent) throws -> [UUID] {
         try database.run("SELECT capture_id FROM pending_captures WHERE agent=? ORDER BY queued_at,rowid LIMIT ?",
-            [agent.rawValue, String(OrganizationQueue.batchSize + OrganizationQueue.textBatchSize)])
+            [agent.rawValue, String(OrganizationQueue.batchSize)])
             .compactMap { $0["capture_id"].flatMap(UUID.init(uuidString:)) }
     }
 

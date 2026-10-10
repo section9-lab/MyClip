@@ -19,7 +19,19 @@ extension LibraryStore {
     public func record(image: CapturedImage, context: CaptureContext, agent: ClipAgent, organize: Bool, extractedText: String? = nil,
                        filterStrategies: Set<CaptureFilterStrategy> = CaptureFilterStrategy.defaults) throws {
         let decision = try database.transaction { () -> RecordingDecision in
-            let decision = try recordingDecision(for: image, context: context, filterStrategies: filterStrategies)
+            var decision = try recordingDecision(for: image, context: context, filterStrategies: filterStrategies)
+            if decision.reusedImage {
+                let reusedURL = root.appendingPathComponent("Images/\(decision.imageID).png")
+                if !FileManager.default.fileExists(atPath: reusedURL.path) {
+                    if decision.imageID == image.fingerprint {
+                        try image.pngData.write(to: reusedURL, options: .atomic)
+                    } else {
+                        decision.imageID = image.fingerprint
+                        decision.reusedImage = false
+                        decision.verdict = nil
+                    }
+                }
+            }
             if !decision.reusedImage {
                 try database.run("INSERT INTO images(id,width,height,block_hash) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET available=1,block_hash=coalesce(images.block_hash,excluded.block_hash)",
                                  [image.fingerprint, String(image.width), String(image.height), image.blockHash?.hex])
@@ -39,8 +51,8 @@ extension LibraryStore {
             }
             return decision
         }
-        guard !decision.reusedImage else { return }
-        let imageURL = root.appendingPathComponent("Images/\(image.fingerprint).png")
+        let imageURL = root.appendingPathComponent("Images/\(decision.imageID).png")
+        if decision.reusedImage { return }
         if !FileManager.default.fileExists(atPath: imageURL.path) {
             try image.pngData.write(to: imageURL, options: .atomic)
         }
@@ -145,6 +157,12 @@ extension LibraryStore {
             if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
             let documentURL = url.deletingPathExtension().appendingPathExtension("txt")
             if FileManager.default.fileExists(atPath: documentURL.path) { try FileManager.default.removeItem(at: documentURL) }
+            let snapshotURL = url.deletingPathExtension().appendingPathExtension("ax.json")
+            if FileManager.default.fileExists(atPath: snapshotURL.path) { try FileManager.default.removeItem(at: snapshotURL) }
+            let statusURL = url.deletingPathExtension().appendingPathExtension("ax.status")
+            if FileManager.default.fileExists(atPath: statusURL.path) { try FileManager.default.removeItem(at: statusURL) }
+            let linesURL = url.deletingPathExtension().appendingPathExtension("vision.json")
+            if FileManager.default.fileExists(atPath: linesURL.path) { try FileManager.default.removeItem(at: linesURL) }
             try database.transaction {
                 try database.run("UPDATE images SET available=0 WHERE id=?", [id])
                 try database.run("DELETE FROM image_text WHERE image_id=?", [id])

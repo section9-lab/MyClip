@@ -155,7 +155,8 @@ struct AgentActivationTests {
         check(execution.first?.sessionID == firstClaudePrompt?["sessionId"] as? String, "Execution history retains the exact Agent session")
         check(model.state(.claude).sessionID == nil, "Completed batches release their temporary session")
         let firstBlocks = firstClaudePrompt?["prompt"] as? [[String: Any]] ?? []
-        check(firstBlocks.allSatisfy { $0["type"] as? String == "text" }, "Mouse captures send OCR without image attachments")
+        check(firstBlocks.filter { $0["type"] as? String == "image" }.count == 1,
+              "Mouse captures send the original screenshot")
 
         model.organizeNow()
         try await waitUntil { (try? requests(.codex, method: "session/prompt").count) == 1 }

@@ -45,12 +45,14 @@ struct TaskDashboardView: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                HStack(spacing: 28) {
-                    viewTab("Kanban", reports: false)
-                    viewTab("Reports", reports: true)
+                HStack {
+                    Picker("Kanban", selection: $model.showingTaskReports) {
+                        Text(verbatim: "Kanban").tag(false)
+                        Text(verbatim: "Reports").tag(true)
+                    }.pickerStyle(.segmented).labelsHidden().frame(width: 220)
                     Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 24).frame(maxWidth: 1200).frame(maxWidth: .infinity)
+                .padding(.horizontal, 24).padding(.vertical, 10).frame(maxWidth: 1200).frame(maxWidth: .infinity)
                 .background(alignment: .bottom) { Divider() }
                 if model.showingTaskReports {
                     TaskReportsView(model: model) { selectedID = $0 }
@@ -97,18 +99,6 @@ struct TaskDashboardView: View {
             if !candidateTasks.isEmpty {
                 candidates
             }
-            if let review = model.lastTaskReview {
-                HStack(spacing: 8) {
-                    Label(review.status == .ignored ? String(localized: "已忽略建议") : String(localized: "已加入「\(review.status.title)」"), systemImage: "checkmark")
-                    Text(review.title).lineLimit(1).foregroundStyle(.secondary).help(review.title)
-                    Spacer(minLength: 8)
-                    Button("撤销") { model.undoTaskReview() }
-                        .disabled(model.updatingTaskIDs.contains(review.taskID))
-                    Button(String(localized: "关闭确认提示"), systemImage: "xmark") { model.lastTaskReview = nil }.labelStyle(.iconOnly)
-                }
-                .font(.caption).buttonStyle(.borderless)
-                .padding(10).background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 7))
-            }
             if width >= 680 {
                 HStack(alignment: .top, spacing: 12) { ForEach(columns, id: \.self) { column($0) } }
             } else {
@@ -121,24 +111,12 @@ struct TaskDashboardView: View {
                         HStack {
                             Button(task.title) { selectedID = task.id }.buttonStyle(.plain)
                             Spacer()
-                            Button("恢复到待确认") { model.setTaskStatus(task.id, .candidate) }.buttonStyle(.borderless)
+                            Button("恢复到待确认") { model.setTaskStatus(task.id, .candidate) }.buttonStyle(.bordered)
                         }.padding(.vertical, 6)
                     }
                 }.font(.callout).foregroundStyle(.secondary)
             }
         }
-    }
-
-    private func viewTab(_ title: String, reports: Bool) -> some View {
-        let selected = model.showingTaskReports == reports
-        return Button { model.showingTaskReports = reports } label: {
-            Text(title).font(.system(size: 15, weight: .medium))
-                .foregroundStyle(selected ? Color.accentColor : .secondary)
-                .frame(height: 40).contentShape(Rectangle())
-                .overlay(alignment: .bottom) {
-                    Rectangle().fill(selected ? Color.accentColor : .clear).frame(height: 2)
-                }
-        }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var taskCount: some View {
@@ -170,12 +148,12 @@ struct TaskDashboardView: View {
                 Text(model.taskDiscoveryFailed ? (model.taskDiscoveryMemorySaved ? String(localized: "任务识别未完成，Memory 已保存") : String(localized: "任务识别未完成")) : message)
                     .foregroundStyle(.secondary)
                 if model.taskDiscoveryFailed {
-                    Button(showingDiscoveryDetails ? String(localized: "收起原因") : String(localized: "查看原因")) { showingDiscoveryDetails.toggle() }.buttonStyle(.borderless)
+                    Button(showingDiscoveryDetails ? String(localized: "收起原因") : String(localized: "查看原因")) { showingDiscoveryDetails.toggle() }.buttonStyle(.bordered)
                 }
                 Spacer(minLength: 0)
                 if !model.discoveringTasks {
                     Button(String(localized: "关闭提示"), systemImage: "xmark") { model.taskDiscoveryMessage = nil }
-                        .labelStyle(.iconOnly).buttonStyle(.borderless).foregroundStyle(.secondary)
+                        .labelStyle(.iconOnly).buttonStyle(.bordered).foregroundStyle(.secondary)
                 }
             }
             if showingDiscoveryDetails {
@@ -202,12 +180,25 @@ struct TaskDashboardView: View {
                 }.buttonStyle(.plain).accessibilityLabel(showingCandidates ? String(localized: "收起待确认任务") : String(localized: "展开待确认任务"))
                 Text("AI 从近期活动中发现").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
+                if showingCandidates && candidateTasks.count > 3 {
+                    HStack(spacing: 8) {
+                        Text("\(start + 1)–\(start + visible.count) / \(candidateTasks.count)").monospacedDigit()
+                        Button(String(localized: "上一页待确认任务"), systemImage: "chevron.left") {
+                            candidatePage = visibleCandidatePage - 1; expandedCandidateID = nil
+                        }.labelStyle(.iconOnly).disabled(visibleCandidatePage == 0)
+                        Button(String(localized: "下一页待确认任务"), systemImage: "chevron.right") {
+                            candidatePage = visibleCandidatePage + 1; expandedCandidateID = nil
+                        }.labelStyle(.iconOnly).disabled(visibleCandidatePage == lastCandidatePage)
+                    }
+                    .font(.caption).foregroundStyle(.secondary).buttonStyle(.bordered).controlSize(.small)
+                    .fixedSize().padding(.trailing, 8)
+                }
                 Button { showingCandidates.toggle() } label: {
                     HStack(spacing: 4) {
                         Text(showingCandidates ? String(localized: "收起") : String(localized: "展开"))
                         Image(systemName: showingCandidates ? "chevron.up" : "chevron.down")
                     }.font(.caption).foregroundStyle(.secondary)
-                }.buttonStyle(.plain)
+                }.buttonStyle(.bordered).controlSize(.small)
             }.padding(.horizontal, 16).padding(.vertical, 13)
             if showingCandidates {
                 Divider()
@@ -217,22 +208,6 @@ struct TaskDashboardView: View {
                         if task.id != visible.last?.id { Divider() }
                     }
                 }.padding(.horizontal, 16)
-                Divider()
-                HStack(spacing: 8) {
-                    Label(String(localized: "确认后，加入建议的看板列"), systemImage: "sparkles").lineLimit(1)
-                    Spacer(minLength: 8)
-                    Text("\(start + 1)–\(start + visible.count) / \(candidateTasks.count)").monospacedDigit()
-                    if candidateTasks.count > 3 {
-                        Button(String(localized: "上一页待确认任务"), systemImage: "chevron.left") {
-                            candidatePage = visibleCandidatePage - 1; expandedCandidateID = nil
-                        }.labelStyle(.iconOnly).disabled(visibleCandidatePage == 0)
-                        Button(String(localized: "下一页待确认任务"), systemImage: "chevron.right") {
-                            candidatePage = visibleCandidatePage + 1; expandedCandidateID = nil
-                        }.labelStyle(.iconOnly).disabled(visibleCandidatePage == lastCandidatePage)
-                    }
-                }
-                .font(.caption).foregroundStyle(.secondary).buttonStyle(.borderless).controlSize(.small)
-                .padding(.horizontal, 16).padding(.vertical, 9).background(.quaternary.opacity(0.15))
             }
         }
         .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
@@ -298,12 +273,12 @@ struct TaskDashboardView: View {
                 .buttonStyle(.bordered).controlSize(.small)
                 .accessibilityLabel("确认\(task.title)，加入\(status.title)")
             Button(String(localized: "忽略\(task.title)"), systemImage: "xmark") { model.reviewTask(task.id, .ignored) }
-                .labelStyle(.iconOnly).buttonStyle(.borderless).foregroundStyle(.secondary).help("忽略这条建议")
+                .labelStyle(.iconOnly).buttonStyle(.bordered).foregroundStyle(.secondary).help("忽略这条建议")
         }.fixedSize(horizontal: true, vertical: false)
     }
 
     private func candidateDetailButton(_ task: WorkTask) -> some View {
-        Button("查看来源与详情") { selectedID = task.id }.buttonStyle(.borderless).font(.caption)
+        Button("查看来源与详情") { selectedID = task.id }.buttonStyle(.bordered).font(.caption)
     }
 
     private func candidateStatusPicker(_ task: WorkTask) -> some View {
