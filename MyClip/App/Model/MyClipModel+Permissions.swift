@@ -19,11 +19,19 @@ extension MyClipModel {
         }
     }
 
-    func requestScreenPermission() { captureService.requestScreenPermission(); refreshPermissions() }
-    func requestAccessibilityPermission() { captureService.requestAccessibilityPermission(); refreshPermissions() }
+    func requestScreenPermission() {
+        if screenPermission { PermissionCoordinator.openScreenCaptureSettings() }
+        else { captureService.requestScreenPermission(); refreshPermissions() }
+    }
+
+    func requestAccessibilityPermission() {
+        if accessibilityPermission { PermissionCoordinator.openAccessibilitySettings() }
+        else { captureService.requestAccessibilityPermission(); refreshPermissions() }
+    }
 
     func requestFolderPermission() {
         guard !preview else { return }
+        if folderPermission { PermissionCoordinator.openFilesAndFoldersSettings(); return }
         PermissionCoordinator.markFolderAccessRequested()
         let manager = FileManager.default
         let home = manager.homeDirectoryForCurrentUser

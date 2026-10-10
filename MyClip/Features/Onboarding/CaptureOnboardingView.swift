@@ -207,9 +207,8 @@ struct CaptureOnboardingView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            // A permission is only ever revoked in System Settings, so the switch acts on the way in and springs
-            // back on the way out.
-            Toggle(title, isOn: Binding(get: { allowed }, set: { wanted in if wanted && !allowed { action() } }))
+            // The switch reflects the OS permission; either tap opens the relevant authorization flow.
+            Toggle(title, isOn: Binding(get: { allowed }, set: { _ in action() }))
                 .labelsHidden().toggleStyle(.switch).controlSize(.small)
                 .accessibilityLabel(allowed ? String(localized: "\(title)已授权") : String(localized: "允许\(title)"))
         }.padding(.vertical, 18)

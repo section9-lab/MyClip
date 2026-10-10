@@ -45,7 +45,9 @@ final class FocusedCaptureService {
 
     func requestAccessibilityPermission() {
         let key = "AXTrustedCheckOptionPrompt"
-        _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
+        if !AXIsProcessTrustedWithOptions([key: true] as CFDictionary) {
+            PermissionCoordinator.openAccessibilitySettings()
+        }
     }
 
     func start() -> Bool {
