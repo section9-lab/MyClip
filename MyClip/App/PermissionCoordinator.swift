@@ -61,14 +61,12 @@ enum PermissionCoordinator {
 
     @MainActor
     static func openScreenCaptureSettings() {
-        let urls = [
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenRecording"
-        ].compactMap(URL.init(string:))
+        openPrivacySettings("Privacy_ScreenCapture")
+    }
 
-        for url in urls where NSWorkspace.shared.open(url) {
-            return
-        }
+    @MainActor
+    static func openAccessibilitySettings() {
+        openPrivacySettings("Privacy_Accessibility")
     }
 
     private static let folderAccessRequestedKey = "folderAccessRequested"
@@ -91,13 +89,12 @@ enum PermissionCoordinator {
 
     @MainActor
     static func openFilesAndFoldersSettings() {
-        let urls = [
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_DesktopFolder",
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_DocumentsFolder"
-        ].compactMap(URL.init(string:))
+        openPrivacySettings("Privacy_FilesAndFolders")
+    }
 
-        for url in urls where NSWorkspace.shared.open(url) {
-            return
-        }
+    @MainActor
+    private static func openPrivacySettings(_ pane: String) {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?\(pane)") else { return }
+        NSWorkspace.shared.open(url)
     }
 }
