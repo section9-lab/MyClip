@@ -19,14 +19,33 @@ struct AgentRuntime {
     let root: URL
     var searchPaths: [String]? = nil
     var desktopApplications: [ClipAgent: URL]? = nil
+    var homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+    var inheritedEnvironment: [String: String] = ProcessInfo.processInfo.environment
 
     var binDirectory: URL { root.appendingPathComponent("node_modules/.bin") }
 
     var environment: [String: String] {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let paths = [binDirectory.path] + (searchPaths ?? ["\(home)/.local/bin", "\(home)/.opencode/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"])
+        var seen = Set<String>()
+        let paths = ([binDirectory.path] + (searchPaths ?? defaultSearchPaths))
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
         // The session's library must take precedence over a globally registered myclip server.
         return ["PATH": paths.joined(separator: ":"), "INITIAL_AGENT_MODE": "agent-full-access", "DISABLE_MCP_CONFIG_FILTERING": "true"]
+    }
+
+    private var defaultSearchPaths: [String] {
+        let home = homeDirectory.path
+        let inheritedPaths = (inheritedEnvironment["PATH"] ?? "").split(separator: ":").map(String.init)
+        let userPaths = ["\(home)/.local/bin", "\(home)/.opencode/bin"]
+        let systemPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+        let nvmDirectory = inheritedEnvironment["NVM_DIR"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) }
+            ?? homeDirectory.appendingPathComponent(".nvm")
+        // Finder launches do not inherit nvm's shell PATH. Scan its installed versions without running shell startup scripts.
+        let versions = (try? FileManager.default.contentsOfDirectory(at: nvmDirectory.appendingPathComponent("versions/node"),
+            includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
+        let nvmPaths = versions.filter { $0.lastPathComponent.hasPrefix("v") }
+            .sorted { $0.lastPathComponent.compare($1.lastPathComponent, options: .numeric) == .orderedDescending }
+            .map { $0.appendingPathComponent("bin").path }
+        return inheritedPaths + userPaths + nvmPaths + systemPaths
     }
 
     private func desktopApplication(for agent: ClipAgent) -> URL? {

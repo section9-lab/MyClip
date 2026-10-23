@@ -54,6 +54,60 @@ struct AgentActivationTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: claudeCLI.path)
         check(discovery.availability(of: .claude, customPath: "") == .commandLine, "Discovery finds locally installed Claude Code")
         check(discovery.availability(of: .claude, customPath: discoveryRoot.appendingPathComponent("missing-adapter").path) == .missing, "An invalid custom adapter is not silently replaced by another installation")
+        let nvmHome = discoveryRoot.appendingPathComponent("Home")
+        let nvmRoot = nvmHome.appendingPathComponent(".nvm")
+        let nvmBin = nvmRoot.appendingPathComponent("versions/node/v24.22.1/bin")
+        func writeExecutable(_ url: URL, contents: String) throws {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try contents.write(to: url, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
+        }
+        // Model a Finder launch: the inherited PATH has no Node version manager entries.
+        let guiDiscovery = AgentRuntime(root: discoveryRoot, desktopApplications: [:], homeDirectory: nvmHome,
+            inheritedEnvironment: ["PATH": "/usr/bin:/bin"])
+        for version in ["v9.11.2", "v22.9.0", "v24.22.1"] {
+            let executable = nvmRoot.appendingPathComponent("versions/node/\(version)/bin/opencode")
+            try writeExecutable(executable, contents: "#!/usr/bin/env node\n")
+        }
+        try writeExecutable(nvmBin.appendingPathComponent("node"), contents: "#!/bin/sh\nprintf 'nvm-node-found'\n")
+        check(guiDiscovery.availability(of: .opencode, customPath: "") == .connector, "Finder discovery finds OpenCode installed through nvm")
+        let nvmCommand = guiDiscovery.command(for: .opencode, customPath: "")
+        check(nvmCommand?.executable.resolvingSymlinksInPath() == nvmBin.appendingPathComponent("opencode").resolvingSymlinksInPath(),
+              "nvm fallback prefers the newest installed version numerically")
+        check(nvmCommand?.arguments == ["acp"], "Discovered OpenCode keeps its ACP arguments")
+        check(guiDiscovery.sessionCommand(for: .opencode, customPath: "")?.executable == nvmCommand?.executable,
+              "Session commands use the same nvm installation as discovery")
+        if let nvmCommand {
+            let process = Process()
+            let output = Pipe()
+            process.executableURL = nvmCommand.executable
+            process.environment = nvmCommand.environment
+            process.standardOutput = output
+            try process.run()
+            let contents = output.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            check(process.terminationStatus == 0 && String(decoding: contents, as: UTF8.self) == "nvm-node-found",
+                  "A discovered npm CLI can resolve Node when launched with the Agent environment")
+        }
+        var inheritedDiscovery = guiDiscovery
+        let selectedBin = nvmRoot.appendingPathComponent("versions/node/v22.9.0/bin").path
+        inheritedDiscovery.inheritedEnvironment["PATH"] = selectedBin + ":/usr/bin:/bin:" + selectedBin
+        check(inheritedDiscovery.command(for: .opencode, customPath: "")?.executable.path == selectedBin + "/opencode",
+              "An inherited PATH preserves the shell's selected Node version")
+        let inheritedPaths = (inheritedDiscovery.environment["PATH"] ?? "").split(separator: ":")
+        check(inheritedPaths.count == Set(inheritedPaths).count, "Agent PATH does not repeat inherited or discovered directories")
+        var customNvmDiscovery = guiDiscovery
+        let customNvm = discoveryRoot.appendingPathComponent("CustomNVM")
+        let customOpenCode = customNvm.appendingPathComponent("versions/node/v24.22.1/bin/opencode")
+        try writeExecutable(customOpenCode, contents: "#!/bin/sh\nexit 0\n")
+        customNvmDiscovery.inheritedEnvironment["NVM_DIR"] = customNvm.path
+        check(customNvmDiscovery.command(for: .opencode, customPath: "")?.executable.resolvingSymlinksInPath() == customOpenCode.resolvingSymlinksInPath(),
+              "Discovery respects a custom NVM_DIR")
+        customNvmDiscovery.searchPaths = []
+        check(customNvmDiscovery.command(for: .opencode, customPath: "") == nil,
+              "Explicit search paths remain isolated from inherited PATH and nvm")
+        check(guiDiscovery.command(for: .opencode, customPath: discoveryRoot.appendingPathComponent("missing-opencode").path) == nil,
+              "An invalid custom OpenCode path is not replaced by an nvm installation")
         let fixture = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent("Tests/MyClipCoreTests/Fixtures/acp_agent.py")
         func shellQuote(_ text: String) -> String { "'" + text.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
