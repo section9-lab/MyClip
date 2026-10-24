@@ -132,6 +132,8 @@ final class AgentCharacterView: NSView {
 enum AgentCharacterDrawing {
     private static let blossom = mask(named: "OpenAIBlossom")
     private static let cursorMark = mask(named: "CursorIcon")
+    private static let workbuddyMark = mask(named: "WorkBuddyIcon")
+    private static let qwenworkMark = mask(named: "QwenWorkIcon")
 
     /// Rasterises a vector asset at a fixed resolution so the mask stays sharp regardless of the SVG's declared size.
     private static func mask(named name: String, pixels: Int = 256) -> CGImage? {
@@ -162,6 +164,7 @@ enum AgentCharacterDrawing {
         case .opencode: body = NSColor.labelColor
         case .cursor: body = NSColor.labelColor
         case .codex: body = NSColor.labelColor
+        case .workbuddy, .qwenwork: body = NSColor.labelColor
         }
         func fill(_ rect: CGRect, _ color: NSColor, radius: CGFloat = 0) {
             c.setFillColor(color.cgColor)
@@ -179,6 +182,18 @@ enum AgentCharacterDrawing {
         c.rotate(by: moving ? tilt : 0)
         if smiling && moving { c.translateBy(x: 0, y: -abs(wave) * (compact ? 1 : 3)) }
         c.translateBy(x: -50, y: -50)
+
+        if agent == .workbuddy || agent == .qwenwork {
+            if let mark = agent == .workbuddy ? workbuddyMark : qwenworkMark {
+                c.saveGState()
+                c.translateBy(x: 0, y: 100); c.scaleBy(x: 1, y: -1)
+                c.draw(mark, in: CGRect(x: 6, y: 6, width: 88, height: 88))
+                c.restoreGState()
+            }
+            if expression == .attention { fill(CGRect(x: 91, y: -3, width: 15, height: 15), .systemOrange, radius: 7.5) }
+            c.restoreGState()
+            return
+        }
 
         if agent == .cursor {
             // Cursor keeps its wordless logo (LobeHub icon set) in label colour; no face, only the attention dot.

@@ -1,5 +1,11 @@
 import AppKit
+import SwiftUI
 import MyClipCore
+
+// Language switching restarts the real app; keep that OS boundary outside the onboarding checks.
+@MainActor enum MyClipAppDelegate {
+    static func relaunch() {}
+}
 
 // Keep capture outside these checks; exercise the real model, store, and ACP process.
 @MainActor
@@ -62,6 +68,37 @@ struct AgentActivationTests {
             try contents.write(to: url, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
         }
+        check(ClipAgent.allCases.count == 6, "The Agent catalog includes all six onboarding choices")
+        let workbuddyApp = discoveryRoot.appendingPathComponent("WorkBuddy.app")
+        let qwenworkApp = discoveryRoot.appendingPathComponent("Renamed QwenWork.app")
+        let desktopDiscovery = AgentRuntime(root: discoveryRoot, searchPaths: [],
+            desktopApplications: [.workbuddy: workbuddyApp, .qwenwork: qwenworkApp])
+        check(desktopDiscovery.availability(of: .workbuddy, customPath: "") == .desktopOnly,
+              "WorkBuddy desktop detection does not pretend its companion CLI is installed")
+        check(desktopDiscovery.availability(of: .qwenwork, customPath: "") == .desktopOnly,
+              "QwenWork without a bundled engine remains unavailable")
+        let qwenworkHost = qwenworkApp.appendingPathComponent("Contents/MacOS/QwenWork")
+        try writeExecutable(qwenworkHost, contents: "#!/bin/sh\nexit 0\n")
+        let appInfo = try PropertyListSerialization.data(fromPropertyList: ["CFBundleExecutable": "QwenWork", "CFBundleIdentifier": "myclip.tests.qwenwork"], format: .xml, options: 0)
+        try appInfo.write(to: qwenworkApp.appendingPathComponent("Contents/Info.plist"))
+        let qwenworkVersion = qwenworkApp.appendingPathComponent("Contents/Resources/agent-sdk/components/flash-cli/1.18.18")
+        let qwenworkEngine = qwenworkVersion.appendingPathComponent("runtime/flash-cli-acp.mjs")
+        try writeExecutable(qwenworkEngine, contents: "// ACP entry point\n")
+        let manifest = #"{"protocol":"acp-stdio","runtime":{"kind":"electron-node","entrypoint":"runtime/flash-cli-acp.mjs","args":[],"env":{"ELECTRON_RUN_AS_NODE":"1"}}}"#
+        try manifest.write(to: qwenworkVersion.appendingPathComponent("engine-manifest.json"), atomically: true, encoding: .utf8)
+        let qwenworkCommand = desktopDiscovery.command(for: .qwenwork, customPath: "")
+        check(qwenworkCommand?.executable.resolvingSymlinksInPath() == qwenworkHost.resolvingSymlinksInPath(),
+              "QwenWork uses its own bundled Electron runtime")
+        check(qwenworkCommand?.arguments.first.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() } == qwenworkEngine.resolvingSymlinksInPath() &&
+              qwenworkCommand?.environment["ELECTRON_RUN_AS_NODE"] == "1",
+              "QwenWork follows its bundled engine manifest instead of an unrelated legacy CLI")
+        check(desktopDiscovery.command(for: .qwenwork, customPath: discoveryRoot.appendingPathComponent("missing-qwenwork").path) == nil,
+              "An invalid custom QwenWork path never falls back to the bundled engine")
+        try writeExecutable(discoveryBin.appendingPathComponent("codebuddy"), contents: "#!/bin/sh\nexit 0\n")
+        check(desktopDiscovery.availability(of: .workbuddy, customPath: "") == .connector,
+              "WorkBuddy's companion CLI enables selection")
+        check(desktopDiscovery.command(for: .workbuddy, customPath: "")?.arguments == ["--acp", "--no-session-persistence"],
+              "WorkBuddy uses its official ACP entry point without persisting temporary sessions")
         // Model a Finder launch: the inherited PATH has no Node version manager entries.
         let guiDiscovery = AgentRuntime(root: discoveryRoot, desktopApplications: [:], homeDirectory: nvmHome,
             inheritedEnvironment: ["PATH": "/usr/bin:/bin"])
@@ -130,7 +167,9 @@ struct AgentActivationTests {
             "myclip.codexPath": root.appendingPathComponent("codex-acp").path,
             "myclip.claudePath": root.appendingPathComponent("claude-agent-acp").path,
             "myclip.opencodePath": root.appendingPathComponent("opencode").path,
-            "myclip.cursorPath": root.appendingPathComponent("cursor-agent").path
+            "myclip.cursorPath": root.appendingPathComponent("cursor-agent").path,
+            "myclip.workbuddyPath": root.appendingPathComponent("codebuddy").path,
+            "myclip.qwenworkPath": root.appendingPathComponent("qwenwork").path
         ], forName: UserDefaults.argumentDomain)
         func requests(_ agent: ClipAgent, method: String) throws -> [[String: Any]] {
             let log = root.appendingPathComponent("\(agent.rawValue).json.requests")
@@ -285,6 +324,75 @@ struct AgentActivationTests {
         check(onboarding.preferences.enabledAgent == .codex, "Retry can switch the default after a successful connection")
         onboarding.stop()
         onboarding.disableAgent()
+        try await Task.sleep(for: .milliseconds(100))
+
+        let choosing = try MyClipModel(root: root.appendingPathComponent("OnboardingSelection"), preview: false)
+        defer { choosing.stop() }
+        let selection = OnboardingAgentSelection()
+        selection.restore(nil)
+        let previousOpenCodeConnections = try requests(.opencode, method: "initialize").count
+        let previousQwenWorkConnections = try requests(.qwenwork, method: "initialize").count
+        selection.select(.opencode)
+        selection.select(.qwenwork)
+        selection.restore(.claude)
+        check(selection.selectedAgent == .qwenwork, "Returning to onboarding preserves its uncommitted selection")
+        check(choosing.preferences.enabledAgent == nil && choosing.agents.values.allSatisfy { $0.phase == .disconnected },
+              "Selecting and switching cards never connects or enables an Agent")
+        check(try requests(.opencode, method: "initialize").count == previousOpenCodeConnections &&
+              requests(.qwenwork, method: "initialize").count == previousQwenWorkConnections,
+              "Changing the onboarding selection never launches an Agent process")
+        check(await selection.start(using: choosing), "Start using completes after connecting the final selection")
+        check(choosing.preferences.enabledAgent == .qwenwork && choosing.state(.qwenwork).available,
+              "Start using connects and enables the final selected Agent")
+        check(try requests(.opencode, method: "initialize").count == previousOpenCodeConnections &&
+              requests(.qwenwork, method: "initialize").count == previousQwenWorkConnections + 1,
+              "Start using launches only the final selected Agent once")
+        selection.select(.codex)
+        choosing.preferences.codexPath = failingAdapter.path
+        check(!(await selection.start(using: choosing)), "A failed connection keeps the setup guide open")
+        check(choosing.preferences.enabledAgent == .qwenwork && !selection.starting,
+              "A failed start preserves the working Agent and allows another attempt")
+        choosing.preferences.codexPath = previousCodexPath
+        check(await selection.start(using: choosing), "Start using can retry after a failed connection")
+        choosing.stop()
+        choosing.disableAgent()
+        let skipping = OnboardingAgentSelection()
+        check(await skipping.start(using: choosing), "Start using can skip Agent setup without a selection")
+        check(choosing.preferences.enabledAgent == nil, "Skipping Agent setup does not enable an Agent")
+        let iconNames = ["OpenAIBlossom", "CursorIcon", "WorkBuddyIcon", "QwenWorkIcon"]
+        let iconImages = iconNames.compactMap { name -> NSImage? in
+            let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent("MyClip/Assets.xcassets/\(name).imageset")
+            guard let contents = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil),
+                  let file = contents.first(where: { $0.pathExtension != "json" }), let image = NSImage(contentsOf: file) else { return nil }
+            image.setName(name)
+            return image
+        }
+        defer { withExtendedLifetime(iconImages) {} }
+        for width: CGFloat in [344, 520] {
+            let host = NSHostingView(rootView: OnboardingAgentPicker(model: choosing, selection: selection)
+                .padding(16).frame(width: width).background(Color(nsColor: .windowBackgroundColor)))
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 400),
+                styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = host
+            for _ in 0..<10 {
+                host.layoutSubtreeIfNeeded()
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            let height = host.fittingSize.height
+            check(height > 0 && height <= 400, "Six Agent cards fit the onboarding column at width \(Int(width))")
+            host.setFrameSize(NSSize(width: width, height: max(1, height)))
+            if let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                host.cacheDisplay(in: host.bounds, to: bitmap)
+                if let png = bitmap.representation(using: .png, properties: [:]) {
+                    let imageURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                        .appendingPathComponent("build/app-tests/onboarding-agents-\(Int(width)).png")
+                    try png.write(to: imageURL)
+                }
+            }
+            window.close()
+        }
         try await Task.sleep(for: .milliseconds(100))
         print("Agent activation checks: \(failures) failure(s)")
         exit(failures == 0 ? 0 : 1)

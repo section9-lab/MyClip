@@ -5,6 +5,8 @@ public enum ClipAgent: String, CaseIterable, Codable, Sendable, Identifiable {
     case claude
     case opencode
     case cursor
+    case workbuddy
+    case qwenwork
 
     public var id: String { rawValue }
     public var name: String {
@@ -13,6 +15,8 @@ public enum ClipAgent: String, CaseIterable, Codable, Sendable, Identifiable {
         case .claude: "Claude Code"
         case .opencode: "OpenCode"
         case .cursor: "Cursor"
+        case .workbuddy: "WorkBuddy"
+        case .qwenwork: String(localized: "千问办公")
         }
     }
     /// The program that speaks ACP on stdio. Codex and Claude need a connector; OpenCode's own CLI is the server.
@@ -22,9 +26,17 @@ public enum ClipAgent: String, CaseIterable, Codable, Sendable, Identifiable {
         case .claude: "claude-agent-acp"
         case .opencode: "opencode"
         case .cursor: "cursor-agent"
+        case .workbuddy: "codebuddy"
+        case .qwenwork: "qwenwork"
         }
     }
-    public var acpArguments: [String] { self == .opencode || self == .cursor ? ["acp"] : [] }
+    public var acpArguments: [String] {
+        switch self {
+        case .opencode, .cursor, .qwenwork: ["acp"]
+        case .workbuddy: ["--acp", "--no-session-persistence"]
+        case .codex, .claude: []
+        }
+    }
     /// The user-facing command line, used for discovery and login instructions.
     public var cliName: String {
         switch self {
@@ -32,6 +44,8 @@ public enum ClipAgent: String, CaseIterable, Codable, Sendable, Identifiable {
         case .claude: "claude"
         case .opencode: "opencode"
         case .cursor: "cursor-agent"
+        case .workbuddy: "codebuddy"
+        case .qwenwork: "qwenwork"
         }
     }
     /// npm connector to install; nil when the CLI itself speaks ACP.
@@ -39,7 +53,7 @@ public enum ClipAgent: String, CaseIterable, Codable, Sendable, Identifiable {
         switch self {
         case .codex: "@agentclientprotocol/codex-acp@1.12.0"
         case .claude: "@agentclientprotocol/claude-agent-acp@0.78.0"
-        case .opencode, .cursor: nil
+        case .opencode, .cursor, .workbuddy, .qwenwork: nil
         }
     }
     /// Session mode that lets the Agent read, write and run tools without asking.
@@ -49,6 +63,8 @@ public enum ClipAgent: String, CaseIterable, Codable, Sendable, Identifiable {
         case .claude: "bypassPermissions"
         case .opencode: "build"
         case .cursor: "agent"
+        case .workbuddy: "bypassPermissions"
+        case .qwenwork: "build"
         }
     }
 }

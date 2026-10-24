@@ -6,6 +6,7 @@ struct CaptureOnboardingView: View {
     @ObservedObject var model: MyClipModel
     var onContinue: () -> Void = {}
     @State private var showingPermissions = true
+    @StateObject private var selection = OnboardingAgentSelection()
 
     var body: some View {
         GeometryReader { geometry in
@@ -35,7 +36,10 @@ struct CaptureOnboardingView: View {
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { model.refreshAgentAvailability() }
+        .onAppear {
+            model.refreshAgentAvailability()
+            selection.restore(model.preferences.enabledAgent)
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshAgentAvailability()
         }
@@ -65,6 +69,8 @@ struct CaptureOnboardingView: View {
                 if !showingPermissions {
                     Button("上一步") { showingPermissions = true }
                         .keyboardShortcut(.cancelAction)
+                        .accessibilityIdentifier("onboarding-back")
+                        .disabled(selection.starting)
                 } else {
                     Button("退出 MyClip") { NSApp.terminate(nil) }
                         .buttonStyle(.bordered)
@@ -72,11 +78,13 @@ struct CaptureOnboardingView: View {
                 Spacer()
                 Button(showingPermissions ? String(localized: "下一步") : String(localized: "开始使用"), systemImage: "arrow.right") {
                     if showingPermissions { showingPermissions = false }
-                    else { onContinue() }
+                    else { startUsing() }
                 }
                 .buttonStyle(.borderedProminent).controlSize(.large)
                 .keyboardShortcut(.defaultAction)
-                .disabled(!model.screenPermission || !model.accessibilityPermission || model.selectingDefaultAgent != nil)
+                .accessibilityIdentifier(showingPermissions ? "onboarding-next" : "onboarding-start")
+                .disabled(!model.screenPermission || !model.accessibilityPermission || selection.starting)
+                if selection.starting { ProgressView().controlSize(.small).accessibilityLabel("正在准备 Agent") }
             }
             .padding(.top, compact ? 18 : 24)
         }
@@ -105,7 +113,7 @@ struct CaptureOnboardingView: View {
                 Text("默认 Agent").fontWeight(.medium)
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 10)
-                defaultAgentSection
+                OnboardingAgentPicker(model: model, selection: selection)
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
@@ -140,61 +148,10 @@ struct CaptureOnboardingView: View {
         .labelsHidden().pickerStyle(.menu).fixedSize()
     }
 
-    private var defaultAgentSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                ForEach(ClipAgent.allCases) { agentCard($0) }
-            }
-            ForEach(ClipAgent.allCases) { agent in
-                let state = model.state(agent)
-                if state.phase == .failed {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("\(agent.name)：\(state.detail)").foregroundStyle(.orange)
-                            .fixedSize(horizontal: false, vertical: true)
-                        ForEach(state.authMethods) { method in
-                            Button(method.name) { model.authenticate(agent, method: method) }
-                        }
-                        if model.hasLoginCommand(agent) {
-                            Button("复制 \(agent.name) 登录命令") { model.copyLoginCommand(for: agent) }
-                        }
-                    }.font(.caption).buttonStyle(.bordered)
-                }
-            }
+    private func startUsing() {
+        Task { @MainActor in
+            if await selection.start(using: model) { onContinue() }
         }
-    }
-
-    private func agentCard(_ agent: ClipAgent) -> some View {
-        let available = model.localAgents[agent] ?? .missing
-        let state = model.state(agent)
-        let selected = model.preferences.enabledAgent == agent
-        return Button {
-            Task { await model.selectDefaultAgent(agent) }
-        } label: {
-            VStack(alignment: .leading, spacing: 9) {
-                HStack(spacing: 8) {
-                    AgentBrandIcon(agent: agent, size: 24)
-                    Text(agent.name).font(.system(size: 13, weight: .semibold))
-                        .lineLimit(1).minimumScaleFactor(0.8)
-                    Spacer(minLength: 0)
-                    if model.selectingDefaultAgent == agent || state.busy {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(selected ? Color.accentColor : Color.secondary.opacity(0.5))
-                    }
-                }
-                Text(state.busy ? state.detail : (state.available ? String(localized: "已连接 · 可自动整理") : available.detail))
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
-                    .lineLimit(2).frame(height: 28, alignment: .topLeading)
-            }
-            .padding(6).frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.bordered)
-        .tint(selected ? Color.accentColor : nil)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-        .disabled(!available.canSelect || state.busy || model.selectingDefaultAgent != nil)
-        .accessibilityLabel("\(agent.name)，\(selected ? String(localized: "默认 Agent") : String(localized: "设为默认 Agent"))，\(available.detail)")
-        .help(available == .commandLine ? String(localized: "选择后安装连接组件并验证登录，成功后设为默认 Agent") : String(localized: "连接成功后设为默认 Agent"))
     }
 
     private func permission(_ title: String, symbol: String, detail: String, allowed: Bool, action: @escaping () -> Void) -> some View {

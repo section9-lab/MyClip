@@ -47,8 +47,8 @@ final class AgentSessionTests: XCTestCase {
             switch agent {
             case .codex: arguments = ["resume", sessionID]
             case .claude: arguments = ["--cli", "--resume", sessionID]
-            case .opencode: arguments = ["--session", sessionID]
-            case .cursor: arguments = ["--resume", sessionID]
+            case .opencode, .qwenwork: arguments = ["--session", sessionID]
+            case .cursor, .workbuddy: arguments = ["--resume", sessionID]
             }
             XCTAssertEqual(String(data: output, encoding: .utf8), ([workspace.path, environmentValue] + arguments).joined(separator: "\n") + "\n")
         }

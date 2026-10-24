@@ -35,7 +35,7 @@ struct AgentRuntime {
     private var defaultSearchPaths: [String] {
         let home = homeDirectory.path
         let inheritedPaths = (inheritedEnvironment["PATH"] ?? "").split(separator: ":").map(String.init)
-        let userPaths = ["\(home)/.local/bin", "\(home)/.opencode/bin"]
+        let userPaths = ["\(home)/.local/bin", "\(home)/.opencode/bin", "\(home)/.codebuddy/bin", "\(home)/.qwenwork/bin"]
         let systemPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
         let nvmDirectory = inheritedEnvironment["NVM_DIR"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) }
             ?? homeDirectory.appendingPathComponent(".nvm")
@@ -55,6 +55,8 @@ struct AgentRuntime {
         case .codex: bundleID = "com.openai.codex"
         case .claude: bundleID = "com.anthropic.claudefordesktop"
         case .cursor: bundleID = "com.todesktop.230313mzl4w4u92"
+        case .workbuddy: bundleID = "com.tencent.workbuddy.mac"
+        case .qwenwork: bundleID = "cn.qwenwork.desktop.mac"
         case .opencode: return nil
         }
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
@@ -81,8 +83,42 @@ struct AgentRuntime {
         let locations = customPath.isEmpty
             ? (environment["PATH"] ?? "").split(separator: ":").map { URL(fileURLWithPath: String($0)).appendingPathComponent(agent.executableName) }
             : [URL(fileURLWithPath: customPath)]
-        guard let executable = locations.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else { return nil }
+        guard let executable = locations.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else {
+            return agent == .qwenwork && customPath.isEmpty ? bundledQwenWorkCommand() : nil
+        }
         return ACPCommand(executable: executable, arguments: agent.acpArguments, environment: environment)
+    }
+
+    private struct QwenWorkEngineManifest: Decodable {
+        let `protocol`: String
+        let runtime: Runtime
+        struct Runtime: Decodable {
+            let kind: String
+            let entrypoint: String
+            let args: [String]
+            let env: [String: String]
+        }
+    }
+
+    private func bundledQwenWorkCommand() -> ACPCommand? {
+        guard let app = desktopApplication(for: .qwenwork), let executable = Bundle(url: app)?.executableURL,
+              FileManager.default.isExecutableFile(atPath: executable.path) else { return nil }
+        let components = app.appendingPathComponent("Contents/Resources/agent-sdk/components/flash-cli")
+        let versions = ((try? FileManager.default.contentsOfDirectory(at: components, includingPropertiesForKeys: nil,
+            options: .skipsHiddenFiles)) ?? []).sorted {
+                $0.lastPathComponent.compare($1.lastPathComponent, options: .numeric) == .orderedDescending
+            }
+        for version in versions {
+            guard let data = try? Data(contentsOf: version.appendingPathComponent("engine-manifest.json")),
+                  let manifest = try? JSONDecoder().decode(QwenWorkEngineManifest.self, from: data),
+                  manifest.protocol == "acp-stdio", manifest.runtime.kind == "electron-node" else { continue }
+            let entrypoint = version.appendingPathComponent(manifest.runtime.entrypoint).standardizedFileURL
+            guard entrypoint.path.hasPrefix(version.standardizedFileURL.path + "/"),
+                  FileManager.default.isReadableFile(atPath: entrypoint.path) else { continue }
+            let env = environment.merging(manifest.runtime.env) { _, value in value }
+            return ACPCommand(executable: executable, arguments: [entrypoint.path] + manifest.runtime.args, environment: env)
+        }
+        return nil
     }
 
     func sessionCommand(for agent: ClipAgent, customPath: String) -> ACPCommand? {

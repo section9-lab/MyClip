@@ -59,7 +59,15 @@ fi
 for name in "${tests[@]}"; do
     echo "Running $name"
     case "$name" in
-        AgentActivationTests|CaptureLifecycleTests)
+        AgentActivationTests)
+            swiftc "${compiler_args[@]}" -I "$package_build/Modules" "${core_objects[@]}" \
+                "${model_sources[@]}" MyClip/Features/Onboarding/OnboardingAgentSelection.swift \
+                MyClip/Features/Onboarding/OnboardingAgentPicker.swift \
+                MyClip/Features/Onboarding/CaptureOnboardingView.swift \
+                MyClip/Features/Agent/AgentCharacterView.swift MyClip/Features/Agent/AgentStatusIcon.swift \
+                MyClip/UI/LibraryCompatibility.swift "Tests/MyClipAppTests/$name.swift" -o "$test_build/bin/$name"
+            ;;
+        CaptureLifecycleTests)
             # These two suites replace only capture with a test double; all model/storage/ACP code is real.
             swiftc "${compiler_args[@]}" -I "$package_build/Modules" "${core_objects[@]}" \
                 "${model_sources[@]}" "Tests/MyClipAppTests/$name.swift" -o "$test_build/bin/$name"

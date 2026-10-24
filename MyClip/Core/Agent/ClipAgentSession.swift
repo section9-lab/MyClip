@@ -21,8 +21,8 @@ public struct ClipAgentSession: Sendable {
         switch agent {
         case .codex: arguments = ["resume", id]
         case .claude: arguments = ["--cli", "--resume", id]
-        case .opencode: arguments = ["--session", id]
-        case .cursor: arguments = ["--resume", id]
+        case .opencode, .qwenwork: arguments = ["--session", id]
+        case .cursor, .workbuddy: arguments = ["--resume", id]
         }
         let environment = command.environment.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }
         let invocation = (["/usr/bin/env"] + environment + [command.executable.path] + command.arguments + arguments)

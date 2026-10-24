@@ -33,7 +33,6 @@ struct BackstageView: View {
             Text("整理 Agent").font(.title3.weight(.semibold))
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 144), spacing: 8)], spacing: 8) {
                 ForEach(ClipAgent.allCases) { agent in agentCard(agent) }
-                workBuddyCard
             }
         }
     }
@@ -102,22 +101,6 @@ struct BackstageView: View {
         .accessibilityLabel(agent.name)
         .accessibilityValue(state.detail)
         .accessibilityAddTraits(enabled ? .isSelected : [])
-    }
-
-    private var workBuddyCard: some View {
-        VStack(spacing: 6) {
-            Image("WorkBuddyIcon").resizable().scaledToFit().frame(width: 28, height: 28).accessibilityHidden(true)
-            Text(verbatim: "WorkBuddy").font(.subheadline.weight(.semibold)).lineLimit(1)
-            Text(verbatim: "Coming soon").font(.caption).foregroundStyle(.secondary).frame(height: 20)
-            Spacer(minLength: 2)
-            Color.clear.frame(height: 24)
-        }
-        .foregroundStyle(.secondary)
-        .padding(10)
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 132, maxHeight: .infinity)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08)))
-        .accessibilityElement(children: .combine)
     }
 
     private func useLabel(_ state: ClipAgentState, availability: LocalAgentAvailability) -> String {
@@ -675,6 +658,8 @@ private struct UsageDashboard: View {
         case .codex: Color(hex: 0x2A78D6)
         case .opencode: Color(hex: 0x1BAF7A)
         case .cursor: Color(hex: 0x4A3AA7)
+        case .workbuddy: .teal
+        case .qwenwork: .indigo
         }
     }
 

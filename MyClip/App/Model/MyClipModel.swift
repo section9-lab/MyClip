@@ -14,6 +14,8 @@ final class ClipPreferences: ObservableObject {
     @Published var claudePath: String { didSet { defaults.set(claudePath, forKey: "myclip.claudePath") } }
     @Published var opencodePath: String { didSet { defaults.set(opencodePath, forKey: "myclip.opencodePath") } }
     @Published var cursorPath: String { didSet { defaults.set(cursorPath, forKey: "myclip.cursorPath") } }
+    @Published var workbuddyPath: String { didSet { defaults.set(workbuddyPath, forKey: "myclip.workbuddyPath") } }
+    @Published var qwenworkPath: String { didSet { defaults.set(qwenworkPath, forKey: "myclip.qwenworkPath") } }
     @Published var mcpClients: Set<MCPClient> { didSet { defaults.set(mcpClients.map(\.rawValue).sorted(), forKey: "myclip.mcpClients") } }
 
     init(preview: Bool) {
@@ -27,6 +29,8 @@ final class ClipPreferences: ObservableObject {
         claudePath = defaults.string(forKey: "myclip.claudePath") ?? ""
         opencodePath = defaults.string(forKey: "myclip.opencodePath") ?? ""
         cursorPath = defaults.string(forKey: "myclip.cursorPath") ?? ""
+        workbuddyPath = defaults.string(forKey: "myclip.workbuddyPath") ?? ""
+        qwenworkPath = defaults.string(forKey: "myclip.qwenworkPath") ?? ""
         mcpClients = defaults.stringArray(forKey: "myclip.mcpClients").map { Set($0.compactMap(MCPClient.init(rawValue:))) } ?? [.codex, .claudeCode]
     }
 
@@ -36,6 +40,8 @@ final class ClipPreferences: ObservableObject {
         case .claude: claudePath
         case .opencode: opencodePath
         case .cursor: cursorPath
+        case .workbuddy: workbuddyPath
+        case .qwenwork: qwenworkPath
         }
     }
 }

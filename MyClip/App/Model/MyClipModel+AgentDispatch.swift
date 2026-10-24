@@ -100,17 +100,20 @@ extension MyClipModel {
     func copyClaudeLoginCommand() { copyLoginCommand(for: .claude) }
 
     /// Agents that log in through their own terminal command rather than an ACP auth method.
-    func hasLoginCommand(_ agent: ClipAgent) -> Bool { agent != .codex && isInstalled(agent) }
+    func hasLoginCommand(_ agent: ClipAgent) -> Bool {
+        agent != .codex && agent != .workbuddy && isInstalled(agent)
+            && (agent != .qwenwork || runtime.sessionCommand(for: agent, customPath: preferences.path(for: agent)) != nil)
+    }
 
     func copyLoginCommand(for agent: ClipAgent) {
-        guard let command = runtime.command(for: agent, customPath: preferences.path(for: agent)) else { return }
+        guard hasLoginCommand(agent), let command = runtime.command(for: agent, customPath: preferences.path(for: agent)) else { return }
         let quotedPath = "'" + command.executable.path.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
         let login: String
         switch agent {
         case .claude: login = quotedPath + " --cli auth login --claudeai"
-        case .opencode: login = quotedPath + " auth login"
+        case .opencode, .qwenwork: login = quotedPath + " auth login"
         case .cursor: login = quotedPath + " login"
-        case .codex: return
+        case .codex, .workbuddy: return
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(login, forType: .string)
