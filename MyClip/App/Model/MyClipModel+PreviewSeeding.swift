@@ -20,7 +20,7 @@ extension MyClipModel {
         try await store.record(image: captured, context: context, agent: .codex, organize: true)
         guard let job = try await store.claimNextJob(immediately: true) else { return }
         try await store.commit(jobID: job.id, drafts: [
-            KnowledgeDraft(kind: .memory, title: String(localized: "让工作中的上下文，成为可以找回的知识"), body: String(localized: "MyClip 将应用窗口中的信息，整理为有来源的本地知识。\n\n## 从一张截图开始\n\n鼠标移动后五秒内点击或双击；向下滚动后静止三秒；或按下回车，记录当前应用的焦点窗口。重复画面共享一份图片，每次出现的时间仍被保留。\n\n## 从记录到理解\n\nCodex 或 Claude 通过 ACP 读取截图，整理 Memory。点击下方来源，可以回到知识产生的那一刻。\n\n这是用于验证界面的示例内容。"), sourceIDs: [context.id]),
+            KnowledgeDraft(kind: .memory, title: String(localized: "让工作中的上下文，成为可以找回的知识"), body: String(localized: "MyClip 将应用窗口中的信息，整理为有来源的本地知识。\n\n## 从一张截图开始\n\n鼠标移动后五秒内点击或双击；向下滚动后静止五秒；或按下回车，记录当前应用的焦点窗口。重复画面共享一份图片，每次出现的时间仍被保留。\n\n## 从记录到理解\n\nCodex 或 Claude 通过 ACP 读取截图，整理 Memory。点击下方来源，可以回到知识产生的那一刻。\n\n这是用于验证界面的示例内容。"), sourceIDs: [context.id]),
             KnowledgeDraft(kind: .memory, title: String(localized: "截图只来自当前焦点窗口"), body: String(localized: "MyClip 记录前台应用的焦点窗口。无法确认焦点时跳过该帧，不截取整个桌面。"), sourceIDs: [context.id]),
             KnowledgeDraft(kind: .memory, title: String(localized: "重复画面，保留每一次出现"), body: String(localized: "相同像素的截图共用一个图片文件，时间、应用和来源记录仍分别保存。"), sourceIDs: [context.id])
         ])

@@ -148,7 +148,7 @@ final class FocusedCaptureService {
         switch type {
         case .scrollWheel:
             guard trigger.scroll(at: time, deltaY: scrollDeltaY) else { return }
-            onStatus?(String(localized: "已检测到向下滚动，静止 3 秒后截图"))
+            onStatus?(String(localized: "已检测到向下滚动，静止 5 秒后截图"))
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
             guard settings.mouseTriggers.contains(.click) else { return }
             updatePointer(at: time)

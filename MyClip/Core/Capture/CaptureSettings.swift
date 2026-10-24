@@ -9,7 +9,7 @@ public enum CaptureScope: String, CaseIterable, Sendable, Identifiable {
 public enum MouseCaptureTrigger: String, CaseIterable, Sendable, Identifiable {
     case click, scroll
     public var id: String { rawValue }
-    public var label: String { self == .click ? String(localized: "鼠标移动后5秒内点击") : String(localized: "scroll向下滚动后静止3秒") }
+    public var label: String { self == .click ? String(localized: "鼠标移动后5秒内点击") : String(localized: "scroll向下滚动后静止5秒") }
     public var shortLabel: String { self == .click ? String(localized: "移动后点击") : String(localized: "向下滚动") }
 }
 
@@ -21,7 +21,7 @@ public enum KeyboardCaptureMode: String, CaseIterable, Sendable, Identifiable {
 
 public enum CaptureFilterStrategy: String, CaseIterable, Sendable, Identifiable {
     case similarImages, nearUniformImages
-    public static let defaults: Set<Self> = [.similarImages]
+    public static let defaults: Set<Self> = [.similarImages, .nearUniformImages]
     public var id: String { rawValue }
     public var label: String { self == .similarImages ? String(localized: "相似画面去重") : String(localized: "近纯色画面过滤（≥98%）") }
     public var shortLabel: String { self == .similarImages ? String(localized: "相似画面") : String(localized: "近纯色画面") }

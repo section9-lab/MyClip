@@ -13,7 +13,7 @@ extension MyClipModel {
     }
 
     func selectDefaultAgent(_ agent: ClipAgent) async {
-        guard !preview, selectingDefaultAgent == nil, !state(agent).busy,
+        guard !preview, selectingDefaultAgent == nil, configuringAgentModels.isEmpty, !state(agent).busy,
               !agents.values.contains(where: { $0.phase == .installing }) else { return }
         refreshAgentAvailability()
         guard localAgents[agent]?.canSelect == true else { return }
@@ -77,7 +77,7 @@ extension MyClipModel {
     }
 
     func connect(_ agent: ClipAgent) {
-        guard !state(agent).busy, !state(agent).available, !preview else { return }
+        guard !state(agent).busy, !state(agent).available, !preview, !configuringAgentModels.contains(agent) else { return }
         agents[agent]?.phase = .connecting
         agents[agent]?.detail = String(localized: "正在连接…")
         Task {
@@ -266,7 +266,7 @@ extension MyClipModel {
         }
     }
 
-    private func connectedClient(_ agent: ClipAgent) async throws -> ACPClient {
+    private func connectedClient(_ agent: ClipAgent, applyingSavedModel: Bool = true) async throws -> ACPClient {
         if let client = sessionCoordinator.client(agent), state(agent).available { return client }
         guard let command = try runtime.organizationCommand(for: agent, customPath: preferences.path(for: agent)) else {
             throw ACPError.disconnected(String(localized: "请先在连接设置中安装组件。"))
@@ -277,7 +277,7 @@ extension MyClipModel {
         let (client, handshake) = try await sessionCoordinator.open(agent, command: command)
         agents[agent]?.authMethods = handshake.authMethods
         guard handshake.supportsImages else { throw ACPError.unsupportedImages }
-        _ = try await session(for: agent, using: client)
+        _ = try await session(for: agent, using: client, applyingSavedModel: applyingSavedModel)
         agents[agent]?.phase = .ready
         agents[agent]?.detail = String(localized: "已就绪 · 每批独立整理")
         return client
@@ -289,14 +289,86 @@ extension MyClipModel {
         return directory
     }
 
-    private func session(for agent: ClipAgent, using client: ACPClient) async throws -> String {
+    private func session(for agent: ClipAgent, using client: ACPClient, applyingSavedModel: Bool = true) async throws -> String {
         // A connection may prepare a blank session before activation. It is consumed by one batch only.
         if let id = state(agent).sessionID { return id }
         let id = try await client.newSession(directory: try workspaceDirectory(), memoryServer: memoryCommand, ephemeralFor: agent)
         try await client.setMode(sessionID: id, modeID: agent.fullAccessModeID)
         agents[agent]?.sessionID = id
         agents[agent]?.sessionIsEphemeral = true
+        if agent == .opencode {
+            modelImageCapabilities[agent] = await Task.detached(priority: .utility) { OpenCodeModelCatalog.localImageCapabilities() }.value
+        }
+        await refreshModels(agent, client: client, session: id)
+        if applyingSavedModel, let selected = preferences.selectedModel(for: agent) {
+            try await client.setModel(sessionID: id, modelID: selected)
+            await refreshModels(agent, client: client, session: id)
+        }
         return id
+    }
+
+    private func refreshModels(_ agent: ClipAgent, client: ACPClient, session: String) async {
+        let selection = await client.modelSelection(sessionID: session)
+        agents[agent]?.modelSelection = selection.annotatingImages(modelImageCapabilities[agent] ?? [:])
+        agents[agent]?.modelsLoaded = true
+    }
+
+    func canConfigureAgentModel(_ agent: ClipAgent) -> Bool {
+        !preview && !state(agent).busy && !dispatching && !discoveringTasks && selectingDefaultAgent == nil && !configuringAgentModels.contains(agent)
+            && !agents.values.contains { $0.phase == .installing }
+    }
+
+    /// Opening a catalog prepares a blank session but never enables an Agent or sends a prompt.
+    func loadAgentModels(_ agent: ClipAgent, refresh: Bool = false) async {
+        guard canConfigureAgentModel(agent), refresh || !state(agent).modelsLoaded else { return }
+        configuringAgentModels.insert(agent)
+        defer { configuringAgentModels.remove(agent) }
+        agents[agent]?.phase = .connecting
+        agents[agent]?.modelError = nil
+        do {
+            _ = try await connectedClient(agent)
+        } catch {
+            await releaseSession(agent)
+            if Task.isCancelled {
+                agents[agent]?.phase = .disconnected
+                agents[agent]?.detail = String(localized: "尚未连接")
+                return
+            }
+            agents[agent]?.modelError = error.localizedDescription
+            setFailure(agent, error)
+        }
+    }
+
+    /// Persist only a confirmed session choice. Each later batch reapplies it to its fresh session.
+    @discardableResult
+    func selectAgentModel(_ agent: ClipAgent, modelID: String?) async -> Bool {
+        guard canConfigureAgentModel(agent) else { return false }
+        configuringAgentModels.insert(agent)
+        defer { configuringAgentModels.remove(agent) }
+        agents[agent]?.phase = .connecting
+        agents[agent]?.modelError = nil
+        do {
+            // A new session also lets “Agent default” undo a previous override without changing global CLI settings.
+            let client = try await connectedClient(agent, applyingSavedModel: false)
+            guard let session = state(agent).sessionID else { throw ACPError.disconnected("") }
+            if let modelID {
+                guard state(agent).modelSelection.options.first(where: { $0.id == modelID })?.supportsImages != false else {
+                    throw LibraryError.invalidResult(String(localized: "此模型不支持图片，无法整理截图。请选择支持图片的模型。"))
+                }
+                agents[agent]?.phase = .connecting
+                try await client.setModel(sessionID: session, modelID: modelID)
+                await refreshModels(agent, client: client, session: session)
+            }
+            preferences.setSelectedModel(modelID, for: agent)
+            agents[agent]?.phase = .ready
+            agents[agent]?.detail = String(localized: "已就绪 · 每批独立整理")
+            return true
+        } catch {
+            agents[agent]?.modelError = error.localizedDescription
+            await releaseSession(agent)
+            setFailure(agent, error)
+            return false
+        }
     }
 
     private func releaseSession(_ agent: ClipAgent) async {
@@ -490,7 +562,10 @@ extension MyClipModel {
 
     private func trackedPrompt(_ client: ACPClient, agent: ClipAgent, session: String, text: String,
                                images: [Data], jobID: UUID? = nil, maximumDuration: Duration? = nil) async throws -> ACPCompletion {
-        try await store.executePrompt(client, agent: agent, sessionID: session, text: text, images: images, jobID: jobID, maximumDuration: maximumDuration)
+        guard images.isEmpty || state(agent).modelSelection.current?.supportsImages != false else {
+            throw LibraryError.invalidResult(String(localized: "当前模型不支持图片。请在 Backstage 选择支持图片的模型后重试。"))
+        }
+        return try await store.executePrompt(client, agent: agent, sessionID: session, text: text, images: images, jobID: jobID, maximumDuration: maximumDuration)
     }
 
     func organizationActivity(at date: Date) -> String {
@@ -509,6 +584,10 @@ extension MyClipModel {
 
     func handle(_ event: ACPEvent, agent: ClipAgent) {
         switch event {
+        case .models(let session, let selection):
+            guard state(agent).sessionID == session else { return }
+            agents[agent]?.modelSelection = selection.annotatingImages(modelImageCapabilities[agent] ?? [:])
+            agents[agent]?.modelsLoaded = true
         case .message(let session, _): updateActivity(String(localized: "\(agent.name) 正在生成结果…"), session: session, agent: agent)
         case .thinking(let session): updateActivity(String(localized: "\(agent.name) 正在思考…"), session: session, agent: agent)
         case .tool(let session, let title, _): updateActivity(title, session: session, agent: agent)

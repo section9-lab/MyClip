@@ -11,6 +11,7 @@ prompt_count = 0
 conversation_file = os.environ.get("MYCLIP_ACP_CONVERSATIONS")
 conversations = {}
 ephemeral_sessions = set()
+model_choices = {}
 if conversation_file and os.path.exists(conversation_file):
     with open(conversation_file) as saved:
         conversations = json.load(saved)
@@ -34,6 +35,24 @@ def finish(request, text="你好，已整理", reason="end_turn", **extra):
     }})
     result(request, {"stopReason":reason, **extra})
 
+def model_configs(session):
+    # Intentionally grouped, duplicated and mixed with unrelated options; clients must use metadata, not names.
+    return [{"id":"temperature", "category":"thought_level", "type":"select", "currentValue":"low", "options":[]},
+            {"id":"fixture-model-selector", "category":"model", "type":"select", "name":"Model",
+             "currentValue":model_choices.get(session, "fixture/default"),
+             "options":[{"group":"fixture", "name":"Fixture provider", "options":[
+                 {"value":"fixture/default", "name":"Default model", "description":"Default description"},
+                 {"value":"fixture/vision", "name":"Vision model"},
+                 {"value":"fixture/rejected", "name":"Rejected model"}]},
+                 {"value":"fixture/vision", "name":"Duplicate ignored"},
+                 {"value":"fixture/flat", "name":"Flat model"}]}]
+
+def model_result(session):
+    if scenario == "models_legacy":
+        return {"models":{"currentModelId":model_choices.get(session, "fixture/default"), "availableModels":[
+            {"modelId":"fixture/default", "name":"Default model"}, {"modelId":"fixture/vision", "name":"Vision model"}]}}
+    return {"configOptions":model_configs(session)}
+
 for line in sys.stdin:
     request = json.loads(line)
     method = request.get("method")
@@ -41,6 +60,8 @@ for line in sys.stdin:
         with open(conversation_file + ".requests", "a") as log:
             log.write(json.dumps(request) + "\n")
     if method == "initialize":
+        if scenario == "models_slow":
+            time.sleep(0.5)
         capabilities = {"promptCapabilities":{"image":scenario != "no_images"}}
         if conversation_file and scenario != "conversation_no_restore":
             capabilities["loadSession"] = True
@@ -55,7 +76,19 @@ for line in sys.stdin:
                 ephemeral_sessions.add(session)
             conversations[session] = []
             save_conversations()
-        result(request, {"sessionId":session})
+        result(request, {"sessionId":session, **(model_result(session) if scenario.startswith("models_") else {})})
+    elif method in ("session/set_config_option", "session/set_model"):
+        session = request["params"]["sessionId"]
+        model = request["params"].get("value", request["params"].get("modelId"))
+        if model == "fixture/rejected":
+            send({"jsonrpc":"2.0", "id":request["id"], "error":{"code":-32602,"message":"Model unavailable"}})
+        elif method == "session/set_config_option" and request["params"].get("configId") != "fixture-model-selector":
+            send({"jsonrpc":"2.0", "id":request["id"], "error":{"code":-32602,"message":"Wrong config ID"}})
+        elif scenario == "models_unconfirmed":
+            result(request, {})
+        else:
+            model_choices[session] = model
+            result(request, {} if method == "session/set_model" else model_result(session))
     elif method in ("session/resume", "session/load"):
         session = request["params"]["sessionId"]
         if scenario == "conversation_auth":
@@ -82,7 +115,20 @@ for line in sys.stdin:
             print("fixture disconnected", file=sys.stderr, flush=True)
             sys.exit(7)
         pending_prompt = request
-        if scenario == "slow_progress":
+        if scenario == "models_notification":
+            session = request["params"]["sessionId"]
+            model_choices[session] = "fixture/flat"
+            send({"jsonrpc":"2.0", "method":"session/update", "params":{"sessionId":session,
+                "update":{"sessionUpdate":"config_option_update", **model_result(session)}}})
+            finish(request)
+        elif scenario == "models_removed":
+            send({"jsonrpc":"2.0", "method":"session/update", "params":{"sessionId":request["params"]["sessionId"],
+                "update":{"sessionUpdate":"config_option_update", "configOptions":[]}}})
+            finish(request)
+        elif scenario == "models_hang":
+            send({"jsonrpc":"2.0", "method":"session/update", "params":{"sessionId":request["params"]["sessionId"],
+                "update":{"sessionUpdate":"tool_call", "toolCallId":"waiting", "title":"Waiting", "status":"in_progress"}}})
+        elif scenario == "slow_progress":
             updates = [
                 {"sessionUpdate":"tool_call", "toolCallId":"compact", "title":"Compact conversation", "status":"in_progress"},
                 {"sessionUpdate":"tool_call_update", "toolCallId":"compact", "status":"completed"},

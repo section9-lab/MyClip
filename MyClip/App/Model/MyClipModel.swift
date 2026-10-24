@@ -16,10 +16,12 @@ final class ClipPreferences: ObservableObject {
     @Published var cursorPath: String { didSet { defaults.set(cursorPath, forKey: "myclip.cursorPath") } }
     @Published var workbuddyPath: String { didSet { defaults.set(workbuddyPath, forKey: "myclip.workbuddyPath") } }
     @Published var qwenworkPath: String { didSet { defaults.set(qwenworkPath, forKey: "myclip.qwenworkPath") } }
+    @Published private(set) var agentModels: [String: String] { didSet { defaults.set(agentModels, forKey: "myclip.agentModels") } }
     @Published var mcpClients: Set<MCPClient> { didSet { defaults.set(mcpClients.map(\.rawValue).sorted(), forKey: "myclip.mcpClients") } }
 
-    init(preview: Bool) {
-        defaults = preview ? UserDefaults(suiteName: "MyClip.Preview")! : .standard
+    init(preview: Bool, defaults suppliedDefaults: UserDefaults? = nil) {
+        let defaults = suppliedDefaults ?? (preview ? UserDefaults(suiteName: "MyClip.Preview")! : .standard)
+        self.defaults = defaults
         enabledAgent = ClipAgent(rawValue: defaults.string(forKey: "myclip.enabledAgent") ?? "")
         autoOrganize = defaults.object(forKey: "myclip.autoOrganize") as? Bool ?? true
         captureSettings = CaptureSettings.load(from: defaults)
@@ -31,6 +33,7 @@ final class ClipPreferences: ObservableObject {
         cursorPath = defaults.string(forKey: "myclip.cursorPath") ?? ""
         workbuddyPath = defaults.string(forKey: "myclip.workbuddyPath") ?? ""
         qwenworkPath = defaults.string(forKey: "myclip.qwenworkPath") ?? ""
+        agentModels = defaults.dictionary(forKey: "myclip.agentModels") as? [String: String] ?? [:]
         mcpClients = defaults.stringArray(forKey: "myclip.mcpClients").map { Set($0.compactMap(MCPClient.init(rawValue:))) } ?? [.codex, .claudeCode]
     }
 
@@ -43,6 +46,12 @@ final class ClipPreferences: ObservableObject {
         case .workbuddy: workbuddyPath
         case .qwenwork: qwenworkPath
         }
+    }
+
+    func selectedModel(for agent: ClipAgent) -> String? { agentModels[agent.rawValue] }
+
+    func setSelectedModel(_ id: String?, for agent: ClipAgent) {
+        agentModels[agent.rawValue] = id
     }
 }
 
@@ -114,6 +123,9 @@ final class MyClipModel: ObservableObject {
     var memoryScrollOffsets: [UUID: CGFloat] = [:]
     @Published var capturing = false
     @Published var workTasks: [WorkTask] = []
+    @Published private(set) var workTasksLoaded = false
+    @Published private(set) var workTasksLoadError: String?
+    @Published private(set) var workTasksUpdatedAt: Date?
     @Published var statistics = LibraryStatistics()
     @Published var tokenUsage = TokenUsageStatistics()
     @Published var workTaskEvents: [WorkTaskEvent] = []
@@ -140,7 +152,7 @@ final class MyClipModel: ObservableObject {
     var canStartOrganization: Bool {
         guard let agent = preferences.enabledAgent else { return false }
         // A disconnected Agent reconnects when a batch is due; only a failed one waits for the user.
-        return !preview && !dispatching && currentJob == nil && !discoveringTasks && [.ready, .disconnected].contains(state(agent).phase)
+        return !preview && !dispatching && currentJob == nil && !discoveringTasks && configuringAgentModels.isEmpty && [.ready, .disconnected].contains(state(agent).phase)
     }
     /// The batch that stopped the queue, if any. Retrying it resumes automatic organization.
     var latestFailedJob: ClipJob? { library.jobs.first { $0.state == .failed } }
@@ -161,6 +173,8 @@ final class MyClipModel: ObservableObject {
     @Published var agents: [ClipAgent: ClipAgentState] = Dictionary(uniqueKeysWithValues: ClipAgent.allCases.map { ($0, ClipAgentState()) })
     @Published var localAgents: [ClipAgent: LocalAgentAvailability] = [:]
     @Published var selectingDefaultAgent: ClipAgent?
+    @Published var configuringAgentModels: Set<ClipAgent> = []
+    var modelImageCapabilities: [ClipAgent: [String: Bool]] = [:]
     @Published var permissions: [ClipPermission] = []
     @Published var currentJob: ClipJob?
     @Published var activityText = "" { didSet { lastActivityAt = Date() } }
@@ -181,12 +195,12 @@ final class MyClipModel: ObservableObject {
     var cancelledJobs: Set<UUID> = []
     var lastCleanup = Date.distantPast
 
-    init(root: URL, preview: Bool) throws {
+    init(root: URL, preview: Bool, preferences suppliedPreferences: ClipPreferences? = nil) throws {
         self.preview = preview
         store = try LibraryStore(root: root)
         cloudSync = CloudSyncController(store: store, preview: preview)
         mcpEnabled = MemoryMCP.isEnabled(in: root)
-        preferences = ClipPreferences(preview: preview)
+        preferences = suppliedPreferences ?? ClipPreferences(preview: preview)
         runtime = AgentRuntime(root: root.appendingPathComponent("Runtime"))
         captureService.onCapture = { [weak self] image, context in
             guard let self else { return }
@@ -281,6 +295,7 @@ final class MyClipModel: ObservableObject {
     func state(_ agent: ClipAgent) -> ClipAgentState { agents[agent] ?? .init() }
 
     func refresh() async {
+        await refreshWorkTasks()
         do {
             if let agent = preferences.enabledAgent { try await store.reassignPendingCaptures(to: agent) }
             library = try await store.snapshot()
@@ -288,13 +303,27 @@ final class MyClipModel: ObservableObject {
             proposals = try await store.proposals()
             statistics = try await store.statistics(since: analyticsDays == 0 ? .distantPast : Calendar.current.date(byAdding: .day, value: -analyticsDays, to: Date())!)
             tokenUsage = try await store.tokenUsageStatistics()
-            workTasks = try await store.workTasks()
-            workTaskEvents = try await store.workTaskEvents()
             let query = search
             let filter = captureFilter
             let found = query.isEmpty && !filter.isActive ? library : try await store.snapshot(query: query, captureFilter: filter)
             if search == query && captureFilter == filter { results = found }
         } catch { notice = error.localizedDescription }
+    }
+
+    private func refreshWorkTasks() async {
+        do {
+            let tasks = try await store.workTasks()
+            let events = try await store.workTaskEvents()
+            workTasks = tasks
+            workTaskEvents = events
+            workTasksLoaded = true
+            workTasksLoadError = nil
+            workTasksUpdatedAt = Date()
+        } catch {
+            // Keep the last readable board while the normal refresh loop retries.
+            workTasksLoadError = error.localizedDescription
+            notice = error.localizedDescription
+        }
     }
 
     private func scheduleSearch() {

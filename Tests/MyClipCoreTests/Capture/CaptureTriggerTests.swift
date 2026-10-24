@@ -150,11 +150,12 @@ final class CaptureTriggerTests: XCTestCase {
         XCTAssertNil(trigger.poll(at: 20))
     }
 
-    func testDownwardScrollingFiresOnceAfterThreeSecondsWithoutPointerMovementOrClick() {
+    func testDownwardScrollingFiresOnceAfterFiveSecondsWithoutPointerMovementOrClick() {
         var trigger = CaptureTrigger()
         trigger.scroll(at: 100, deltaY: -1)
-        XCTAssertNil(trigger.poll(at: 102.999))
-        XCTAssertEqual(trigger.poll(at: 103), .scrollIdle)
+        XCTAssertNil(trigger.poll(at: 103))
+        XCTAssertNil(trigger.poll(at: 104.999))
+        XCTAssertEqual(trigger.poll(at: 105), .scrollIdle)
         XCTAssertNil(trigger.poll(at: 200))
     }
 
@@ -162,8 +163,9 @@ final class CaptureTriggerTests: XCTestCase {
         var trigger = CaptureTrigger()
         trigger.scroll(at: 10, deltaY: -1)
         trigger.scroll(at: 11.5, deltaY: -1)
-        XCTAssertNil(trigger.poll(at: 14.499))
-        XCTAssertEqual(trigger.poll(at: 14.5), .scrollIdle)
+        XCTAssertNil(trigger.poll(at: 15))
+        XCTAssertNil(trigger.poll(at: 16.499))
+        XCTAssertEqual(trigger.poll(at: 16.5), .scrollIdle)
     }
 
     func testUpwardAndHorizontalScrollingDoNotTriggerCapture() {
@@ -190,8 +192,8 @@ final class CaptureTriggerTests: XCTestCase {
         XCTAssertTrue(trigger.scroll(at: 10, deltaY: -1))
         XCTAssertFalse(trigger.scroll(at: 11, deltaY: 1))
         XCTAssertTrue(trigger.scroll(at: 12, deltaY: -0.25))
-        XCTAssertNil(trigger.poll(at: 14.999))
-        XCTAssertEqual(trigger.poll(at: 15), .scrollIdle)
+        XCTAssertNil(trigger.poll(at: 16.999))
+        XCTAssertEqual(trigger.poll(at: 17), .scrollIdle)
     }
 
     func testUpwardAndHorizontalScrollingPreservePendingClickCapture() {
@@ -211,14 +213,14 @@ final class CaptureTriggerTests: XCTestCase {
         trigger.scroll(at: 10, deltaY: -1)
         XCTAssertFalse(trigger.press(at: 11))
         XCTAssertFalse(trigger.click(at: 11.25))
-        XCTAssertEqual(trigger.poll(at: 13), .scrollIdle)
+        XCTAssertEqual(trigger.poll(at: 15), .scrollIdle)
     }
 
     func testPointerMovementDoesNotPostponeScrollCapture() {
         var trigger = CaptureTrigger()
         trigger.scroll(at: 10, deltaY: -1)
         trigger.activity(at: 11)
-        XCTAssertEqual(trigger.poll(at: 13), .scrollIdle)
+        XCTAssertEqual(trigger.poll(at: 15), .scrollIdle)
         XCTAssertNil(trigger.poll(at: 20))
     }
 
@@ -229,7 +231,7 @@ final class CaptureTriggerTests: XCTestCase {
         trigger.click(at: 12.25)
         trigger.scroll(at: 12.5, deltaY: -1)
         XCTAssertNil(trigger.poll(at: 12.75))
-        XCTAssertEqual(trigger.poll(at: 15.5), .scrollIdle)
+        XCTAssertEqual(trigger.poll(at: 17.5), .scrollIdle)
         XCTAssertNil(trigger.poll(at: 20))
     }
 
@@ -287,7 +289,7 @@ final class CaptureTriggerTests: XCTestCase {
         var trigger = CaptureTrigger()
         _ = trigger.keyDown(keyCode: 0)
         trigger.scroll(at: 10, deltaY: -1)
-        XCTAssertEqual(trigger.poll(at: 13), .scrollIdle)
+        XCTAssertEqual(trigger.poll(at: 15), .scrollIdle)
         XCTAssertEqual(trigger.keyDown(keyCode: 36), .enter)
     }
 
@@ -297,7 +299,7 @@ final class CaptureTriggerTests: XCTestCase {
         trigger.scroll(at: 10, deltaY: -1)
         trigger.resetKeyboard()
         XCTAssertNil(trigger.keyDown(keyCode: 36))
-        XCTAssertEqual(trigger.poll(at: 13), .scrollIdle)
+        XCTAssertEqual(trigger.poll(at: 15), .scrollIdle)
     }
 
     func testPauseAndSettingsChangesDiscardArmedInput() {
@@ -320,7 +322,8 @@ final class CaptureTriggerTests: XCTestCase {
             XCTAssertEqual(trigger.click(at: 11.25), selected.contains(.click))
             XCTAssertEqual(trigger.poll(at: 11.75), selected.contains(.click) ? .clickAfterIdle : nil)
             trigger.scroll(at: 20, deltaY: -1)
-            XCTAssertEqual(trigger.poll(at: 23), selected.contains(.scroll) ? .scrollIdle : nil)
+            XCTAssertNil(trigger.poll(at: 23))
+            XCTAssertEqual(trigger.poll(at: 25), selected.contains(.scroll) ? .scrollIdle : nil)
             _ = trigger.keyDown(keyCode: 0)
             XCTAssertEqual(trigger.keyDown(keyCode: 36), .enter)
         }

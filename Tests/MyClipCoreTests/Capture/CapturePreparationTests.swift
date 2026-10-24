@@ -26,8 +26,8 @@ final class CapturePreparationTests: XCTestCase {
         XCTAssertNotNil(try CapturedImage.prepare(image: image(foregroundPixels: 733), settings: settings, reason: .enter))
     }
 
-    func testSparseContentDoesNotVetoFilteringForAutomaticTriggers() throws {
-        let settings = CaptureSettings(filterStrategies: [.nearUniformImages])
+    func testDefaultSettingsFilterSparseContentForAutomaticTriggers() throws {
+        let settings = CaptureSettings()
         for color: [UInt8] in [[255, 255, 255, 255], [228, 229, 231, 255], [24, 24, 24, 255], [0, 0, 0, 255]] {
             for reason: CaptureReason in [.enter, .clickAfterIdle, .scrollIdle] {
                 XCTAssertNil(try CapturedImage.prepare(image: image(foregroundPixels: 8, background: color), settings: settings, reason: reason))

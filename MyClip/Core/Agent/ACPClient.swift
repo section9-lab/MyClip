@@ -47,6 +47,7 @@ public struct ACPPermissionRequest: Sendable, Identifiable {
 }
 
 public enum ACPEvent: Sendable {
+    case models(sessionID: String, selection: ACPModelSelection)
     case message(sessionID: String, text: String)
     case thinking(sessionID: String)
     case tool(sessionID: String, title: String, status: String)
@@ -183,6 +184,7 @@ public actor ACPClient {
     private var executions: [String: ACPExecutionState] = [:]
     private var sessionCosts: [String: ExecutionCost] = [:]
     private var freshCostSessions: Set<String> = []
+    private var sessionModels: [String: ACPModelSelection] = [:]
     private var lastPromptActivity: [String: ContinuousClock.Instant] = [:]
     private var supportsImages = false
     private var supportsSessionLoading = false
@@ -264,6 +266,7 @@ public actor ACPClient {
             throw ACPError.protocolError(String(localized: "缺少会话标识。"))
         }
         freshCostSessions.insert(id)
+        captureModels(result, session: id)
         return id
     }
 
@@ -288,7 +291,8 @@ public actor ACPClient {
             var params = sessionParameters(directory: directory, memoryServer: memoryServer)
             params["sessionId"] = .string(saved.id)
             do {
-                _ = try await request(supportsSessionResume ? "session/resume" : "session/load", params: .object(params), timeout: .seconds(60))
+                let result = try await request(supportsSessionResume ? "session/resume" : "session/load", params: .object(params), timeout: .seconds(60))
+                captureModels(result, session: saved.id)
                 conversations[stateFile] = saved
                 return ACPConversation(id: saved.id, origin: .restored)
             } catch ACPError.remote(let code, _) where [-32601, -32602, -32002].contains(code) {
@@ -308,9 +312,71 @@ public actor ACPClient {
     }
 
     public func setMode(sessionID: String, modeID: String) async throws {
-        _ = try await request("session/set_mode", params: .object(["sessionId": .string(sessionID), "modeId": .string(modeID)]))
+        let result = try await request("session/set_mode", params: .object(["sessionId": .string(sessionID), "modeId": .string(modeID)]))
+        captureModels(result, session: sessionID)
         if ClipAgent.allCases.contains(where: { $0.fullAccessModeID == modeID }) { fullAccessSessions.insert(sessionID) }
         else { fullAccessSessions.remove(sessionID) }
+    }
+
+    public func modelSelection(sessionID: String) -> ACPModelSelection { sessionModels[sessionID] ?? ACPModelSelection() }
+
+    public func setModel(sessionID: String, modelID: String) async throws {
+        guard responses[sessionID] == nil else { throw ACPError.protocolError(String(localized: "请等待当前整理结束后再切换模型。")) }
+        let selection = modelSelection(sessionID: sessionID)
+        guard selection.canSelect, selection.options.contains(where: { $0.id == modelID }) else {
+            throw LibraryError.invalidResult(String(localized: "所选模型不在 Agent 当前提供的列表中，请刷新后重新选择。"))
+        }
+        let result: JSONValue
+        if let configID = selection.configID {
+            result = try await request("session/set_config_option", params: .object([
+                "sessionId": .string(sessionID), "configId": .string(configID), "value": .string(modelID)
+            ]))
+            guard case .array = result["configOptions"] else {
+                throw LibraryError.invalidResult(String(localized: "Agent 未确认所选模型，请刷新列表后重试。"))
+            }
+            captureModels(result, session: sessionID)
+            guard sessionModels[sessionID]?.currentID == modelID else {
+                throw LibraryError.invalidResult(String(localized: "Agent 未确认所选模型，请刷新列表后重试。"))
+            }
+        } else {
+            result = try await request("session/set_model", params: .object(["sessionId": .string(sessionID), "modelId": .string(modelID)]))
+            // The legacy setter acknowledges with an empty result.
+            sessionModels[sessionID]?.currentID = modelID
+            captureModels(result, session: sessionID)
+            guard sessionModels[sessionID]?.currentID == modelID else {
+                throw LibraryError.invalidResult(String(localized: "Agent 未确认所选模型，请刷新列表后重试。"))
+            }
+        }
+    }
+
+    private func captureModels(_ result: JSONValue, session: String) {
+        if case .array(let configs) = result["configOptions"] {
+            if let model = configs.first(where: { $0["category"].string == "model" && $0["type"].string == "select" }),
+               let id = model["id"].string {
+                var seen: Set<String> = []
+                let options = model["options"].array.flatMap { value -> [ACPModelOption] in
+                    let grouped = value["group"].string != nil
+                    return (grouped ? value["options"].array : [value]).compactMap { option in
+                        guard let id = option["value"].string, !id.isEmpty, seen.insert(id).inserted else { return nil }
+                        return ACPModelOption(id: id, name: option["name"].string ?? id,
+                            description: option["description"].string, group: grouped ? value["name"].string : nil)
+                    }
+                }
+                sessionModels[session] = ACPModelSelection(currentID: model["currentValue"].string, options: options, configID: id)
+                return
+            }
+            // An authoritative full config refresh may remove the model selector.
+            sessionModels[session] = ACPModelSelection()
+        }
+        if case .object = result["models"] {
+            let models = result["models"]
+            var seen: Set<String> = []
+            let options = models["availableModels"].array.compactMap { option -> ACPModelOption? in
+                guard let id = option["modelId"].string, !id.isEmpty, seen.insert(id).inserted else { return nil }
+                return ACPModelOption(id: id, name: option["name"].string ?? id, description: option["description"].string)
+            }
+            sessionModels[session] = ACPModelSelection(currentID: models["currentModelId"].string, options: options, usesLegacyAPI: true)
+        }
     }
 
     public func prompt(sessionID: String, text: String, images: [Data], maximumDuration: Duration? = nil,
@@ -406,6 +472,7 @@ public actor ACPClient {
         failPending(ACPError.disconnected(""))
         permissions.removeAll()
         fullAccessSessions.removeAll()
+        sessionModels.removeAll()
         cancelledPrompts.removeAll()
         eventContinuation.finish()
     }
@@ -502,6 +569,9 @@ public actor ACPClient {
             if method == "session/update", let session = params["sessionId"].string {
                 let update = params["update"]
                 switch update["sessionUpdate"].string {
+                case "config_option_update":
+                    captureModels(update, session: session)
+                    eventContinuation.yield(.models(sessionID: session, selection: modelSelection(sessionID: session)))
                 case "agent_thought_chunk":
                     if responses[session] != nil, let text = update["content"]["text"].string, !text.isEmpty {
                         recordPromptActivity(session)

@@ -22,7 +22,7 @@ public enum CaptureReason: String, Codable, Sendable {
         case .pointerIdle: String(localized: "鼠标活动停止 2 秒")
         case .clickIdle: String(localized: "移动后点击，停顿 2 秒")
         case .clickAfterIdle: String(localized: "鼠标移动后5秒内点击")
-        case .scrollIdle: String(localized: "scroll向下滚动后静止3秒")
+        case .scrollIdle: String(localized: "scroll向下滚动后静止5秒")
         case .enter: String(localized: "回车触发")
         case .manual: String(localized: "手动截图")
         }
@@ -37,6 +37,7 @@ public struct CaptureTrigger: Sendable {
     private var pressedClick = false
     private var pending: (deadline: TimeInterval, reason: CaptureReason)?
     private var hasTypedLetter = false
+    private static let scrollIdleDelay: TimeInterval = 5
     private static let letterKeys: Set<UInt16> = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 31, 32, 34, 35, 37, 38, 40, 45, 46]
 
     public init(settings: CaptureSettings = CaptureSettings()) { self.settings = settings }
@@ -75,7 +76,7 @@ public struct CaptureTrigger: Sendable {
             if pending?.reason == .scrollIdle { pending = nil }
             return false
         }
-        pending = (time + 3, .scrollIdle)
+        pending = (time + Self.scrollIdleDelay, .scrollIdle)
         return true
     }
 

@@ -567,6 +567,46 @@
         }
       }
     },
+    "%@ 模型": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@-Modelle"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ models"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelos de %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèles de %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ のモデル"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 모델"
+          }
+        }
+      }
+    },
     "%@ 正在思考…": {
       "localizations": {
         "de": {
@@ -1856,6 +1896,46 @@
         }
       }
     },
+    "%lld 项": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Aufgaben"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld tasks"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld tareas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld tâches"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 件"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld개"
+          }
+        }
+      }
+    },
     "%lld 项修改待确认": {
       "localizations": {
         "de": {
@@ -2467,6 +2547,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "Agent가 완료 전에 중단되었습니다. 다시 시도하십시오."
+          }
+        }
+      }
+    },
+    "Agent 未提供可选模型，请先在 Agent 中设置或更新其连接组件。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Agent hat keine Modelle bereitgestellt. Im Agent konfigurieren oder den Connector aktualisieren."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Agent did not provide model choices. Configure it in the Agent or update its connector."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El Agent no proporcionó modelos. Configúralo en el Agent o actualiza su conector."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le Agent n’a pas fourni de modèles. Configurez-les dans le Agent ou mettez son connecteur à jour."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent がモデル候補を返しませんでした。Agent 側で設定するか、接続コンポーネントを更新してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent가 모델 목록을 제공하지 않았습니다. Agent에서 설정하거나 연결 구성 요소를 업데이트하세요."
+          }
+        }
+      }
+    },
+    "Agent 未确认所选模型，请刷新列表后重试。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Agent hat das gewählte Modell nicht bestätigt. Liste aktualisieren und erneut versuchen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Agent did not confirm the selected model. Refresh the list and retry."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El Agent no confirmó el modelo elegido. Actualiza la lista e inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le Agent n’a pas confirmé le modèle choisi. Actualisez la liste et réessayez."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent が選択したモデルを確認できませんでした。一覧を更新して再試行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent가 선택한 모델을 확인하지 않았습니다. 목록을 새로 고친 후 다시 시도하세요."
           }
         }
       }
@@ -4034,42 +4194,42 @@
         }
       }
     },
-    "MyClip 将应用窗口中的信息，整理为有来源的本地知识。\n\n## 从一张截图开始\n\n鼠标移动后五秒内点击或双击；向下滚动后静止三秒；或按下回车，记录当前应用的焦点窗口。重复画面共享一份图片，每次出现的时间仍被保留。\n\n## 从记录到理解\n\nCodex 或 Claude 通过 ACP 读取截图，整理 Memory。点击下方来源，可以回到知识产生的那一刻。\n\n这是用于验证界面的示例内容。": {
+    "MyClip 将应用窗口中的信息，整理为有来源的本地知识。\n\n## 从一张截图开始\n\n鼠标移动后五秒内点击或双击；向下滚动后静止五秒；或按下回车，记录当前应用的焦点窗口。重复画面共享一份图片，每次出现的时间仍被保留。\n\n## 从记录到理解\n\nCodex 或 Claude 通过 ACP 读取截图，整理 Memory。点击下方来源，可以回到知识产生的那一刻。\n\n这是用于验证界面的示例内容。": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyClip organisiert die Informationen aus App-Fenstern zu lokalem Wissen mit Quellenangaben.\n\n## Mit einem Bildschirmfoto beginnen\n\nKlicke oder doppelklicke innerhalb von fünf Sekunden nach einer Mausbewegung; scrolle nach unten und pausiere drei Sekunden; oder drücke den Zeilenschalter, um das aktive Fenster der aktuellen App aufzunehmen. Wiederholte Bilder teilen sich eine Bilddatei, der Zeitpunkt jedes Vorkommens bleibt erhalten.\n\n## Von der Aufzeichnung zum Verständnis\n\nCodex oder Claude lesen die Bildschirmfotos über ACP und organisieren Memory. Klicke unten auf eine Quelle, um zu dem Moment zurückzukehren, in dem das Wissen entstanden ist.\n\nDies ist Beispielinhalt zur Überprüfung der Oberfläche."
+            "value": "MyClip organisiert die Informationen aus App-Fenstern zu lokalem Wissen mit Quellenangaben.\n\n## Mit einem Bildschirmfoto beginnen\n\nKlicke oder doppelklicke innerhalb von fünf Sekunden nach einer Mausbewegung; scrolle nach unten und pausiere fünf Sekunden; oder drücke den Zeilenschalter, um das aktive Fenster der aktuellen App aufzunehmen. Wiederholte Bilder teilen sich eine Bilddatei, der Zeitpunkt jedes Vorkommens bleibt erhalten.\n\n## Von der Aufzeichnung zum Verständnis\n\nCodex oder Claude lesen die Bildschirmfotos über ACP und organisieren Memory. Klicke unten auf eine Quelle, um zu dem Moment zurückzukehren, in dem das Wissen entstanden ist.\n\nDies ist Beispielinhalt zur Überprüfung der Oberfläche."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyClip turns the information in your app windows into local knowledge with sources.\n\n## Start with a Screenshot\n\nClick or double-click within five seconds of moving the mouse; scroll down and stop for three seconds; or press Return to record the focused window of the current app. Repeated frames share one image, while the time of each occurrence is still kept.\n\n## From Records to Understanding\n\nCodex or Claude reads the screenshots through ACP and organizes Memory. Click a source below to return to the moment the knowledge was created.\n\nThis is sample content for verifying the interface."
+            "value": "MyClip turns the information in your app windows into local knowledge with sources.\n\n## Start with a Screenshot\n\nClick or double-click within five seconds of moving the mouse; scroll down and stop for five seconds; or press Return to record the focused window of the current app. Repeated frames share one image, while the time of each occurrence is still kept.\n\n## From Records to Understanding\n\nCodex or Claude reads the screenshots through ACP and organizes Memory. Click a source below to return to the moment the knowledge was created.\n\nThis is sample content for verifying the interface."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyClip convierte la información de las ventanas de tus apps en conocimiento local con fuentes.\n\n## Empieza con una captura de pantalla\n\nHaz clic o doble clic dentro de los cinco segundos después de mover el ratón; desplázate hacia abajo y detente tres segundos; o pulsa Retorno para registrar la ventana con el foco de la app actual. Las imágenes repetidas comparten un solo archivo, pero se conserva la hora de cada aparición.\n\n## Del registro a la comprensión\n\nCodex o Claude leen las capturas mediante ACP y organizan Memory. Haz clic en una fuente más abajo para volver al momento en que surgió ese conocimiento.\n\nEste es un contenido de ejemplo para validar la interfaz."
+            "value": "MyClip convierte la información de las ventanas de tus apps en conocimiento local con fuentes.\n\n## Empieza con una captura de pantalla\n\nHaz clic o doble clic dentro de los cinco segundos después de mover el ratón; desplázate hacia abajo y detente cinco segundos; o pulsa Retorno para registrar la ventana con el foco de la app actual. Las imágenes repetidas comparten un solo archivo, pero se conserva la hora de cada aparición.\n\n## Del registro a la comprensión\n\nCodex o Claude leen las capturas mediante ACP y organizan Memory. Haz clic en una fuente más abajo para volver al momento en que surgió ese conocimiento.\n\nEste es un contenido de ejemplo para validar la interfaz."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyClip transforme les informations affichées dans vos fenêtres en connaissances locales accompagnées de leurs sources.\n\n## Tout commence par une capture d'écran\n\nCliquez ou double-cliquez dans les cinq secondes après avoir déplacé la souris ; faites défiler vers le bas puis arrêtez-vous trois secondes ; ou appuyez sur Retour : la fenêtre au premier plan de l'app active est enregistrée. Les images identiques partagent un seul fichier, mais l'heure de chaque occurrence est conservée.\n\n## De l'enregistrement à la compréhension\n\nCodex ou Claude lit les captures via ACP et organise Memory. Cliquez sur une source ci-dessous pour revenir à l'instant où la connaissance est née.\n\nCeci est un exemple de contenu destiné à vérifier l'interface."
+            "value": "MyClip transforme les informations affichées dans vos fenêtres en connaissances locales accompagnées de leurs sources.\n\n## Tout commence par une capture d'écran\n\nCliquez ou double-cliquez dans les cinq secondes après avoir déplacé la souris ; faites défiler vers le bas puis arrêtez-vous cinq secondes ; ou appuyez sur Retour : la fenêtre au premier plan de l'app active est enregistrée. Les images identiques partagent un seul fichier, mais l'heure de chaque occurrence est conservée.\n\n## De l'enregistrement à la compréhension\n\nCodex ou Claude lit les captures via ACP et organise Memory. Cliquez sur une source ci-dessous pour revenir à l'instant où la connaissance est née.\n\nCeci est un exemple de contenu destiné à vérifier l'interface."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyClip はアプリのウインドウに表示された情報を、出典付きのローカルナレッジとして整理します。\n\n## 1 枚のスクリーンショットから\n\nマウスを動かしてから5秒以内にクリックまたはダブルクリック、下にスクロールしてから3秒静止、または Return キーを押すと、現在のアプリのフォーカスウインドウを記録します。同じ画面は 1 枚の画像を共有し、それぞれの出現時刻は保持されます。\n\n## 記録から理解へ\n\nCodex または Claude が ACP 経由でスクリーンショットを読み取り、Memory を整理します。下のソースをクリックすると、その知識が生まれた瞬間に戻れます。\n\nこれはインターフェイス確認用のサンプルコンテンツです。"
+            "value": "MyClip はアプリのウインドウに表示された情報を、出典付きのローカルナレッジとして整理します。\n\n## 1 枚のスクリーンショットから\n\nマウスを動かしてから5秒以内にクリックまたはダブルクリック、下にスクロールしてから5秒静止、または Return キーを押すと、現在のアプリのフォーカスウインドウを記録します。同じ画面は 1 枚の画像を共有し、それぞれの出現時刻は保持されます。\n\n## 記録から理解へ\n\nCodex または Claude が ACP 経由でスクリーンショットを読み取り、Memory を整理します。下のソースをクリックすると、その知識が生まれた瞬間に戻れます。\n\nこれはインターフェイス確認用のサンプルコンテンツです。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "MyClip은 앱 윈도우의 정보를 출처가 있는 로컬 지식으로 정리합니다.\n\n## 한 장의 스크린샷에서 시작\n\n마우스를 움직인 뒤 5초 이내에 클릭 또는 이중 클릭하거나, 아래로 스크롤한 뒤 3초간 멈추거나, Return 키를 누르면 현재 앱의 포커스 윈도우를 기록합니다. 반복되는 화면은 이미지 한 장을 공유하며, 매번 등장한 시간은 그대로 보존됩니다.\n\n## 기록에서 이해로\n\nCodex 또는 Claude가 ACP를 통해 스크린샷을 읽고 Memory를 정리합니다. 아래의 출처를 클릭하면 지식이 만들어진 그 순간으로 돌아갈 수 있습니다.\n\n이 내용은 인터페이스 확인용 예시입니다."
+            "value": "MyClip은 앱 윈도우의 정보를 출처가 있는 로컬 지식으로 정리합니다.\n\n## 한 장의 스크린샷에서 시작\n\n마우스를 움직인 뒤 5초 이내에 클릭 또는 이중 클릭하거나, 아래로 스크롤한 뒤 5초간 멈추거나, Return 키를 누르면 현재 앱의 포커스 윈도우를 기록합니다. 반복되는 화면은 이미지 한 장을 공유하며, 매번 등장한 시간은 그대로 보존됩니다.\n\n## 기록에서 이해로\n\nCodex 또는 Claude가 ACP를 통해 스크린샷을 읽고 Memory를 정리합니다. 아래의 출처를 클릭하면 지식이 만들어진 그 순간으로 돌아갈 수 있습니다.\n\n이 내용은 인터페이스 확인용 예시입니다."
           }
         }
       }
@@ -4150,6 +4310,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "MyClip이 기억의 원본입니다. 동기화는 전용 클라우드 폴더와 파일만 업데이트하며 클라우드 편집은 가져오지 않습니다. 로컬 삭제나 동기화 범위 제외 시 해당 관리 사본이 휴지통으로 이동합니다. 스크린샷과 OCR은 업로드하지 않습니다."
+          }
+        }
+      }
+    },
+    "MyClip 看板": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip-Kanban"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip Kanban"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tablero de MyClip"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tableau MyClip"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip 看板"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip 칸반"
           }
         }
       }
@@ -4797,42 +4997,42 @@
         }
       }
     },
-    "scroll向下滚动后静止3秒": {
+    "scroll向下滚动后静止5秒": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nach unten scrollen, dann 3 Sekunden pausieren"
+            "value": "Nach unten scrollen, dann 5 Sekunden pausieren"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scroll down, then pause for 3 seconds"
+            "value": "Scroll down, then pause for 5 seconds"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Desplazarse hacia abajo y detenerse 3 s"
+            "value": "Desplazarse hacia abajo y detenerse 5 s"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Faire défiler vers le bas, puis s’arrêter 3 s"
+            "value": "Faire défiler vers le bas, puis s’arrêter 5 s"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "下にスクロールしてから3秒静止"
+            "value": "下にスクロールしてから5秒静止"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "아래로 스크롤한 후 3초간 정지"
+            "value": "아래로 스크롤한 후 5초간 정지"
           }
         }
       }
@@ -5926,6 +6126,46 @@
         }
       }
     },
+    "不支持图片": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Bildunterstützung"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No image support"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No admite imágenes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Images non prises en charge"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画像非対応"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미지 미지원"
+          }
+        }
+      }
+    },
     "不是 UTF-8 文本。": {
       "localizations": {
         "de": {
@@ -6722,6 +6962,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "오늘"
+          }
+        }
+      }
+    },
+    "从 Agent 获取可用模型，应用到后续整理会话": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verfügbare Agent-Modelle abrufen und in späteren Sitzungen verwenden"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get available models from the Agent and use the selection in later sessions"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obtener los modelos del Agent y usarlos en sesiones posteriores"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obtenir les modèles du Agent et appliquer le choix aux sessions suivantes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent から利用可能なモデルを取得し、以降の整理セッションで使用"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent에서 사용 가능한 모델을 가져와 이후 정리 세션에 적용"
           }
         }
       }
@@ -8002,6 +8282,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "정리에 활성화된 %@ 사용"
+          }
+        }
+      }
+    },
+    "使用新会话的默认模型，不修改 Agent 全局设置": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standardmodell der neuen Sitzung verwenden, ohne globale Agent-Einstellungen zu ändern"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the new session’s default model without changing global Agent settings"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar el modelo predeterminado de la nueva sesión sin cambiar los ajustes globales del Agent"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser le modèle par défaut de la nouvelle session sans modifier les réglages globaux du Agent"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent の全体設定を変更せず、新規セッションの既定モデルを使用"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 전역 설정을 변경하지 않고 새 세션의 기본 모델 사용"
           }
         }
       }
@@ -10326,6 +10646,46 @@
         }
       }
     },
+    "刷新列表": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liste aktualisieren"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh list"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizar lista"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualiser la liste"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リストを更新"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "목록 새로 고침"
+          }
+        }
+      }
+    },
     "剪切": {
       "localizations": {
         "de": {
@@ -12086,6 +12446,86 @@
         }
       }
     },
+    "图片能力未知": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bildunterstützung unbekannt"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Image support unknown"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compatibilidad con imágenes desconocida"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prise en charge des images inconnue"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画像対応は不明"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미지 지원 여부 알 수 없음"
+          }
+        }
+      }
+    },
+    "图片能力未知的模型需以实际调用结果为准；不会自动切换到其他模型。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei unbekannter Bildunterstützung entscheidet die tatsächliche Antwort. Modelle werden nie automatisch gewechselt."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For models with unknown image support, the actual response determines compatibility. Models are never switched automatically."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En modelos de compatibilidad desconocida, la respuesta real determina si admiten imágenes. No se cambia de modelo automáticamente."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pour les modèles de capacité inconnue, la réponse réelle détermine la compatibilité. Aucun changement automatique de modèle."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画像対応が不明なモデルは実際の応答で確認します。他のモデルへ自動切り替えはしません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미지 지원 여부가 불명확한 모델은 실제 호출 결과로 확인합니다. 다른 모델로 자동 전환하지 않습니다."
+          }
+        }
+      }
+    },
     "图表": {
       "localizations": {
         "de": {
@@ -12162,6 +12602,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "Finder에서 보기"
+          }
+        }
+      }
+    },
+    "在应用中新建待办，或让 AI 从 Memory 发现工作。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erstelle eine Aufgabe in der App oder lass die KI Aufgaben in Memory finden."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a task in the app, or let AI find tasks in Memory."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crea una tarea en la app o deja que la IA encuentre tareas en Memory."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créez une tâche dans l’app ou laissez l’IA trouver des tâches dans Memory."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリでタスクを作成するか、AI で Memory から見つけましょう。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앱에서 할 일을 만들거나 AI가 Memory에서 작업을 찾도록 하세요."
           }
         }
       }
@@ -14766,42 +15246,42 @@
         }
       }
     },
-    "已检测到向下滚动，静止 3 秒后截图": {
+    "已检测到向下滚动，静止 5 秒后截图": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abwärtsscrollen erkannt. Aufnahme nach 3 Sekunden Pause"
+            "value": "Abwärtsscrollen erkannt. Aufnahme nach 5 Sekunden Pause"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Downward scrolling detected; capture after a 3-second pause"
+            "value": "Downward scrolling detected; capture after a 5-second pause"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Desplazamiento hacia abajo detectado; captura tras una pausa de 3 s"
+            "value": "Desplazamiento hacia abajo detectado; captura tras una pausa de 5 s"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Défilement vers le bas détecté ; capture après une pause de 3 s"
+            "value": "Défilement vers le bas détecté ; capture après une pause de 5 s"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "下へのスクロールを検出。3秒静止後に撮影します"
+            "value": "下へのスクロールを検出。5秒静止後に撮影します"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "아래로 스크롤 감지, 3초간 정지 후 캡처"
+            "value": "아래로 스크롤 감지, 5초간 정지 후 캡처"
           }
         }
       }
@@ -15122,6 +15602,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "연결됨 · 자동 정리 가능"
+          }
+        }
+      }
+    },
+    "已选择": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausgewählt"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seleccionado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionné"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択済み"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택됨"
           }
         }
       }
@@ -15606,6 +16126,46 @@
         }
       }
     },
+    "当前会话：%@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktuelle Sitzung: %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current session: %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesión actual: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session actuelle : %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在のセッション：%@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "현재 세션: %@"
+          }
+        }
+      }
+    },
     "当前使用": {
       "localizations": {
         "de": {
@@ -15722,6 +16282,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "현재 내용 · 버전 %lld"
+          }
+        }
+      }
+    },
+    "当前模型不支持图片。请在 Backstage 选择支持图片的模型后重试。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das aktuelle Modell unterstützt keine Bilder. In Backstage ein bildfähiges Modell wählen und erneut versuchen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The current model does not support images. Choose an image-capable model in Backstage and retry."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo actual no admite imágenes. Elige un modelo compatible en Backstage y vuelve a intentarlo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle actuel ne prend pas en charge les images. Choisissez un modèle compatible dans Backstage et réessayez."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在のモデルは画像に対応していません。Backstage で画像対応モデルを選び、再試行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "현재 모델은 이미지를 지원하지 않습니다. Backstage에서 이미지 지원 모델을 선택한 후 다시 시도하세요."
+          }
+        }
+      }
+    },
+    "当前模型不支持图片，请选择支持图片的模型后整理截图。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das aktuelle Modell unterstützt keine Bilder. Für Screenshots ein bildfähiges Modell wählen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The current model does not support images. Choose an image-capable model to organize screenshots."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo actual no admite imágenes. Elige un modelo compatible para organizar capturas."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle actuel ne prend pas en charge les images. Choisissez un modèle compatible pour organiser les captures."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在のモデルは画像に対応していません。スクリーンショットの整理には画像対応モデルを選択してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "현재 모델은 이미지를 지원하지 않습니다. 스크린샷을 정리하려면 이미지 지원 모델을 선택하세요."
           }
         }
       }
@@ -16646,6 +17286,46 @@
         }
       }
     },
+    "所选模型不在 Agent 当前提供的列表中，请刷新后重新选择。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das gewählte Modell fehlt in der aktuellen Agent-Liste. Aktualisieren und neu wählen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The selected model is not in the Agent’s current list. Refresh and choose again."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo elegido no está en la lista actual del Agent. Actualiza y vuelve a elegir."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle choisi n’est pas dans la liste actuelle du Agent. Actualisez et choisissez à nouveau."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択したモデルは Agent の現在の一覧にありません。更新して選び直してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택한 모델이 Agent의 현재 목록에 없습니다. 새로 고침 후 다시 선택하세요."
+          }
+        }
+      }
+    },
     "手动创建": {
       "localizations": {
         "de": {
@@ -16922,6 +17602,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "클라우드 폴더 열기"
+          }
+        }
+      }
+    },
+    "打开应用": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App öffnen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open App"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir app"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir l’app"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリを開く"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앱 열기"
           }
         }
       }
@@ -17282,6 +18002,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "상위 폴더 지정(선택 사항)"
+          }
+        }
+      }
+    },
+    "按 Agent 分别保存，应用到后续整理会话。列表由 Agent 实时提供。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wird je Agent gespeichert und in späteren Sitzungen angewendet. Die aktuelle Liste liefert der Agent."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved separately for each Agent and applied to later organization sessions. The Agent supplies the live list."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se guarda por separado para cada Agent y se aplica a sesiones posteriores. El Agent proporciona la lista actual."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistré séparément par Agent et appliqué aux sessions suivantes. La liste est fournie par le Agent."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent ごとに保存し、以降の整理セッションに適用します。一覧は Agent から取得します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent별로 저장하여 이후 정리 세션에 적용합니다. 목록은 Agent에서 실시간으로 제공합니다."
           }
         }
       }
@@ -18006,6 +18766,46 @@
         }
       }
     },
+    "搜索模型名称或 ID": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modellnamen oder ID suchen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search model name or ID"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar nombre o ID del modelo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechercher un nom ou ID de modèle"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデル名または ID を検索"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델 이름 또는 ID 검색"
+          }
+        }
+      }
+    },
     "搜索结果": {
       "localizations": {
         "de": {
@@ -18122,6 +18922,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "실행 취소"
+          }
+        }
+      }
+    },
+    "支持图片": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unterstützt Bilder"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supports images"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Admite imágenes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Images prises en charge"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画像対応"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미지 지원"
           }
         }
       }
@@ -20326,6 +21166,46 @@
         }
       }
     },
+    "显示 MyClip 看板": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip-Kanban anzeigen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show MyClip Kanban"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar el tablero de MyClip"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le tableau MyClip"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip の看板を表示"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip 칸반 표시"
+          }
+        }
+      }
+    },
     "显示原图": {
       "localizations": {
         "de": {
@@ -20362,6 +21242,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "원본 이미지 보기"
+          }
+        }
+      }
+    },
+    "显示只读看板": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schreibgeschütztes Board anzeigen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the read-only board"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar el tablero de solo lectura"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le tableau en lecture seule"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "読み取り専用の看板を表示"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "읽기 전용 칸반 표시"
           }
         }
       }
@@ -20606,6 +21526,46 @@
         }
       }
     },
+    "暂无看板任务": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Aufgaben auf dem Board"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No tasks on the board"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay tareas en el tablero"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune tâche dans le tableau"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "看板にタスクがありません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "칸반에 작업이 없습니다"
+          }
+        }
+      }
+    },
     "暂无记录。": {
       "localizations": {
         "de": {
@@ -20642,6 +21602,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "기록이 없습니다."
+          }
+        }
+      }
+    },
+    "暂时无法读取看板": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Board ist vorübergehend nicht verfügbar"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The board is temporarily unavailable"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El tablero no está disponible temporalmente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le tableau est temporairement indisponible"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "看板を読み込めません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "칸반을 일시적으로 불러올 수 없습니다"
           }
         }
       }
@@ -20722,6 +21722,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "추가 근거 · %lld"
+          }
+        }
+      }
+    },
+    "更新于 %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktualisiert um %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updated at %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizado a las %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mis à jour à %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新 %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 업데이트"
+          }
+        }
+      }
+    },
+    "更新失败": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktualisierung fehlgeschlagen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update failed"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error al actualizar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec de la mise à jour"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新に失敗"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업데이트 실패"
           }
         }
       }
@@ -22966,6 +24046,86 @@
         }
       }
     },
+    "模型": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデル"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델"
+          }
+        }
+      }
+    },
+    "模型设置失败：%@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelleinstellung fehlgeschlagen: %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model setup failed: %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error al configurar el modelo: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec du réglage du modèle : %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデル設定に失敗：%@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델 설정 실패: %@"
+          }
+        }
+      }
+    },
     "正在保存…": {
       "localizations": {
         "de": {
@@ -23242,6 +24402,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "생성 중: %@"
+          }
+        }
+      }
+    },
+    "正在加载任务…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufgaben werden geladen…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading tasks…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargando tareas…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement des tâches…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タスクを読み込み中…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "작업 불러오는 중…"
           }
         }
       }
@@ -24526,6 +25726,86 @@
         }
       }
     },
+    "此模型不支持图片，无法整理截图。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Modell unterstützt keine Bilder und kann keine Screenshots verarbeiten."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This model cannot process images and cannot organize screenshots."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este modelo no admite imágenes y no puede organizar capturas."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce modèle ne prend pas en charge les images et ne peut pas organiser les captures."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このモデルは画像に対応していないため、スクリーンショットを整理できません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 모델은 이미지를 지원하지 않아 스크린샷을 정리할 수 없습니다."
+          }
+        }
+      }
+    },
+    "此模型不支持图片，无法整理截图。请选择支持图片的模型。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Modell kann keine Screenshots verarbeiten. Ein Modell mit Bildunterstützung wählen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This model cannot organize screenshots. Choose a model that supports images."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este modelo no puede organizar capturas. Elige uno compatible con imágenes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce modèle ne peut pas organiser les captures. Choisissez un modèle prenant en charge les images."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このモデルではスクリーンショットを整理できません。画像対応モデルを選択してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 모델로는 스크린샷을 정리할 수 없습니다. 이미지를 지원하는 모델을 선택하세요."
+          }
+        }
+      }
+    },
     "此目标正在同步或连接，请稍候。": {
       "localizations": {
         "de": {
@@ -24882,6 +26162,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "일치하는 작업 없음"
+          }
+        }
+      }
+    },
+    "没有匹配的模型": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine passenden Modelle"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching models"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay modelos coincidentes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun modèle correspondant"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一致するモデルはありません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "일치하는 모델 없음"
           }
         }
       }
@@ -26202,6 +27522,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "연결된 페이지"
+          }
+        }
+      }
+    },
+    "看板": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kanban"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kanban"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tablero"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tableau"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "看板"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "칸반"
           }
         }
       }
@@ -28322,6 +29682,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "자동 캡처 대기 중"
+          }
+        }
+      }
+    },
+    "等待连接 Agent 获取模型列表": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warte auf Verbindung zum Agent für die Modellliste"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting to connect to the Agent for its model list"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esperando conectar con el Agent para obtener sus modelos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En attente de connexion au Agent pour obtenir ses modèles"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent に接続してモデル一覧を取得します"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent에 연결하여 모델 목록을 가져오는 중"
           }
         }
       }
@@ -30806,6 +32206,46 @@
         }
       }
     },
+    "请打开应用查看，稍后会自动重试。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Öffne die App für Details. MyClip versucht es automatisch erneut."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the app for details. MyClip will retry automatically."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre la app para ver los detalles. MyClip volverá a intentarlo automáticamente."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrez l’app pour plus de détails. MyClip réessaiera automatiquement."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリで詳細を確認してください。後で自動的に再試行します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "자세한 내용은 앱에서 확인하세요. 잠시 후 자동으로 다시 시도합니다."
+          }
+        }
+      }
+    },
     "请检查 Codex 安装后重试。": {
       "localizations": {
         "de": {
@@ -30842,6 +32282,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "Codex 설치를 확인한 후 다시 시도하십시오."
+          }
+        }
+      }
+    },
+    "请等待当前整理结束后再切换模型。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor dem Modellwechsel das Ende der aktuellen Verarbeitung abwarten."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait for the current organization to finish before switching models."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espera a que termine la organización actual para cambiar de modelo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attendez la fin de l’organisation en cours avant de changer de modèle."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在の整理が完了してからモデルを切り替えてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "현재 정리가 끝난 후 모델을 변경하세요."
           }
         }
       }
@@ -31522,6 +33002,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "시간 초과 및 다시 시도"
+          }
+        }
+      }
+    },
+    "跟随 Agent 默认": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent-Standard verwenden"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow Agent default"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar el valor del Agent"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suivre le réglage du Agent"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent の既定値を使用"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 기본값 사용"
           }
         }
       }
@@ -33006,6 +34526,86 @@
         }
       }
     },
+    "退出应用": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App beenden"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit App"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salir de la app"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitter l’app"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリを終了"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앱 종료"
+          }
+        }
+      }
+    },
+    "选择 %@ 的模型": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell für %@ wählen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a model for %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir un modelo para %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir un modèle pour %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ のモデルを選択"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 모델 선택"
+          }
+        }
+      }
+    },
     "选择 Agent 整理工作记录，也可以稍后设置。": {
       "localizations": {
         "de": {
@@ -33202,6 +34802,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "정리할 Agent 선택"
+          }
+        }
+      }
+    },
+    "选择模型…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell wählen…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose model…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir modelo…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir un modèle…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデルを選択…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델 선택…"
           }
         }
       }

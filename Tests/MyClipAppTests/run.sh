@@ -10,8 +10,8 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 if [[ ${#tests[@]} -eq 0 ]]; then
-    tests=(AgentActivationTests CaptureLifecycleTests CaptureFilterModelTests ScreenshotDocumentTests
-           MemoryDirectoryTests MemoryScrollTests TaskBoardScrollTests BackstageResponsivenessTests)
+    tests=(AgentActivationTests AgentModelTests CaptureLifecycleTests CaptureFilterModelTests ScreenshotDocumentTests
+           MemoryDirectoryTests MemoryScrollTests TaskBoardScrollTests MenuBarBoardTests AgentModelPickerTests BackstageResponsivenessTests)
 fi
 if [[ ${#test_args[@]} -gt 0 && ${#tests[@]} -ne 1 ]]; then
     echo "Arguments after -- require exactly one test name." >&2
@@ -21,8 +21,8 @@ needs_model=false
 needs_app=false
 for name in "${tests[@]}"; do
     case "$name" in
-        AgentActivationTests|CaptureLifecycleTests) needs_model=true ;;
-        CaptureFilterModelTests|ScreenshotDocumentTests|MemoryDirectoryTests|MemoryScrollTests|TaskBoardScrollTests|BackstageResponsivenessTests) needs_app=true ;;
+        AgentActivationTests|AgentModelTests|CaptureLifecycleTests|MenuBarBoardTests) needs_model=true ;;
+        CaptureFilterModelTests|ScreenshotDocumentTests|MemoryDirectoryTests|MemoryScrollTests|TaskBoardScrollTests|AgentModelPickerTests|BackstageResponsivenessTests) needs_app=true ;;
         *) echo "Unknown app test: $name" >&2; exit 2 ;;
     esac
 done
@@ -67,10 +67,16 @@ for name in "${tests[@]}"; do
                 MyClip/Features/Agent/AgentCharacterView.swift MyClip/Features/Agent/AgentStatusIcon.swift \
                 MyClip/UI/LibraryCompatibility.swift "Tests/MyClipAppTests/$name.swift" -o "$test_build/bin/$name"
             ;;
-        CaptureLifecycleTests)
+        CaptureLifecycleTests|AgentModelTests)
             # These two suites replace only capture with a test double; all model/storage/ACP code is real.
             swiftc "${compiler_args[@]}" -I "$package_build/Modules" "${core_objects[@]}" \
                 "${model_sources[@]}" "Tests/MyClipAppTests/$name.swift" -o "$test_build/bin/$name"
+            ;;
+        MenuBarBoardTests)
+            swiftc "${compiler_args[@]}" -I "$package_build/Modules" "${core_objects[@]}" \
+                "${model_sources[@]}" MyClip/Features/Capture/FocusedCaptureService.swift \
+                MyClip/Features/Capture/WindowImageCapture.swift MyClip/App/MyClipMenuBar.swift \
+                MyClip/Features/Tasks/MenuBarBoardView.swift "Tests/MyClipAppTests/$name.swift" -o "$test_build/bin/$name"
             ;;
         *)
             # Reuse the built application for UI tests instead of maintaining another production source list.

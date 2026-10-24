@@ -6,7 +6,7 @@ final class CaptureSettingsTests: XCTestCase {
         let settings = CaptureSettings(scope: .focusedDisplay, mouseTriggers: [.scroll], keyboard: .afterLetters)
         let explanation = String(describing: settings)
         XCTAssertTrue(explanation.contains("焦点窗口所在的显示器"))
-        XCTAssertTrue(explanation.contains("scroll向下滚动后静止3秒"))
+        XCTAssertTrue(explanation.contains("scroll向下滚动后静止5秒"))
         XCTAssertTrue(explanation.contains("字母键后再回车"))
         XCTAssertFalse(explanation.contains("点击"))
         XCTAssertFalse(explanation.contains("只记录"))
@@ -28,6 +28,8 @@ final class CaptureSettingsTests: XCTestCase {
         XCTAssertEqual(initial.scope, .focusedWindow)
         XCTAssertEqual(initial.keyboard, .afterLetters)
         XCTAssertEqual(initial.mouseTriggers, [.click, .scroll])
+        XCTAssertEqual(initial.filterStrategies, [.similarImages, .nearUniformImages])
+        XCTAssertEqual(CaptureSettings().filterStrategies, initial.filterStrategies)
         for (value, expected) in [("pointer", Set<MouseCaptureTrigger>([.click])), ("scroll", [.scroll]), ("both", [.click, .scroll])] {
             defaults.set(value, forKey: "myclip.mouseActivity")
             XCTAssertEqual(CaptureSettings.load(from: defaults).mouseTriggers, expected)
@@ -44,12 +46,12 @@ final class CaptureSettingsTests: XCTestCase {
         XCTAssertEqual(CaptureSettings.load(from: UserDefaults(suiteName: name)!), options)
     }
 
-    func testImageFilteringIsEnabledForOldPreferences() {
+    func testBothImageFiltersAreEnabledWhenOldPreferencesHaveNoFilterSelection() {
         let name = "MyClip.CaptureTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         defer { defaults.removePersistentDomain(forName: name) }
         CaptureSettings.load(from: defaults).save(to: defaults)
-        XCTAssertEqual(defaults.stringArray(forKey: "myclip.captureFilterStrategies"), ["similarImages"])
+        XCTAssertEqual(defaults.stringArray(forKey: "myclip.captureFilterStrategies"), ["nearUniformImages", "similarImages"])
         XCTAssertEqual(CaptureFilterStrategy.allCases, [.similarImages, .nearUniformImages])
     }
 

@@ -7,15 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C10D00000000000000000001 /* CloudSyncController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10D00000000000000000011 /* CloudSyncController.swift */; };
-		C10D00000000000000000002 /* GoogleCloudOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10D00000000000000000012 /* GoogleCloudOAuth.swift */; };
-		C10D00000000000000000003 /* MemoryCloudSyncView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10D00000000000000000013 /* MemoryCloudSyncView.swift */; };
-		47747B6810368667ED56E58C /* OnboardingAgentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4DD890A1E2EBFC48D5F5F0 /* OnboardingAgentPicker.swift */; };
-		AA102223B0470480D98EC176 /* OnboardingAgentSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 630571D135886257D826182E /* OnboardingAgentSelection.swift */; };
 		141B5D09CCC37A312F2B2168 /* AgentStatusIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70B06A8F2D47DD4E505B9838 /* AgentStatusIcon.swift */; };
 		15FFB6046C4B83946F6695FB /* LibraryEmptyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78ABB8589A8DB36E09DA4C14 /* LibraryEmptyView.swift */; };
 		173D685A7D5405C853DA2247 /* MyClipModel+Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52603ED8574A1CB1A053AAE1 /* MyClipModel+Library.swift */; };
 		199858A02E568ECF4CBE0E3F /* FocusedCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1ACE9797FA6F2673F804281 /* FocusedCaptureService.swift */; };
+		1E69641895AF38398E8AD5FE /* OnboardingAgentSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB62018615C91CA2CBE29BFD /* OnboardingAgentSelection.swift */; };
 		20BC017C73F98E303FB12726 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F6147B8A0454F327B1C063E0 /* Localizable.xcstrings */; };
 		2D897039A9ABAE6A84789471 /* MyClipMenuBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B418277E6C6F4375D4CECF6F /* MyClipMenuBar.swift */; };
 		327DA081E04E7C68B47249FE /* CaptureLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CAEE5EDC1B2B064F52127E7 /* CaptureLibraryView.swift */; };
@@ -35,16 +31,22 @@
 		7A2E057DCDD83CC7525D6B07 /* MyClipModel+AgentDispatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5A953523FE50AB97501F41B /* MyClipModel+AgentDispatch.swift */; };
 		88B77B6DA51786D2DEB6201E /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DE76E67842510FF0693827A /* TaskDetailView.swift */; };
 		90A7F64BC2721DCAC22968BC /* AgentSessionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C79E0BB0A6A678E11AAA95CE /* AgentSessionCoordinator.swift */; };
+		9110E3F8C2E4C0AED09B7D6A /* MenuBarBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5386358D85297726BFFD0377 /* MenuBarBoardView.swift */; };
 		917EABC0891930A51484CD61 /* MyClipModel+MCP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34076FA1D95F6350A937A5E9 /* MyClipModel+MCP.swift */; };
 		941F401D57C3D1771CADB50D /* MyClipModel+PreviewSeeding.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6EF20CCF8E5C6FE65A46B70 /* MyClipModel+PreviewSeeding.swift */; };
+		A23D263862FE35CC5AD98168 /* CloudSyncController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88A7B97BE5C37D01F02BC6E5 /* CloudSyncController.swift */; };
 		A360B75B9365C109D10FAB72 /* CaptureOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A8E483BBAB3FAC6D0C9E66 /* CaptureOnboardingView.swift */; };
+		A601670578EEF9A9E528DDCE /* OnboardingAgentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A170092F402C828E92799453 /* OnboardingAgentPicker.swift */; };
+		AF20B3AE626D13156D74C95C /* LucideThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = 0334B2B9D358A3A43ECD84DB /* LucideThirdPartyNotices.txt */; };
 		B408A0726AAC1C4650021E17 /* MemoryMarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91C8CDA764D9C33380E2E181 /* MemoryMarkdownView.swift */; };
 		B4440E613F7363981D933F35 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C0591743E8AF1CE014CB1016 /* Assets.xcassets */; };
 		B537DCA7BD2AC57378F44909 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 893EE47D89D1C46AA406DDE3 /* MarkdownUI */; };
 		B73004AE857EE926FBA677B3 /* TaskReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9204951212CBA0EC46D14F03 /* TaskReportsView.swift */; };
+		BBC708352A422957C4DFBA83 /* GoogleCloudOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A705376F32BBFF7FADC1E9DB /* GoogleCloudOAuth.swift */; };
 		BE06ACC337950D7D031E97C2 /* TaskDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335D30CE9541EBF8930FEFDE /* TaskDashboardView.swift */; };
 		C3624FC7CDAA4F45F3DEDE44 /* BackstageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB7B1A75879DA374DAC5B36E /* BackstageView.swift */; };
 		D2AE50A8E32BF1C998951251 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 30CF768494B68CDFC6D7AFDF /* InfoPlist.xcstrings */; };
+		D4625810847EDC92F89DC74A /* MemoryCloudSyncView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 535481F8E6CC4330BF697A01 /* MemoryCloudSyncView.swift */; };
 		E14DE260BB8A27741F2BFBFA /* PermissionRequestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9177FD6294A3A264B8020C5 /* PermissionRequestView.swift */; };
 		E99A19133EA1089BCE03FE1F /* AgentRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C8DE86C797CEE965338B1C8 /* AgentRuntime.swift */; };
 		EFC0EF4553050FC905C1106E /* KnowledgeLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A5636C1E1A34430C1497903 /* KnowledgeLibraryView.swift */; };
@@ -54,11 +56,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		C10D00000000000000000011 /* CloudSyncController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncController.swift; sourceTree = "<group>"; };
-		C10D00000000000000000012 /* GoogleCloudOAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleCloudOAuth.swift; sourceTree = "<group>"; };
-		C10D00000000000000000013 /* MemoryCloudSyncView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCloudSyncView.swift; sourceTree = "<group>"; };
-		BC4DD890A1E2EBFC48D5F5F0 /* OnboardingAgentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingAgentPicker.swift; sourceTree = "<group>"; };
-		630571D135886257D826182E /* OnboardingAgentSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingAgentSelection.swift; sourceTree = "<group>"; };
+		0334B2B9D358A3A43ECD84DB /* LucideThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = LucideThirdPartyNotices.txt; sourceTree = "<group>"; };
 		0A5636C1E1A34430C1497903 /* KnowledgeLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowledgeLibraryView.swift; sourceTree = "<group>"; };
 		0D3D0BC567D8289A2AC73A4C /* MyClipRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyClipRootView.swift; sourceTree = "<group>"; };
 		20A8E483BBAB3FAC6D0C9E66 /* CaptureOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureOnboardingView.swift; sourceTree = "<group>"; };
@@ -69,6 +67,8 @@
 		357E53D3B46FD41B1CD21920 /* MyClip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MyClip.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4282F3AB5C600ED212AAD2E5 /* AnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsView.swift; sourceTree = "<group>"; };
 		52603ED8574A1CB1A053AAE1 /* MyClipModel+Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MyClipModel+Library.swift"; sourceTree = "<group>"; };
+		535481F8E6CC4330BF697A01 /* MemoryCloudSyncView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCloudSyncView.swift; sourceTree = "<group>"; };
+		5386358D85297726BFFD0377 /* MenuBarBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBoardView.swift; sourceTree = "<group>"; };
 		5510D075C5E2E2757C421222 /* ReportShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportShareView.swift; sourceTree = "<group>"; };
 		5C8DE86C797CEE965338B1C8 /* AgentRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRuntime.swift; sourceTree = "<group>"; };
 		6073BF53BD6D93A05B390CAB /* LibraryCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCompatibility.swift; sourceTree = "<group>"; };
@@ -79,15 +79,18 @@
 		78ABB8589A8DB36E09DA4C14 /* LibraryEmptyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEmptyView.swift; sourceTree = "<group>"; };
 		7CAEE5EDC1B2B064F52127E7 /* CaptureLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureLibraryView.swift; sourceTree = "<group>"; };
 		81C1E81CCBAF206D7358751F /* MyClipModel+Permissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MyClipModel+Permissions.swift"; sourceTree = "<group>"; };
+		88A7B97BE5C37D01F02BC6E5 /* CloudSyncController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncController.swift; sourceTree = "<group>"; };
 		8C538A894C0DA8D034D5ABFE /* ExecutionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionDetailView.swift; sourceTree = "<group>"; };
 		8CD7B102E641D08BD7DCD335 /* AgentCharacterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCharacterView.swift; sourceTree = "<group>"; };
 		91C8CDA764D9C33380E2E181 /* MemoryMarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryMarkdownView.swift; sourceTree = "<group>"; };
 		9204951212CBA0EC46D14F03 /* TaskReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskReportsView.swift; sourceTree = "<group>"; };
 		943B491A74E96ED4E031171C /* MyClipSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyClipSettingsView.swift; sourceTree = "<group>"; };
 		9DE76E67842510FF0693827A /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
+		A170092F402C828E92799453 /* OnboardingAgentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingAgentPicker.swift; sourceTree = "<group>"; };
 		A2D0486E69563DCE662D41AC /* MyClipModel+WorkTasks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MyClipModel+WorkTasks.swift"; sourceTree = "<group>"; };
 		A34D79AA23B040321002EFD9 /* MyClipModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyClipModel.swift; sourceTree = "<group>"; };
 		A5A953523FE50AB97501F41B /* MyClipModel+AgentDispatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MyClipModel+AgentDispatch.swift"; sourceTree = "<group>"; };
+		A705376F32BBFF7FADC1E9DB /* GoogleCloudOAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleCloudOAuth.swift; sourceTree = "<group>"; };
 		B418277E6C6F4375D4CECF6F /* MyClipMenuBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyClipMenuBar.swift; sourceTree = "<group>"; };
 		C0591743E8AF1CE014CB1016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C5C76804C327A0A0B592C603 /* MarkdownThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = MarkdownThirdPartyNotices.txt; sourceTree = "<group>"; };
@@ -97,6 +100,7 @@
 		D9177FD6294A3A264B8020C5 /* PermissionRequestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRequestView.swift; sourceTree = "<group>"; };
 		DB7B1A75879DA374DAC5B36E /* BackstageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackstageView.swift; sourceTree = "<group>"; };
 		E25B03C51C65E327F4389E00 /* MyClip.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MyClip.entitlements; sourceTree = "<group>"; };
+		EB62018615C91CA2CBE29BFD /* OnboardingAgentSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingAgentSelection.swift; sourceTree = "<group>"; };
 		F1ACE9797FA6F2673F804281 /* FocusedCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusedCaptureService.swift; sourceTree = "<group>"; };
 		F6147B8A0454F327B1C063E0 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		FB5F0C1BBDD52F2D72D0DC22 /* WindowImageCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowImageCapture.swift; sourceTree = "<group>"; };
@@ -119,8 +123,8 @@
 			isa = PBXGroup;
 			children = (
 				20A8E483BBAB3FAC6D0C9E66 /* CaptureOnboardingView.swift */,
-				BC4DD890A1E2EBFC48D5F5F0 /* OnboardingAgentPicker.swift */,
-				630571D135886257D826182E /* OnboardingAgentSelection.swift */,
+				A170092F402C828E92799453 /* OnboardingAgentPicker.swift */,
+				EB62018615C91CA2CBE29BFD /* OnboardingAgentSelection.swift */,
 			);
 			path = Onboarding;
 			sourceTree = "<group>";
@@ -128,8 +132,8 @@
 		06134ECECA2084C1AA0D4BC4 /* Model */ = {
 			isa = PBXGroup;
 			children = (
-				C10D00000000000000000011 /* CloudSyncController.swift */,
-				C10D00000000000000000012 /* GoogleCloudOAuth.swift */,
+				88A7B97BE5C37D01F02BC6E5 /* CloudSyncController.swift */,
+				A705376F32BBFF7FADC1E9DB /* GoogleCloudOAuth.swift */,
 				A34D79AA23B040321002EFD9 /* MyClipModel.swift */,
 				A5A953523FE50AB97501F41B /* MyClipModel+AgentDispatch.swift */,
 				52603ED8574A1CB1A053AAE1 /* MyClipModel+Library.swift */,
@@ -173,6 +177,7 @@
 		56FA5A3554915D720A993C0C /* Tasks */ = {
 			isa = PBXGroup;
 			children = (
+				5386358D85297726BFFD0377 /* MenuBarBoardView.swift */,
 				5510D075C5E2E2757C421222 /* ReportShareView.swift */,
 				335D30CE9541EBF8930FEFDE /* TaskDashboardView.swift */,
 				9DE76E67842510FF0693827A /* TaskDetailView.swift */,
@@ -197,8 +202,8 @@
 		626BC5F15C0BCCEA42DBB39E /* Memory */ = {
 			isa = PBXGroup;
 			children = (
-				C10D00000000000000000013 /* MemoryCloudSyncView.swift */,
 				0A5636C1E1A34430C1497903 /* KnowledgeLibraryView.swift */,
+				535481F8E6CC4330BF697A01 /* MemoryCloudSyncView.swift */,
 				91C8CDA764D9C33380E2E181 /* MemoryMarkdownView.swift */,
 			);
 			path = Memory;
@@ -218,6 +223,7 @@
 				6BF48A94D66DB8CBAD8C2C37 /* Info.plist */,
 				30CF768494B68CDFC6D7AFDF /* InfoPlist.xcstrings */,
 				F6147B8A0454F327B1C063E0 /* Localizable.xcstrings */,
+				0334B2B9D358A3A43ECD84DB /* LucideThirdPartyNotices.txt */,
 				C5C76804C327A0A0B592C603 /* MarkdownThirdPartyNotices.txt */,
 				E25B03C51C65E327F4389E00 /* MyClip.entitlements */,
 			);
@@ -363,6 +369,7 @@
 				B4440E613F7363981D933F35 /* Assets.xcassets in Resources */,
 				D2AE50A8E32BF1C998951251 /* InfoPlist.xcstrings in Resources */,
 				20BC017C73F98E303FB12726 /* Localizable.xcstrings in Resources */,
+				AF20B3AE626D13156D74C95C /* LucideThirdPartyNotices.txt in Resources */,
 				5117721355FE13BB45B4E874 /* MarkdownThirdPartyNotices.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -374,9 +381,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C10D00000000000000000001 /* CloudSyncController.swift in Sources */,
-				C10D00000000000000000002 /* GoogleCloudOAuth.swift in Sources */,
-				C10D00000000000000000003 /* MemoryCloudSyncView.swift in Sources */,
 				610DABD292333BFB3252692E /* AgentCharacterView.swift in Sources */,
 				E99A19133EA1089BCE03FE1F /* AgentRuntime.swift in Sources */,
 				90A7F64BC2721DCAC22968BC /* AgentSessionCoordinator.swift in Sources */,
@@ -385,14 +389,16 @@
 				C3624FC7CDAA4F45F3DEDE44 /* BackstageView.swift in Sources */,
 				327DA081E04E7C68B47249FE /* CaptureLibraryView.swift in Sources */,
 				A360B75B9365C109D10FAB72 /* CaptureOnboardingView.swift in Sources */,
-				47747B6810368667ED56E58C /* OnboardingAgentPicker.swift in Sources */,
-				AA102223B0470480D98EC176 /* OnboardingAgentSelection.swift in Sources */,
+				A23D263862FE35CC5AD98168 /* CloudSyncController.swift in Sources */,
 				79C82E477E668E2C8107B3B9 /* ExecutionDetailView.swift in Sources */,
 				199858A02E568ECF4CBE0E3F /* FocusedCaptureService.swift in Sources */,
+				BBC708352A422957C4DFBA83 /* GoogleCloudOAuth.swift in Sources */,
 				EFC0EF4553050FC905C1106E /* KnowledgeLibraryView.swift in Sources */,
 				772D3B1BCE0D1DECD9F6017A /* LibraryCompatibility.swift in Sources */,
 				15FFB6046C4B83946F6695FB /* LibraryEmptyView.swift in Sources */,
+				D4625810847EDC92F89DC74A /* MemoryCloudSyncView.swift in Sources */,
 				B408A0726AAC1C4650021E17 /* MemoryMarkdownView.swift in Sources */,
+				9110E3F8C2E4C0AED09B7D6A /* MenuBarBoardView.swift in Sources */,
 				FD08315AB518ADF1981415A3 /* MyClipApp.swift in Sources */,
 				51FE03716D5DBE963B384C6F /* MyClipMain.swift in Sources */,
 				2D897039A9ABAE6A84789471 /* MyClipMenuBar.swift in Sources */,
@@ -405,6 +411,8 @@
 				3A2742797902AADF6CB7F893 /* MyClipModel.swift in Sources */,
 				66D5E958D402320799B98DD6 /* MyClipRootView.swift in Sources */,
 				55B40BD12296605472993D86 /* MyClipSettingsView.swift in Sources */,
+				A601670578EEF9A9E528DDCE /* OnboardingAgentPicker.swift in Sources */,
+				1E69641895AF38398E8AD5FE /* OnboardingAgentSelection.swift in Sources */,
 				3CD75CE86D030A06FD9AB21B /* PermissionCoordinator.swift in Sources */,
 				E14DE260BB8A27741F2BFBFA /* PermissionRequestView.swift in Sources */,
 				4FD2F0D8963A3C2C7C830196 /* ReportShareView.swift in Sources */,

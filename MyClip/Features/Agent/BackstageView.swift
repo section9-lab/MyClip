@@ -6,6 +6,7 @@ import MyClipCore
 struct BackstageView: View {
     @ObservedObject var model: MyClipModel
     @State private var selectedJob: ClipJob?
+    @State private var selectedModelAgent: ClipAgent?
     @State private var jobFilter = JobFilter.all
     @State private var usageRange = UsageRange.month
     @State private var usageExpanded = false
@@ -24,6 +25,7 @@ struct BackstageView: View {
         }
         .onAppear { model.refreshAgentAvailability() }
         .sheet(item: $selectedJob) { ExecutionDetailView(model: model, job: $0) }
+        .sheet(item: $selectedModelAgent) { AgentModelPickerView(model: model, agent: $0) }
     }
 
     // MARK: - Agents
@@ -60,6 +62,18 @@ struct BackstageView: View {
                     }
                 }.controlSize(.small)
             }
+            Button { selectedModelAgent = agent } label: {
+                VStack(spacing: 2) {
+                    Text("模型").foregroundStyle(.secondary)
+                    Text(state.modelSelection.current?.name ?? model.preferences.selectedModel(for: agent) ?? String(localized: "选择模型…"))
+                        .lineLimit(1).truncationMode(.middle)
+                }.font(.caption)
+            }
+            .buttonStyle(.bordered).controlSize(.small)
+            .disabled(!availability.canSelect || !model.canConfigureAgentModel(agent) || installing || selecting)
+            .accessibilityLabel(String(localized: "选择 \(agent.name) 的模型"))
+            .help(!availability.canSelect ? String(localized: "先安装 \(agent.name) 命令行")
+                  : state.busy ? String(localized: "请等待当前整理结束后再切换模型。") : String(localized: "从 Agent 获取可用模型，应用到后续整理会话"))
             Spacer(minLength: 2)
             Group {
                 if enabled {
@@ -371,6 +385,111 @@ struct BackstageView: View {
         }
     }
 
+}
+
+/// Every Agent uses its own live ACP catalog; no model IDs are bundled into the app.
+struct AgentModelPickerView: View {
+    @ObservedObject var model: MyClipModel
+    let agent: ClipAgent
+    @Environment(\.dismiss) private var dismiss
+    @State private var search = ""
+
+    private var state: ClipAgentState { model.state(agent) }
+    private var selectedID: String? { model.preferences.selectedModel(for: agent) }
+    private var busy: Bool { !model.canConfigureAgentModel(agent) }
+    private var options: [ACPModelOption] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return state.modelSelection.options.filter {
+            query.isEmpty || [$0.id, $0.name, $0.group ?? "", $0.description ?? ""].contains { $0.localizedCaseInsensitiveContains(query) }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(String(localized: "\(agent.name) 模型")).font(.title3.weight(.semibold))
+                Spacer()
+                if model.configuringAgentModels.contains(agent) { ProgressView().controlSize(.small) }
+                Button("刷新列表") { Task { await model.loadAgentModels(agent, refresh: true) } }.disabled(busy)
+            }
+            Text("按 Agent 分别保存，应用到后续整理会话。列表由 Agent 实时提供。")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if let current = state.modelSelection.currentID {
+                Text(String(localized: "当前会话：\(current)"))
+                    .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+            }
+            if let error = state.modelError {
+                Text(error).font(.callout).foregroundStyle(.orange).textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true).accessibilityLabel(String(localized: "模型设置失败：\(error)"))
+            }
+            if state.modelSelection.current?.supportsImages == false {
+                Text("当前模型不支持图片，请选择支持图片的模型后整理截图。")
+                    .font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+            }
+            TextField("搜索模型名称或 ID", text: $search).textFieldStyle(.roundedBorder)
+            List {
+                Button { choose(nil) } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("跟随 Agent 默认").foregroundStyle(.primary)
+                            Text("使用新会话的默认模型，不修改 Agent 全局设置").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if selectedID == nil { Text("已选择").font(.caption).foregroundStyle(Color.accentColor) }
+                    }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                }.disabled(busy || !state.modelsLoaded)
+                    .accessibilityAddTraits(selectedID == nil ? .isSelected : [])
+                ForEach(options) { option in
+                    Button { choose(option.id) } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(option.name).foregroundStyle(.primary)
+                                Text(option.id).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                                if let group = option.group { Text(group).font(.caption).foregroundStyle(.secondary) }
+                                if let description = option.description { Text(description).font(.caption).foregroundStyle(.secondary) }
+                            }
+                            Spacer(minLength: 8)
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text(capability(option)).font(.caption).foregroundStyle(option.supportsImages == false ? Color.orange : .secondary)
+                                if selectedID == option.id { Text("已选择").font(.caption).foregroundStyle(Color.accentColor) }
+                            }
+                        }.padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                    }
+                    .disabled(busy || option.supportsImages == false)
+                    .accessibilityAddTraits(selectedID == option.id ? .isSelected : [])
+                    .help(option.supportsImages == false ? String(localized: "此模型不支持图片，无法整理截图。") : option.id)
+                }
+                if state.modelsLoaded && state.modelSelection.options.isEmpty {
+                    Text("Agent 未提供可选模型，请先在 Agent 中设置或更新其连接组件。")
+                        .font(.callout).foregroundStyle(.secondary).padding(.vertical, 12)
+                } else if !state.modelsLoaded && !model.configuringAgentModels.contains(agent) && state.modelError == nil {
+                    Text("等待连接 Agent 获取模型列表").foregroundStyle(.secondary)
+                } else if !state.modelSelection.options.isEmpty && options.isEmpty {
+                    Text("没有匹配的模型").foregroundStyle(.secondary)
+                }
+            }.buttonStyle(.borderless)
+            Text(state.busy && !model.configuringAgentModels.contains(agent)
+                 ? String(localized: "请等待当前整理结束后再切换模型。")
+                 : String(localized: "图片能力未知的模型需以实际调用结果为准；不会自动切换到其他模型。"))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack { Spacer(); Button("完成") { dismiss() }.keyboardShortcut(.defaultAction) }
+        }
+        .padding(24).frame(minWidth: 520, idealWidth: 580, maxWidth: 680, minHeight: 480, idealHeight: 560)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .task { await model.loadAgentModels(agent) }
+    }
+
+    private func choose(_ id: String?) {
+        Task { await model.selectAgentModel(agent, modelID: id) }
+    }
+
+    private func capability(_ option: ACPModelOption) -> String {
+        switch option.supportsImages {
+        case true: String(localized: "支持图片")
+        case false: String(localized: "不支持图片")
+        case nil: String(localized: "图片能力未知")
+        }
+    }
 }
 
 /// White-on-grey grouped surface with a hairline; sections stack their rows inside.
