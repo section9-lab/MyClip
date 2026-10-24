@@ -40,13 +40,6 @@ extension MyClipModel {
         }
     }
 
-    func rebuildIndex() {
-        Task {
-            do { try await store.rebuildSearchIndex(); await refresh(); notice = String(localized: "搜索索引已重建。") }
-            catch { notice = error.localizedDescription }
-        }
-    }
-
     func cleanupIfNeeded() async {
         guard Date().timeIntervalSince(lastCleanup) > 3600 else { return }
         lastCleanup = Date()

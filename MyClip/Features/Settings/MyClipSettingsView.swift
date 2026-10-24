@@ -150,11 +150,8 @@ struct MyClipSettingsView: View {
                     Text("7 天").tag(7); Text("30 天").tag(30); Text("90 天").tag(90); Text("一直保留").tag(0)
                 }.pickerStyle(.segmented).labelsHidden().fixedSize()
             }
-            SettingsRow(String(localized: "本地资料库"), subtitle: model.store.root.path(percentEncoded: false).replacingOccurrences(of: NSHomeDirectory(), with: "~"), monospacedSubtitle: true) {
+            SettingsRow(String(localized: "本地资料库"), subtitle: model.store.root.path(percentEncoded: false).replacingOccurrences(of: NSHomeDirectory(), with: "~"), monospacedSubtitle: true, last: true) {
                 Button(String(localized: "在访达中打开"), systemImage: "folder") { NSWorkspace.shared.open(model.store.root) }
-            }
-            SettingsRow(String(localized: "搜索索引"), subtitle: String(localized: "搜索结果缺失或异常时重建"), last: true) {
-                Button(String(localized: "重建索引"), systemImage: "arrow.clockwise") { model.rebuildIndex() }
             }
         }
     }

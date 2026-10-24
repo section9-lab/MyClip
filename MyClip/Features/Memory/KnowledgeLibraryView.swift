@@ -80,6 +80,7 @@ private struct MemoryDirectoryView: View {
 struct KnowledgeLibraryView: View {
     @ObservedObject var model: MyClipModel
     @State private var proposal: MemoryProposal?
+    @State private var showingCloudSync = false
 
     private var selected: KnowledgeEntry? {
         (model.results.entries + model.library.entries).first { $0.id == model.selectedEntry }
@@ -91,6 +92,14 @@ struct KnowledgeLibraryView: View {
             content.frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .toolbar {
+            ToolbarItem {
+                Button("云端同步") { showingCloudSync = true }
+                    .help("将 Memory 同步到 Google Drive 或 Notion")
+                    .accessibilityLabel("Memory 云端同步")
+            }
+        }
+        .sheet(isPresented: $showingCloudSync) { MemoryCloudSyncView(sync: model.cloudSync) }
         .sheet(item: $proposal) { ProposalReviewView(model: model, proposal: $0) }
         .task(id: model.library.entries.first { $0.relativePath == "Memory.md" }?.id) {
             if model.selectedEntry == nil && model.memoryFolder == nil && model.search.isEmpty {

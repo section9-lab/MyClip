@@ -71,6 +71,7 @@ jobs:
       - name: Test core, adapters, packaging and benchmarks
         run: |
           bash Scripts/test.sh core
+          bash Scripts/test.sh cloud-sync
           bash Scripts/test.sh scripts
           bash Scripts/test.sh benchmark
 

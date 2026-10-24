@@ -83,6 +83,7 @@ enum MCPSetupResult {
 @MainActor
 final class MyClipModel: ObservableObject {
     let store: LibraryStore
+    let cloudSync: CloudSyncController
     let preferences: ClipPreferences
     let preview: Bool
     @Published var page: LibraryPage? = .captures
@@ -183,6 +184,7 @@ final class MyClipModel: ObservableObject {
     init(root: URL, preview: Bool) throws {
         self.preview = preview
         store = try LibraryStore(root: root)
+        cloudSync = CloudSyncController(store: store, preview: preview)
         mcpEnabled = MemoryMCP.isEnabled(in: root)
         preferences = ClipPreferences(preview: preview)
         runtime = AgentRuntime(root: root.appendingPathComponent("Runtime"))
@@ -205,6 +207,7 @@ final class MyClipModel: ObservableObject {
 
     func start() {
         guard worker == nil else { return }
+        cloudSync.start()
         if !preview, let agent = preferences.enabledAgent { connect(agent) }
         worker = Task { [weak self] in
             guard let self else { return }
@@ -259,6 +262,7 @@ final class MyClipModel: ObservableObject {
     }
 
     func stop() {
+        cloudSync.stop()
         worker?.cancel()
         worker = nil
         captureService.stop()
@@ -280,6 +284,7 @@ final class MyClipModel: ObservableObject {
         do {
             if let agent = preferences.enabledAgent { try await store.reassignPendingCaptures(to: agent) }
             library = try await store.snapshot()
+            cloudSync.observe(library.entries)
             proposals = try await store.proposals()
             statistics = try await store.statistics(since: analyticsDays == 0 ? .distantPast : Calendar.current.date(byAdding: .day, value: -analyticsDays, to: Date())!)
             tokenUsage = try await store.tokenUsageStatistics()

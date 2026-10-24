@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C10D00000000000000000001 /* CloudSyncController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10D00000000000000000011 /* CloudSyncController.swift */; };
+		C10D00000000000000000002 /* GoogleCloudOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10D00000000000000000012 /* GoogleCloudOAuth.swift */; };
+		C10D00000000000000000003 /* MemoryCloudSyncView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10D00000000000000000013 /* MemoryCloudSyncView.swift */; };
 		47747B6810368667ED56E58C /* OnboardingAgentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4DD890A1E2EBFC48D5F5F0 /* OnboardingAgentPicker.swift */; };
 		AA102223B0470480D98EC176 /* OnboardingAgentSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 630571D135886257D826182E /* OnboardingAgentSelection.swift */; };
 		141B5D09CCC37A312F2B2168 /* AgentStatusIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70B06A8F2D47DD4E505B9838 /* AgentStatusIcon.swift */; };
@@ -51,6 +54,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C10D00000000000000000011 /* CloudSyncController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncController.swift; sourceTree = "<group>"; };
+		C10D00000000000000000012 /* GoogleCloudOAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleCloudOAuth.swift; sourceTree = "<group>"; };
+		C10D00000000000000000013 /* MemoryCloudSyncView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCloudSyncView.swift; sourceTree = "<group>"; };
 		BC4DD890A1E2EBFC48D5F5F0 /* OnboardingAgentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingAgentPicker.swift; sourceTree = "<group>"; };
 		630571D135886257D826182E /* OnboardingAgentSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingAgentSelection.swift; sourceTree = "<group>"; };
 		0A5636C1E1A34430C1497903 /* KnowledgeLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowledgeLibraryView.swift; sourceTree = "<group>"; };
@@ -122,6 +128,8 @@
 		06134ECECA2084C1AA0D4BC4 /* Model */ = {
 			isa = PBXGroup;
 			children = (
+				C10D00000000000000000011 /* CloudSyncController.swift */,
+				C10D00000000000000000012 /* GoogleCloudOAuth.swift */,
 				A34D79AA23B040321002EFD9 /* MyClipModel.swift */,
 				A5A953523FE50AB97501F41B /* MyClipModel+AgentDispatch.swift */,
 				52603ED8574A1CB1A053AAE1 /* MyClipModel+Library.swift */,
@@ -189,6 +197,7 @@
 		626BC5F15C0BCCEA42DBB39E /* Memory */ = {
 			isa = PBXGroup;
 			children = (
+				C10D00000000000000000013 /* MemoryCloudSyncView.swift */,
 				0A5636C1E1A34430C1497903 /* KnowledgeLibraryView.swift */,
 				91C8CDA764D9C33380E2E181 /* MemoryMarkdownView.swift */,
 			);
@@ -365,6 +374,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C10D00000000000000000001 /* CloudSyncController.swift in Sources */,
+				C10D00000000000000000002 /* GoogleCloudOAuth.swift in Sources */,
+				C10D00000000000000000003 /* MemoryCloudSyncView.swift in Sources */,
 				610DABD292333BFB3252692E /* AgentCharacterView.swift in Sources */,
 				E99A19133EA1089BCE03FE1F /* AgentRuntime.swift in Sources */,
 				90A7F64BC2721DCAC22968BC /* AgentSessionCoordinator.swift in Sources */,

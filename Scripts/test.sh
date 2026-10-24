@@ -8,11 +8,13 @@ if [[ $# -gt 0 ]]; then shift; fi
 case "$suite" in
     all)
         bash Scripts/test.sh core
+        bash Scripts/test.sh cloud-sync
         bash Scripts/test.sh scripts
         bash Scripts/test.sh benchmark
         bash Scripts/test.sh app
         ;;
     core) swift test "$@" ;;
+    cloud-sync) bash Tests/CloudSync/run.sh "$@" ;;
     scripts)
         node --test Tests/Adapters/test_ephemeral_codex.cjs
         PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Tests/Packaging -v
@@ -22,5 +24,5 @@ case "$suite" in
         PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s benchmark/tests -v
         ;;
     app) bash Tests/MyClipAppTests/run.sh "$@" ;;
-    *) echo "Usage: bash Scripts/test.sh [all|core|scripts|benchmark|app [TestName...]]" >&2; exit 2 ;;
+    *) echo "Usage: bash Scripts/test.sh [all|core|cloud-sync|scripts|benchmark|app [TestName...]]" >&2; exit 2 ;;
 esac
