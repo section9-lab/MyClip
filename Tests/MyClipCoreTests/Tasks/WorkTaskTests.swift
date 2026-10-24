@@ -18,26 +18,47 @@ final class WorkTaskTests: XCTestCase {
         XCTAssertTrue(snapshot.jobs.isEmpty)
     }
 
-    func testSuggestionsAreCandidatesAndReplayDoesNotDuplicateEvidence() async throws {
+    func testAIWorkEntersBoardAndReplayDoesNotDuplicateEvidence() async throws {
         let store = try LibraryStore(root: root)
-        let source = fixtureContext()
+        let source = fixtureContext(at: 300)
+        let now = Date(timeIntervalSince1970: 400)
         try await store.record(image: fixtureImage(), context: source, agent: .codex, organize: false)
         let draft = WorkTaskDraft(title: "验证截图", project: "MyClip", suggestedStatus: .done, evidence: "测试已通过", sourceIDs: [source.id])
-        for _ in 0..<2 { try await store.ingestTaskSuggestions([draft], allowedSourceIDs: [source.id], allowedMemoryIDs: []) }
+        for _ in 0..<2 { try await store.ingestTaskSuggestions([draft], allowedSourceIDs: [source.id], allowedMemoryIDs: [], at: now) }
         let tasks = try await store.workTasks()
         let task = try XCTUnwrap(tasks.first)
         XCTAssertEqual(tasks.count, 1)
-        XCTAssertEqual(task.status, .candidate)
-        XCTAssertEqual(task.suggestedStatus, .done)
-        XCTAssertNil(task.confirmedAt)
+        XCTAssertEqual(task.status, .done)
+        XCTAssertEqual(task.confirmedAt, now)
+        XCTAssertEqual(task.completedAt, now)
+        XCTAssertEqual(task.statusObservedAt, source.date)
         XCTAssertEqual(task.evidence.count, 1)
         XCTAssertEqual(task.evidence.first?.sourceIDs, [source.id])
-        let stats = try await store.workTaskStatistics(days: 7)
-        XCTAssertEqual(stats.added, 0)
-        XCTAssertEqual(stats.completed, 0)
+        let stats = try await store.workTaskStatistics(days: 7, now: now)
+        XCTAssertEqual(stats.added, 1)
+        XCTAssertEqual(stats.completed, 1)
+        let events = try await store.workTaskEvents(task.id)
+        XCTAssertEqual(events.count, 1)
+        XCTAssertNil(events.first?.from)
+        XCTAssertEqual(events.first?.to, .done)
+        XCTAssertEqual(events.first?.actor, .ai)
     }
 
-    func testNewEvidenceAdvancesConfirmedTasksAndPreservesIgnoredStateAcrossRestart() async throws {
+    func testNewTasksEnterTheirAIStatusWithoutDatedMemory() async throws {
+        let store = try LibraryStore(root: root)
+        let snapshot = try await store.snapshot()
+        let memory = try XCTUnwrap(snapshot.entries.first { $0.relativePath == "Now.md" })
+        XCTAssertNil(memory.observedAt)
+        let statuses: [WorkTaskStatus] = [.todo, .doing, .done]
+        let drafts = statuses.map { WorkTaskDraft(title: "任务 \($0.rawValue)", suggestedStatus: $0, evidence: "明确的用户工作记录", memoryIDs: [memory.id]) }
+        try await store.ingestTaskSuggestions(drafts, allowedSourceIDs: [], allowedMemoryIDs: [memory.id])
+        let tasks = try await store.workTasks()
+        XCTAssertEqual(Set(tasks.map(\.status)), Set(statuses))
+        XCTAssertTrue(tasks.allSatisfy { $0.confirmedAt != nil })
+        XCTAssertNotNil(tasks.first { $0.status == .done }?.completedAt)
+    }
+
+    func testNewEvidenceUpdatesTasksAndPreservesIgnoredStateAcrossRestart() async throws {
         let store = try LibraryStore(root: root)
         let source = fixtureContext(at: 300)
         try await store.record(image: fixtureImage(), context: source, agent: .codex, organize: false)
@@ -54,7 +75,6 @@ final class WorkTaskTests: XCTestCase {
         let tasks = try await store.workTasks()
         XCTAssertEqual(tasks.count, 1)
         XCTAssertEqual(tasks.first?.status, .done)
-        XCTAssertNil(tasks.first?.suggestedStatus)
         XCTAssertEqual(tasks.first?.evidence.count, 2)
         try await store.setWorkTaskStatus(id, status: .ignored)
         let reopened = try LibraryStore(root: root)
@@ -83,7 +103,6 @@ final class WorkTaskTests: XCTestCase {
         try await store.ingestTaskSuggestions([draft], allowedSourceIDs: [source.id], allowedMemoryIDs: [], at: Date(timeIntervalSince1970: 230))
         tasks = try await store.workTasks()
         XCTAssertEqual(tasks.first?.status, .todo)
-        XCTAssertNil(tasks.first?.suggestedStatus)
 
         let fresh = fixtureContext(at: 300)
         try await store.record(image: fixtureImage(), context: fresh, agent: .codex, organize: false)
@@ -100,7 +119,7 @@ final class WorkTaskTests: XCTestCase {
         XCTAssertEqual(history.count, 4)
     }
 
-    func testAIRegressionRemainsAReviewableSuggestion() async throws {
+    func testNewEvidenceAutomaticallyReopensCompletedWork() async throws {
         let store = try LibraryStore(root: root)
         let id = try await store.createWorkTask(title: "验收发布", at: Date(timeIntervalSince1970: 100))
         try await store.setWorkTaskStatus(id, status: .done, at: Date(timeIntervalSince1970: 200))
@@ -109,14 +128,15 @@ final class WorkTaskTests: XCTestCase {
         let draft = WorkTaskDraft(taskID: id, title: "验收发布", suggestedStatus: .doing, evidence: "新发现的问题需要继续排查", sourceIDs: [source.id])
         try await store.ingestTaskSuggestions([draft], allowedSourceIDs: [source.id], allowedMemoryIDs: [], at: Date(timeIntervalSince1970: 310))
         let tasks = try await store.workTasks()
-        XCTAssertEqual(tasks.first?.status, .done)
-        XCTAssertEqual(tasks.first?.suggestedStatus, .doing)
-        try await store.setWorkTaskStatus(id, status: .doing, at: Date(timeIntervalSince1970: 320))
-        let updated = try await store.workTasks()
-        XCTAssertNil(updated.first?.completedAt)
+        XCTAssertEqual(tasks.first?.status, .doing)
+        XCTAssertNil(tasks.first?.completedAt)
+        let events = try await store.workTaskEvents(id)
+        XCTAssertEqual(events.last?.from, .done)
+        XCTAssertEqual(events.last?.to, .doing)
+        XCTAssertEqual(events.last?.actor, .ai)
     }
 
-    func testUndatedMemoryRequiresReviewInsteadOfAutomaticCompletion() async throws {
+    func testUndatedMemoryAddsEvidenceWithoutOverwritingCurrentStatus() async throws {
         let store = try LibraryStore(root: root)
         let id = try await store.createWorkTask(title: "验证交付", at: Date(timeIntervalSince1970: 100))
         let snapshot = try await store.snapshot()
@@ -126,7 +146,7 @@ final class WorkTaskTests: XCTestCase {
         try await store.ingestTaskSuggestions([draft], allowedSourceIDs: [], allowedMemoryIDs: [memory.id])
         let tasks = try await store.workTasks()
         XCTAssertEqual(tasks.first?.status, .todo)
-        XCTAssertEqual(tasks.first?.suggestedStatus, .done)
+        XCTAssertEqual(tasks.first?.evidence.first?.body, draft.evidence)
     }
 
     func testInvalidBatchRollsBackAutomaticStatusChanges() async throws {
@@ -167,7 +187,7 @@ final class WorkTaskTests: XCTestCase {
             old.evidence = "重读旧的测试中记录"
             try await store.ingestTaskSuggestions([old], allowedSourceIDs: [started.id], allowedMemoryIDs: [], at: Date(timeIntervalSince1970: 1002))
             tasks = try await store.workTasks()
-            XCTAssertNil(tasks.first(where: { $0.id == id })?.suggestedStatus)
+            XCTAssertEqual(tasks.first(where: { $0.id == id })?.status, .done)
         }
     }
 
@@ -270,7 +290,7 @@ final class WorkTaskTests: XCTestCase {
         let after = try await upgraded.snapshot()
         XCTAssertEqual(after.captures.map(\.id), before.captures.map(\.id))
         XCTAssertEqual(after.entries.map(\.id), before.entries.map(\.id))
-        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "15")
+        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "16")
         _ = try await upgraded.createWorkTask(title: "升级后的新任务")
         let tasks = try await upgraded.workTasks()
         XCTAssertEqual(tasks.count, 1)
@@ -283,6 +303,8 @@ final class WorkTaskTests: XCTestCase {
         let memory = try XCTUnwrap(snapshot.entries.first)
         try await store.ingestTaskSuggestions([WorkTaskDraft(title: "历史候选任务", evidence: "需要确认的工作", memoryIDs: [memory.id])], allowedSourceIDs: [], allowedMemoryIDs: [memory.id])
         let database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
+        try database.run("UPDATE work_tasks SET status='candidate',suggested_status='todo',confirmed_at=NULL WHERE title='历史候选任务'")
+        try database.run("UPDATE work_task_events SET to_status='candidate' WHERE task_id IN (SELECT id FROM work_tasks WHERE status='candidate')")
         if try database.run("PRAGMA table_info(work_tasks)").contains(where: { $0["name"] == "status_observed_at" }) {
             try database.script("ALTER TABLE work_tasks DROP COLUMN status_observed_at;")
         }

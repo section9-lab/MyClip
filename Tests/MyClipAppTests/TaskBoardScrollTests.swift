@@ -134,6 +134,26 @@ struct TaskBoardScrollTests {
                       "The last share action is reachable at height \(Int(height))")
             }
         }
+        let snapshot = try await model.store.snapshot()
+        guard let memory = snapshot.entries.first else { throw LibraryError.invalidResult("Missing Memory fixture") }
+        try await model.store.ingestTaskSuggestions(statuses.map {
+            WorkTaskDraft(title: "AI direct entry \($0.rawValue)", suggestedStatus: $0, evidence: "明确的用户工作记录", memoryIDs: [memory.id])
+        }, allowedSourceIDs: [], allowedMemoryIDs: [memory.id])
+        await model.refresh()
+        model.search = "AI direct entry"
+        window.contentView = NSHostingView(rootView: TaskDashboardView(model: model))
+        window.setContentSize(NSSize(width: 960, height: 700))
+        try await settle()
+        let automatic = model.workTasks.filter { $0.title.hasPrefix("AI direct entry") }
+        check(automatic.count == 3 && Set(automatic.map(\.status)) == Set(statuses), "AI-created tasks enter all three columns without confirmation")
+        check(!WorkTaskStatus.allCases.contains(.candidate), "Task status controls do not offer confirmation")
+        check(columns().count == 3, "Automatic tasks use the same three-column layout")
+        if let destination = CommandLine.arguments.dropFirst().first, let host = window.contentView,
+           let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            let url = URL(fileURLWithPath: destination).appendingPathComponent("automatic-board.png")
+            try bitmap.representation(using: .png, properties: [:])!.write(to: url)
+        }
         print("Task board scrolling checks: \(failures) failure(s)")
         if failures > 0 { exit(1) }
     }

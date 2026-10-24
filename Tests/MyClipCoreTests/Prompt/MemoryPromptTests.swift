@@ -73,4 +73,14 @@ final class MemoryPromptTests: XCTestCase {
         XCTAssertTrue(prompt.contains("suggestedStatus"))
         XCTAssertTrue(prompt.contains("evidence"))
     }
+
+    func testTaskPromptsDescribeAutomaticEntryAndReopening() {
+        for prompt in [MemoryPrompt.organizeBatchPrompt(captures: [], tasks: []), TaskPrompt.discoveryPrompt(memories: [], tasks: [])] {
+            XCTAssertTrue(prompt.contains("新任务会直接进入"))
+            XCTAssertTrue(prompt.contains("无需用户确认"))
+            XCTAssertTrue(prompt.contains("已完成任务重新进入"))
+            XCTAssertTrue(prompt.contains("人工修正后的旧记录不能覆盖当前状态"))
+            XCTAssertFalse(prompt.contains("新任务和状态回退由用户确认"))
+        }
+    }
 }

@@ -123,7 +123,6 @@ final class MyClipModel: ObservableObject {
     @Published var taskDiscoveryMemorySaved = false
     @Published var taskDiscoveryFailed = false
     @Published var updatingTaskIDs: Set<UUID> = []
-    @Published var lastTaskReview: WorkTaskReview?
     @Published var proposals: [MemoryProposal] = []
     @Published var analyticsDays = 7 { didSet { Task { await refresh() } } }
     @Published var captureStatus = String(localized: "正在准备采集")

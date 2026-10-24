@@ -3,7 +3,7 @@ import Foundation
 extension LibraryStore {
     static func prepareDatabase(_ database: SQLiteConnection) throws {
         let version = Int(try database.run("PRAGMA user_version").first?["user_version"] ?? "0") ?? 0
-        guard version <= 15 else { throw LibraryError.database(String(localized: "资料库由更新的 MyClip 创建，请升级应用。")) }
+        guard version <= 16 else { throw LibraryError.database(String(localized: "资料库由更新的 MyClip 创建，请升级应用。")) }
         if version > 0 && version < 10 {
             // Search tables gain anchor text, stemming and resolved link edges; they are rebuilt from entry files below.
             try database.script("DROP TABLE IF EXISTS entry_search; DROP TABLE IF EXISTS memory_passage_search; DROP TABLE IF EXISTS memory_links;")
@@ -163,6 +163,7 @@ extension LibraryStore {
             }
             try database.script("PRAGMA user_version=15;")
         }
+        if version < 16 { try Self.migrateAutomaticWorkTasks(database) }
         // Edge text shares the link's rowid, so removing a link (directly or by cascade) removes its searchable text.
         try database.script("""
             CREATE TRIGGER IF NOT EXISTS memory_links_forget AFTER DELETE ON memory_links BEGIN

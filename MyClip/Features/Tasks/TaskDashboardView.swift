@@ -4,7 +4,7 @@ import MyClipCore
 extension WorkTaskStatus {
     var tint: Color {
         switch self {
-        case .candidate: .orange
+        case .candidate: .secondary
         case .todo, .ignored: .secondary
         case .doing: .orange
         case .done: .blue
@@ -23,18 +23,11 @@ struct TaskDashboardView: View {
     @State private var selectedID: UUID?
     @State private var editing: TaskEditRequest?
     @State private var savedTaskID: UUID?
-    @State private var showingCandidates = true
-    @State private var candidatePage = 0
-    @State private var expandedCandidateID: UUID?
-    @State private var candidateStatuses: [UUID: WorkTaskStatus] = [:]
     @State private var showingDiscoveryDetails = false
     private let columns: [WorkTaskStatus] = [.todo, .doing, .done]
     private let taskCardHeight: CGFloat = 110
     private let taskCardSpacing: CGFloat = 8
 
-    private var candidateTasks: [WorkTask] { tasks.filter { $0.status == .candidate } }
-    private var lastCandidatePage: Int { max(0, (candidateTasks.count - 1) / 3) }
-    private var visibleCandidatePage: Int { min(candidatePage, lastCandidatePage) }
     private var visibleTaskRows: Int { min(5, max(1, columns.map { status in tasks.filter { $0.status == status }.count }.max() ?? 0)) }
 
     private var tasks: [WorkTask] {
@@ -65,12 +58,6 @@ struct TaskDashboardView: View {
             }
             .background(Color(nsColor: .windowBackgroundColor))
         }
-        .onChange(of: model.search) { _ in candidatePage = 0; expandedCandidateID = nil }
-        .onChange(of: candidateTasks.map(\.id)) { ids in
-            candidatePage = visibleCandidatePage
-            if let expandedCandidateID, !ids.contains(expandedCandidateID) { self.expandedCandidateID = nil }
-            candidateStatuses = candidateStatuses.filter { ids.contains($0.key) }
-        }
         .onChange(of: model.taskDiscoveryMessage) { _ in showingDiscoveryDetails = false }
         .sheet(isPresented: Binding(get: { selectedID != nil }, set: { if !$0 { selectedID = nil } })) {
             if let selectedID { TaskDetailView(model: model, taskID: selectedID) }
@@ -96,9 +83,6 @@ struct TaskDashboardView: View {
                     description: Text(model.search.isEmpty ? String(localized: "新建待办，或让 AI 从 Memory 发现工作。之后 AI 会根据截图与记忆更新进展。") : String(localized: "尝试搜索任务名称、项目或来源依据。")))
                     .frame(maxWidth: .infinity).padding(.vertical, 20)
             }
-            if !candidateTasks.isEmpty {
-                candidates
-            }
             if width >= 680 {
                 HStack(alignment: .top, spacing: 12) { ForEach(columns, id: \.self) { column($0) } }
             } else {
@@ -111,7 +95,7 @@ struct TaskDashboardView: View {
                         HStack {
                             Button(task.title) { selectedID = task.id }.buttonStyle(.plain)
                             Spacer()
-                            Button("恢复到待确认") { model.setTaskStatus(task.id, .candidate) }.buttonStyle(.bordered)
+                            Button("恢复到待办") { model.setTaskStatus(task.id, .todo) }.buttonStyle(.bordered)
                         }.padding(.vertical, 6)
                     }
                 }.font(.callout).foregroundStyle(.secondary)
@@ -120,7 +104,7 @@ struct TaskDashboardView: View {
     }
 
     private var taskCount: some View {
-        Text("当前任务 · \(tasks.filter { $0.status.isConfirmed }.count) 项")
+        Text("当前任务 · \(tasks.filter { $0.status.isOnBoard }.count) 项")
             .font(.callout).foregroundStyle(.secondary)
             .help("AI 跟进进展，可拖动卡片调整状态")
     }
@@ -164,134 +148,11 @@ struct TaskDashboardView: View {
         }.font(.caption)
     }
 
-    private var candidates: some View {
-        let start = visibleCandidatePage * 3
-        let visible = Array(candidateTasks.dropFirst(start).prefix(3))
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Button { showingCandidates.toggle() } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "tray").foregroundStyle(.orange)
-                        Text("待确认").font(.headline)
-                        Text(candidateTasks.count.formatted()).font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 4))
-                    }
-                }.buttonStyle(.plain).accessibilityLabel(showingCandidates ? String(localized: "收起待确认任务") : String(localized: "展开待确认任务"))
-                Text("AI 从近期活动中发现").font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                Spacer()
-                if showingCandidates && candidateTasks.count > 3 {
-                    HStack(spacing: 8) {
-                        Text("\(start + 1)–\(start + visible.count) / \(candidateTasks.count)").monospacedDigit()
-                        Button(String(localized: "上一页待确认任务"), systemImage: "chevron.left") {
-                            candidatePage = visibleCandidatePage - 1; expandedCandidateID = nil
-                        }.labelStyle(.iconOnly).disabled(visibleCandidatePage == 0)
-                        Button(String(localized: "下一页待确认任务"), systemImage: "chevron.right") {
-                            candidatePage = visibleCandidatePage + 1; expandedCandidateID = nil
-                        }.labelStyle(.iconOnly).disabled(visibleCandidatePage == lastCandidatePage)
-                    }
-                    .font(.caption).foregroundStyle(.secondary).buttonStyle(.bordered).controlSize(.small)
-                    .fixedSize().padding(.trailing, 8)
-                }
-                Button { showingCandidates.toggle() } label: {
-                    HStack(spacing: 4) {
-                        Text(showingCandidates ? String(localized: "收起") : String(localized: "展开"))
-                        Image(systemName: showingCandidates ? "chevron.up" : "chevron.down")
-                    }.font(.caption).foregroundStyle(.secondary)
-                }.buttonStyle(.bordered).controlSize(.small)
-            }.padding(.horizontal, 16).padding(.vertical, 13)
-            if showingCandidates {
-                Divider()
-                VStack(spacing: 0) {
-                    ForEach(visible) { task in
-                        candidateRow(task)
-                        if task.id != visible.last?.id { Divider() }
-                    }
-                }.padding(.horizontal, 16)
-            }
-        }
-        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color(nsColor: .separatorColor).opacity(0.45)))
-    }
-
-    private func candidateRow(_ task: WorkTask) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 16) {
-                    candidateTitle(task).frame(minWidth: 220)
-                    candidateControls(task)
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    candidateTitle(task)
-                    HStack { Spacer(); candidateControls(task) }
-                }
-            }.padding(.vertical, 11)
-            if expandedCandidateID == task.id {
-                VStack(alignment: .leading, spacing: 9) {
-                    Text(task.title).font(.callout.weight(.medium)).textSelection(.enabled)
-                    if let evidence = task.evidence.first {
-                        Label(String(localized: "来源依据 · \(evidence.date.formatted(date: .abbreviated, time: .shortened))"), systemImage: "doc.text")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Text(evidence.body).font(.callout).textSelection(.enabled)
-                    } else {
-                        Text("暂无来源依据，可在详情中核对任务。").font(.caption).foregroundStyle(.secondary)
-                    }
-                    ViewThatFits(in: .horizontal) {
-                        HStack { candidateDetailButton(task); Spacer(minLength: 12); candidateStatusPicker(task) }
-                        VStack(alignment: .leading, spacing: 8) {
-                            candidateDetailButton(task)
-                            candidateStatusPicker(task)
-                        }
-                    }
-                }
-                .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 7))
-                .padding(.bottom, 12)
-            }
-        }.disabled(model.updatingTaskIDs.contains(task.id))
-    }
-
-    private func candidateTitle(_ task: WorkTask) -> some View {
-        Button { expandedCandidateID = expandedCandidateID == task.id ? nil : task.id } label: {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(task.title).font(.body.weight(.medium)).foregroundStyle(.primary).lineLimit(2)
-                HStack(spacing: 5) {
-                    Text("\(task.projectTitle) · \(task.evidence.count) 条依据").lineLimit(1)
-                    Image(systemName: expandedCandidateID == task.id ? "chevron.up" : "chevron.right").font(.system(size: 9))
-                }.font(.caption).foregroundStyle(.secondary)
-            }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
-        }.buttonStyle(.plain).help(task.title).accessibilityHint("展开或收起来源依据")
-    }
-
-    private func candidateControls(_ task: WorkTask) -> some View {
-        let status = candidateStatuses[task.id] ?? task.suggestedStatus.flatMap { $0.isConfirmed ? $0 : nil } ?? .todo
-        return HStack(spacing: 10) {
-            statusLabel(status, prefix: candidateStatuses[task.id] == nil ? String(localized: "建议") : String(localized: "设为"))
-                .font(.caption).foregroundStyle(status.tint).frame(width: 80, alignment: .leading)
-            Button(String(localized: "确认"), systemImage: "checkmark") { model.reviewTask(task.id, status) }
-                .buttonStyle(.bordered).controlSize(.small)
-                .accessibilityLabel("确认\(task.title)，加入\(status.title)")
-            Button(String(localized: "忽略\(task.title)"), systemImage: "xmark") { model.reviewTask(task.id, .ignored) }
-                .labelStyle(.iconOnly).buttonStyle(.bordered).foregroundStyle(.secondary).help("忽略这条建议")
-        }.fixedSize(horizontal: true, vertical: false)
-    }
-
-    private func candidateDetailButton(_ task: WorkTask) -> some View {
-        Button("查看来源与详情") { selectedID = task.id }.buttonStyle(.bordered).font(.caption)
-    }
-
-    private func candidateStatusPicker(_ task: WorkTask) -> some View {
-        Picker("确认后设为", selection: Binding(get: { candidateStatuses[task.id] ?? task.suggestedStatus ?? .todo }, set: { candidateStatuses[task.id] = $0 })) {
-            ForEach(columns, id: \.self) { Text($0.title).tag($0) }
-        }.font(.caption).controlSize(.small).fixedSize()
-    }
-
-    private func statusLabel(_ status: WorkTaskStatus, prefix: String = "") -> some View {
+    private func statusLabel(_ status: WorkTaskStatus) -> some View {
         HStack(spacing: 6) {
             Image(systemName: status == .done ? "checkmark.circle.fill" : status == .doing ? "circle.lefthalf.filled" : "circle")
                 .font(.system(size: 10)).foregroundStyle(status.tint)
-            Text(prefix + status.title)
+            Text(status.title)
         }
     }
 
@@ -312,18 +173,15 @@ struct TaskDashboardView: View {
                     ForEach(items) { task in
                         let waiting = !task.waitingReason.isEmpty && task.status != .done
                         let aiUpdated = model.workTaskEvents.last(where: { $0.taskID == task.id })?.actor == .ai
-                        let hasUpdate = (task.suggestedStatus.map { $0 != task.status } ?? false) || aiUpdated
                         Button { selectedID = task.id } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(task.title).font(.body.weight(.medium)).foregroundStyle(.primary)
-                                    .lineLimit(waiting && hasUpdate ? 2 : 3)
+                                    .lineLimit(waiting && aiUpdated ? 2 : 3)
                                 if waiting {
                                     Label(String(localized: "等待：\(task.waitingReason)"), systemImage: "clock").font(.caption).foregroundStyle(.orange)
                                         .lineLimit(1).help("等待：\(task.waitingReason)")
                                 }
-                                if let suggestion = task.suggestedStatus, suggestion != task.status {
-                                    Label(String(localized: "待确认：调整为\(suggestion.title)"), systemImage: "sparkle").font(.caption).foregroundStyle(.orange).lineLimit(1)
-                                } else if aiUpdated {
+                                if aiUpdated {
                                     Label(String(localized: "AI 已更新进展"), systemImage: "sparkles").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                                 }
                                 Spacer(minLength: 0)
@@ -365,7 +223,7 @@ struct TaskDashboardView: View {
         }
         .contentShape(Rectangle())
         .dropDestination(for: String.self) { values, _ in
-            let ids = values.compactMap(UUID.init(uuidString:)).filter { id in model.workTasks.contains { $0.id == id && $0.status.isConfirmed } }
+            let ids = values.compactMap(UUID.init(uuidString:)).filter { id in model.workTasks.contains { $0.id == id && $0.status.isOnBoard } }
             for id in ids { model.setTaskStatus(id, status) }
             return !ids.isEmpty
         }

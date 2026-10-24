@@ -267,7 +267,7 @@ final class MemoryLinkGraphTests: XCTestCase {
         XCTAssertEqual(after.revision, before.revision + 1)
         XCTAssertEqual(after.updatedAt, before.updatedAt, "Only the evidence list changed")
         let database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
-        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "15")
+        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "16")
         XCTAssertTrue(try database.run("SELECT value FROM vault_meta WHERE key='source_repair'").isEmpty)
         _ = try await migrated.snapshot()
         let again = try await migrated.readMemory(path: "Wiki/Topics/Notes.md")
@@ -327,7 +327,7 @@ final class MemoryLinkGraphTests: XCTestCase {
         let found = try await migrated.searchMemories(query: "记忆项目")
         XCTAssertTrue(found.map(\.id).contains(target))
         let version = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite")).run("PRAGMA user_version").first?["user_version"]
-        XCTAssertEqual(version, "15")
+        XCTAssertEqual(version, "16")
         XCTAssertTrue(try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite")).run("SELECT value FROM vault_meta WHERE key='search_rebuild'").isEmpty)
     }
 }

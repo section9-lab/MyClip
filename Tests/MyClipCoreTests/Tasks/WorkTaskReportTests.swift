@@ -119,7 +119,7 @@ final class WorkTaskReportTests: XCTestCase {
         let start = date("2026-09-18T00:00:00+08:00")
         let end = date("2026-09-19T00:00:00+08:00")
         let id = UUID()
-        let task = WorkTask(id: id, title: "联调", project: "MyClip", status: .done, suggestedStatus: nil,
+        let task = WorkTask(id: id, title: "联调", project: "MyClip", status: .done,
                             createdAt: start, updatedAt: end, confirmedAt: start, completedAt: end,
                             evidence: [
                                 WorkTaskEvidence(id: UUID(), body: "后来完成的验收", sourceIDs: [], memoryIDs: [], date: end),
@@ -169,7 +169,7 @@ final class WorkTaskReportTests: XCTestCase {
     func testSharedFormatsDropMarkdownSyntaxAndEscapeHTML() {
         let start = date("2026-09-18T00:00:00+08:00")
         let id = UUID()
-        let task = WorkTask(id: id, title: "修复 <Slack> & 飞书分享", project: "MyClip", status: .doing, suggestedStatus: nil,
+        let task = WorkTask(id: id, title: "修复 <Slack> & 飞书分享", project: "MyClip", status: .doing,
                             createdAt: start, updatedAt: start, confirmedAt: start, completedAt: nil,
                             evidence: [WorkTaskEvidence(id: UUID(), body: "已复制富文本\n待验证钉钉", sourceIDs: [], memoryIDs: [], date: start)])
         let events = [WorkTaskEvent(id: UUID(), taskID: id, from: nil, to: .doing, date: start, actor: .user)]

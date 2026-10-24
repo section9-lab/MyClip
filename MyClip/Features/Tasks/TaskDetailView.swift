@@ -43,13 +43,6 @@ struct TaskDetailView: View {
             if !task.waitingReason.isEmpty && task.status != .done {
                 Label(String(localized: "等待：\(task.waitingReason)"), systemImage: "clock").font(.callout).foregroundStyle(.orange)
             }
-            if let suggestion = task.suggestedStatus, suggestion != task.status {
-                HStack {
-                    Label(String(localized: "AI 建议调整为\(suggestion.title)"), systemImage: "sparkle").foregroundStyle(.orange)
-                    Button("确认\(suggestion.title)") { model.setTaskStatus(task.id, suggestion) }
-                    Button("保留当前状态") { model.setTaskStatus(task.id, task.status) }.buttonStyle(.bordered)
-                }.font(.callout)
-            }
             if let first = task.evidence.first {
                 Text("来源依据").font(.headline)
                 evidence(first)

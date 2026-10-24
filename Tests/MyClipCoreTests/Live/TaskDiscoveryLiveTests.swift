@@ -36,7 +36,7 @@ final class TaskDiscoveryLiveTests: XCTestCase {
         XCTAssertFalse(drafts.isEmpty, "The explicit work task must be discovered")
         try await store.ingestTaskSuggestions(drafts, allowedSourceIDs: [], allowedMemoryIDs: [memory.id])
         let tasks = try await store.workTasks()
-        XCTAssertTrue(tasks.contains { $0.title.contains("导出字段") && $0.status == .candidate && $0.evidence.contains { $0.memoryIDs.contains(memory.id) } })
+        XCTAssertTrue(tasks.contains { $0.title.contains("导出字段") && $0.status == .todo && $0.evidence.contains { $0.memoryIDs.contains(memory.id) } })
         XCTAssertEqual(try String(contentsOf: updated.fileURL, encoding: .utf8), original)
         await client.close()
     }
