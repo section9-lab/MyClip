@@ -18,19 +18,21 @@
 
 - **回顾工作。** 浏览截图时间线，查看笔记背后的来源。每张截图都有本地 OCR 文本文档，可以阅读、复制或打开。
 - **建立个人知识库。** 搜索、编辑并连接不同项目、主题和日常工作中的笔记。笔记以 Markdown 文件保存，也可以用其他编辑器打开。
-- **跟进下一步。** 审核任务建议，确认重要事项，通过看板追踪进度。在 **Kanban** 和 **Reports** 之间切换，查看按项目和进度组织的日报、周报与月报。
+- **跟进下一步。** AI 将识别出的任务直接加入待办、进行中或已完成，并根据新的依据更新状态；你可以随时编辑、移动或忽略任务。在 **Kanban** 和 **Reports** 之间切换，查看按项目和进度组织的日报、周报与月报。
 - **为 AI 工具提供上下文。** 让 Codex、Claude Code、Claude Desktop、Cursor 或 OpenCode 搜索已保存的记忆。
 
 ## 开始使用
 
-需要 **macOS 13 或更高版本**，以及 **Codex 或 Claude 账户**。安装 Agent 连接器还需要 **Node.js 22 或更高版本**。本地构建说明见下文。
+需要 **macOS 13 或更高版本**，以及所选 Agent 的可用账户。安装 Agent 连接器还需要 **Node.js 22 或更高版本**。本地构建说明见下文。
 
-1. 打开 MyClip，进入侧边栏的 **Backstage**。安装连接器并登录，点击**连接**检查是否可用，再点击**启用**，将该 Agent 用于整理。仅连接不会启动任务；可以连接多个 Agent，但同一时间只能启用一个。
+1. 打开 MyClip，在引导页选择 Codex、Claude Code、OpenCode、Cursor、WorkBuddy 或千问办公。点击卡片仅切换选中项，点击**开始使用**后才连接并启用。WorkBuddy 使用 `codebuddy` 命令行；千问办公可复用桌面端内置引擎。之后可以在 **Backstage** 更换 Agent；可以连接多个 Agent，但同一时间只能启用一个。
 2. 授予**屏幕录制**和**辅助功能**权限。MyClip 打开时会自动采集，首次授权后也会开始。
 3. 正常工作即可。默认触发条件为：鼠标移动后五秒内点击、向下滚动后静止三秒，或输入字母键后按回车。自动整理会将新截图转为 Memory。
-4. 在 **Memory** 查看笔记，在 **Timeline** 浏览截图，在 **Kanban** 审核任务建议。
+4. 在 **Memory** 查看笔记，在 **Timeline** 浏览截图，在 **Kanban** 跟进任务。AI 判断状态后直接入板，无需逐项确认。
 
 要让 AI 工具使用记忆，请在设置中开启 **MyClip MCP**，选择客户端并应用配置，然后重启客户端或新建会话。
+
+使用云文档连接器的 Personal Agent，可以通过 **Memory → 云端同步** 读取发布到 Google Drive 或 Notion 的记忆。两者独立支持自动同步和立即同步；首次接入需自行配置 Google 桌面 OAuth 客户端或 Notion 集成，见 [Memory 云端同步](memory-cloud-sync.md)。原始截图和独立 OCR 文件保留在本地。
 
 **Claude Code（命令行）**通过 ACP 在后台整理截图。**Claude Desktop** 有独立入口，用于打开应用以及配置 Chat 和本地 Code 会话中的 MCP 记忆访问，不能启用为后台整理 Agent。桌面端配置保存在 `~/Library/Application Support/Claude/claude_desktop_config.json`，保留已有服务器，不修改命令行配置。配置后请完全退出并重新打开 Claude Desktop。
 

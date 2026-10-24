@@ -21,19 +21,21 @@
 
 - **Revisit your work.** Browse a screenshot timeline and check the sources behind your notes. Every screenshot has a local OCR text document you can view, copy, or open.
 - **Build a personal knowledge library.** Search, edit, and link notes across projects, topics, and daily work. Your notes are Markdown files you can open in other editors.
-- **Keep track of next steps.** Review suggested tasks, confirm what matters, and follow progress on a task board. Switch between **Kanban** and **Reports** to review daily, weekly, or monthly work reports grouped by project and progress.
+- **Keep track of next steps.** AI adds tasks directly to To Do, In Progress, or Done and updates their status as new evidence arrives. You can edit, move, or ignore tasks at any time. Switch between **Kanban** and **Reports** to review daily, weekly, or monthly work reports grouped by project and progress.
 - **Give your AI tools context.** Let Codex, Claude Code, Claude Desktop, Cursor, or OpenCode search your saved memories.
 
 ## Get started
 
-Requires **macOS 13 or later** and a **Codex or Claude account**. Installing the agent connector also requires **Node.js 22 or later**. Download the Apple Silicon or Intel DMG from [Releases](https://github.com/section9-lab/MyClip/releases). These community builds are self-signed and not notarized; see [opening the app and permission recovery](docs/release-signing.md). Local build instructions are below.
+Requires **macOS 13 or later** and an account for your selected Agent. Installing the agent connector also requires **Node.js 22 or later**. Download the Apple Silicon or Intel DMG from [Releases](https://github.com/section9-lab/MyClip/releases). These community builds are self-signed and not notarized; see [opening the app and permission recovery](docs/release-signing.md). Local build instructions are below.
 
-1. Open MyClip and choose a default Agent in onboarding. MyClip detects available local agents and saves your selection after a successful connection. You can change it later in **Backstage**; multiple agents can be connected, but only one is enabled at a time.
+1. Open MyClip and choose a default Agent in onboarding: Codex, Claude Code, OpenCode, Cursor, WorkBuddy, or QwenWork. Choosing a card only changes the selection; **Start using** connects and enables the Agent after a successful connection. WorkBuddy uses the `codebuddy` CLI; QwenWork can use its bundled desktop engine. You can change the Agent later in **Backstage**; multiple agents can be connected, but only one is enabled at a time.
 2. Grant **Screen Recording** and **Accessibility** permissions. Capture starts automatically whenever MyClip is open, including after permissions are granted.
 3. Work as usual. By default, MyClip captures the focused window after a click within five seconds of mouse movement, after three seconds without scrolling following a downward scroll, or after a letter key followed by Return. Automatic organization turns new screenshots into Memory.
-4. Explore **Memory** for notes, **Timeline** for screenshots, and **Kanban** for suggested work.
+4. Explore **Memory** for notes, **Timeline** for screenshots, and **Kanban** to follow your work. Tasks appear directly in their AI-assessed status, without a confirmation step.
 
 To use your memory in an AI tool, enable **MyClip MCP** in Settings, select your clients, and apply the configuration. Restart the client or start a new session afterward.
+
+For agents that read cloud documents, open **Memory → Cloud Sync** to connect Google Drive or Notion. Each destination supports automatic updates and **Sync Now**. Setup requires your own desktop Google OAuth client or Notion integration; see [Memory cloud sync](docs/memory-cloud-sync.md). Screenshots and standalone OCR files remain local.
 
 **Claude Code (CLI)** handles background screenshot organization through ACP. **Claude Desktop** has a separate entry for opening the app and configuring MCP memory access in Chat and local Code sessions; it cannot be enabled for background organization. Desktop configuration is saved to `~/Library/Application Support/Claude/claude_desktop_config.json`, preserving existing servers and leaving the CLI configuration untouched. Fully quit and reopen Claude Desktop after configuring it.
 
