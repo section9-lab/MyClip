@@ -11,7 +11,7 @@ while [[ $# -gt 0 ]]; do
 done
 if [[ ${#tests[@]} -eq 0 ]]; then
     tests=(AgentActivationTests CaptureLifecycleTests CaptureFilterModelTests ScreenshotDocumentTests
-           MemoryDirectoryTests MemoryScrollTests TaskBoardScrollTests)
+           MemoryDirectoryTests MemoryScrollTests TaskBoardScrollTests BackstageResponsivenessTests)
 fi
 if [[ ${#test_args[@]} -gt 0 && ${#tests[@]} -ne 1 ]]; then
     echo "Arguments after -- require exactly one test name." >&2
@@ -22,7 +22,7 @@ needs_app=false
 for name in "${tests[@]}"; do
     case "$name" in
         AgentActivationTests|CaptureLifecycleTests) needs_model=true ;;
-        CaptureFilterModelTests|ScreenshotDocumentTests|MemoryDirectoryTests|MemoryScrollTests|TaskBoardScrollTests) needs_app=true ;;
+        CaptureFilterModelTests|ScreenshotDocumentTests|MemoryDirectoryTests|MemoryScrollTests|TaskBoardScrollTests|BackstageResponsivenessTests) needs_app=true ;;
         *) echo "Unknown app test: $name" >&2; exit 2 ;;
     esac
 done

@@ -182,7 +182,9 @@ struct BackstageView: View {
                         .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 28)
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 0) {
+                        // At most 50 fixed-height rows: eager placement avoids lazy height estimation
+                        // feeding back into this nested viewport while progress and job states change.
+                        VStack(spacing: 0) {
                             ForEach(visibleJobs.prefix(50)) { job in
                                 jobRow(job)
                                 Divider().padding(.leading, 60)

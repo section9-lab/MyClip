@@ -15,6 +15,7 @@ final class AgentCharacterView: NSView {
     private var nextBlink = Date.now.addingTimeInterval(Double.random(in: 3...6))
     private var animationTask: Task<Void, Never>?
     private var tracking: NSTrackingArea?
+    private var configured = false
 
     init(agent: ClipAgent) {
         self.agent = agent
@@ -36,28 +37,32 @@ final class AgentCharacterView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { interactive ? super.hitTest(point) : nil }
 
     func configure(state: ClipAgentState, animated: Bool = true, interactive: Bool = false, reduceMotion: Bool = false) {
-        let changed = self.state.phase != state.phase || self.state.lastCompleted != state.lastCompleted
+        let changed = !configured || self.state.phase != state.phase || self.state.lastCompleted != state.lastCompleted
             || self.animated != animated || motionDisabled != reduceMotion
+        let interactionChanged = !configured || self.interactive != interactive
+        let label = state.detail.isEmpty ? agent.name : "\(agent.name) · \(state.detail)"
         self.state = state
         self.animated = animated
         self.interactive = interactive
         motionDisabled = reduceMotion
-        setAccessibilityElement(interactive)
-        setAccessibilityRole(.button)
-        setAccessibilityLabel(state.detail.isEmpty ? agent.name : "\(agent.name) · \(state.detail)")
-        if changed || animationTask == nil { restartAnimation() }
-        needsDisplay = true
+        if interactionChanged { setAccessibilityElement(interactive) }
+        if !configured { setAccessibilityRole(.button) }
+        if accessibilityLabel() != label { setAccessibilityLabel(label) }
+        configured = true
+        updateMouseTracking()
+        if changed || (animated && animationTask == nil) { restartAnimation() }
+        if changed || interactionChanged { needsDisplay = true }
     }
 
-    override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); restartAnimation() }
+    override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); updateMouseTracking(); restartAnimation() }
     override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
-    @objc private func motionPreferenceChanged() { restartAnimation(); needsDisplay = true }
+    @objc private func motionPreferenceChanged() { updateMouseTracking(); restartAnimation(); needsDisplay = true }
     private var reduceMotion: Bool { motionDisabled || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
     private func restartAnimation() {
         animationTask?.cancel()
         animationTask = nil
-        guard animated, window != nil else { return }
+        guard configured, animated, window != nil else { return }
         animationTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let delay = self?.advanceAnimation() else { return }
@@ -107,10 +112,20 @@ final class AgentCharacterView: NSView {
         if event.keyCode == 36 || event.keyCode == 49 { greet() } else { super.keyDown(with: event) }
     }
     override func updateTrackingAreas() {
-        if let tracking { removeTrackingArea(tracking) }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect], owner: self)
-        addTrackingArea(area); tracking = area
+        updateMouseTracking()
         super.updateTrackingAreas()
+    }
+    private func updateMouseTracking() {
+        let enabled = configured && window != nil && animated && !reduceMotion
+        if enabled, tracking == nil {
+            // inVisibleRect follows scrolling and resizing itself. Replacing the area during every layout
+            // needlessly invalidates AppKit's tracking state, including for static icons in history rows.
+            let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect], owner: self)
+            addTrackingArea(area); tracking = area
+        } else if !enabled, let tracking {
+            removeTrackingArea(tracking); self.tracking = nil
+            if hovered || gaze != .zero { look(at: nil, hovered: false) }
+        }
     }
     override func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
     override func mouseMoved(with event: NSEvent) { look(at: convert(event.locationInWindow, from: nil), hovered: true) }
