@@ -3,6 +3,19 @@ import XCTest
 
 @MainActor
 final class ACPClientTests: XCTestCase {
+    func testTypedProviderFailureIsNotSuccessfulCompletion() async throws {
+        let client = ACPClient()
+        defer { Task { await client.close() } }
+        _ = try await client.connect(command: command("terminal_provider_error"))
+        let session = try await client.newSession(directory: FileManager.default.temporaryDirectory)
+        do {
+            _ = try await client.prompt(sessionID: session, text: "fixture", images: [])
+            XCTFail("Provider failure must not complete successfully")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("model_not_found"))
+        }
+    }
+
     func command(_ scenario: String = "success") -> ACPCommand {
         ACPCommand(executable: URL(fileURLWithPath: "/usr/bin/env"),
                    arguments: ["python3", Bundle.module.url(forResource: "acp_agent", withExtension: "py", subdirectory: "Fixtures")!.path],

@@ -2,6 +2,17 @@ import Foundation
 import MyClipCore
 
 extension MyClipModel {
+    func retryTaskIngestionFailures() {
+        guard canStartOrganization else { return }
+        Task {
+            do {
+                try await store.retryFailedTaskIngestions()
+                await refresh()
+                await processNext(immediately: true)
+            } catch { notice = error.localizedDescription }
+        }
+    }
+
     func setTaskStatus(_ id: UUID, _ status: WorkTaskStatus) {
         guard !updatingTaskIDs.contains(id) else { return }
         updatingTaskIDs.insert(id)

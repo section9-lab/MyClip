@@ -135,6 +135,7 @@ final class MyClipModel: ObservableObject {
     /// True when the last discovery failure happened after the batch's Memory was already saved.
     @Published var taskDiscoveryMemorySaved = false
     @Published var taskDiscoveryFailed = false
+    @Published var taskIngestionSummary = TaskIngestionSummary()
     @Published var updatingTaskIDs: Set<UUID> = []
     @Published var proposals: [MemoryProposal] = []
     @Published var analyticsDays = 7 { didSet { Task { await refresh() } } }
@@ -174,6 +175,8 @@ final class MyClipModel: ObservableObject {
     @Published var localAgents: [ClipAgent: LocalAgentAvailability] = [:]
     @Published var selectingDefaultAgent: ClipAgent?
     @Published var configuringAgentModels: Set<ClipAgent> = []
+    @Published var authorizingAccounts: Set<ClipAgent> = []
+    var accountAuthorizationTasks: [ClipAgent: Task<Void, Never>] = [:]
     var modelImageCapabilities: [ClipAgent: [String: Bool]] = [:]
     @Published var permissions: [ClipPermission] = []
     @Published var currentJob: ClipJob?
@@ -284,6 +287,7 @@ final class MyClipModel: ObservableObject {
         textWorker?.cancel()
         searchTask?.cancel()
         taskDiscovery?.cancel()
+        accountAuthorizationTasks.values.forEach { $0.cancel() }
         Task { [sessionCoordinator] in await sessionCoordinator.stopAll() }
     }
 
@@ -314,6 +318,7 @@ final class MyClipModel: ObservableObject {
         do {
             let tasks = try await store.workTasks()
             let events = try await store.workTaskEvents()
+            taskIngestionSummary = try await store.taskIngestionSummary()
             workTasks = tasks
             workTaskEvents = events
             workTasksLoaded = true

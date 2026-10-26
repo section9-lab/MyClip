@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "nodeVersion": "22.23.4",
+  "executorVersion": "1.19.3",
+  "platforms": [
+    {
+      "architecture": "arm64",
+      "node": {
+        "url": "https://nodejs.org/dist/v22.23.4/node-v22.23.4-darwin-arm64.tar.gz",
+        "algorithm": "sha256",
+        "digest": "c9e1dbc748b33ed2d14f42445191ecaf14c56259c7a9a26d0042c49ec2b66428",
+        "member": "node-v22.23.4-darwin-arm64/bin/node",
+        "licenseMember": "node-v22.23.4-darwin-arm64/LICENSE"
+      },
+      "executor": {
+        "url": "https://registry.npmjs.org/opencode-darwin-arm64/-/opencode-darwin-arm64-1.19.3.tgz",
+        "algorithm": "sha512",
+        "digest": "3660c5dbc8c3f16ee6f5afe4e26737ada8c459fb437a619e72bcc1248b734d6c0dd04bb9585484141a1cbe699ab14af89e1f1e8bd665d69c11befeba47874de8",
+        "member": "package/bin/opencode"
+      }
+    },
+    {
+      "architecture": "x86_64",
+      "node": {
+        "url": "https://nodejs.org/dist/v22.23.4/node-v22.23.4-darwin-x64.tar.gz",
+        "algorithm": "sha256",
+        "digest": "efcc2b0db6f94bf53eddb038fe2b370277a042bd29e4f19b8f8e23598795b819",
+        "member": "node-v22.23.4-darwin-x64/bin/node",
+        "licenseMember": "node-v22.23.4-darwin-x64/LICENSE"
+      },
+      "executor": {
+        "url": "https://registry.npmjs.org/opencode-darwin-x64-baseline/-/opencode-darwin-x64-baseline-1.19.3.tgz",
+        "algorithm": "sha512",
+        "digest": "61084bf07ac7a784942072d1dc9298dee551bc89618993c514ae40647d9abf3090b811bb80102271ed81fc36d3d2578037386f6374a870477ead533f19c79b33",
+        "member": "package/bin/opencode"
+      }
+    }
+  ]
+}

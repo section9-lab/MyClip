@@ -15,6 +15,15 @@ import MyClipCore
     func stop() {}
 }
 
+private actor FixtureAccountStorage: AgentAccountStorage {
+    private var value = Data(#"{"uid":"fixture","access":"fixture-original"}"#.utf8)
+    private var reads = 0
+    private var saves = 0
+    func read() -> Data? { reads += 1; return value }
+    func save(_ data: Data) { saves += 1; value = data }
+    func counts() -> (Int, Int) { (reads, saves) }
+}
+
 /// Real ACP subprocesses and application model, with an isolated library and preference suite.
 @main struct AgentModelTests {
     @MainActor static func main() async throws {
@@ -41,7 +50,46 @@ import MyClipCore
             _ = try await client.connect(command: command(scenario))
             return (client, try await client.newSession(directory: root))
         }
+        let accountFixture = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("Tests/SubscriptionAgent/account-fixture.py")
+        for allowed in [false, true] {
+            let storage = FixtureAccountStorage()
+            let accountClient = ACPClient(accountStorage: storage)
+            var accountCommand = ACPCommand(executable: URL(fileURLWithPath: "/usr/bin/python3"), arguments: [accountFixture.path],
+                environment: ["FIXTURE_ACCOUNT_ALLOWED": allowed ? "1" : "0"])
+            if allowed { accountCommand.accountContext = AgentAccountContext(provider: .qwenwork, scope: root) }
+            let events = Task { () -> (Bool, Double?) in
+                var sawAuthorization = false
+                for await event in accountClient.events {
+                    if case .authorization = event { sawAuthorization = true }
+                    if case .account(let info) = event { return (sawAuthorization, info.creditsRemaining) }
+                }
+                return (sawAuthorization, nil)
+            }
+            _ = try await accountClient.connect(command: accountCommand)
+            try await accountClient.authenticate(methodID: "fixture")
+            let (reads, saves) = await storage.counts()
+            if allowed {
+                let (opened, remaining) = await events.value
+                check(reads == 1 && saves == 1 && opened, "Only an explicitly scoped account bridge can read, rotate and authorize its credential")
+                check(remaining == 42.5, "Remaining-only quota is preserved without inventing total or used credits")
+            } else {
+                check(reads == 0 && saves == 0, "Ordinary Agent processes cannot request account credentials or open authorization URLs")
+                events.cancel()
+            }
+            await accountClient.close()
+        }
         let (modern, modernSession) = try await client("models_modern")
+        for scenario in ["terminal_provider_error", "terminal_provider_warning"] {
+            let (provider, providerSession) = try await client(scenario)
+            do {
+                let result = try await provider.prompt(sessionID: providerSession, text: "fixture only", images: [])
+                check(scenario == "terminal_provider_warning" && result.stopReason == "end_turn", "Recovered provider warnings may complete normally")
+            } catch {
+                check(scenario == "terminal_provider_error" && error.localizedDescription.contains("model_not_found"), "A structured provider failure with end_turn is rejected instead of reported successful")
+            }
+            await provider.close()
+        }
         let catalog = await modern.modelSelection(sessionID: modernSession)
         check(catalog.options.map(\.id) == ["fixture/default", "fixture/vision", "fixture/rejected", "fixture/flat"], "Live grouped and flat model options preserve order and deduplicate IDs")
         check(catalog.options[0].group == "Fixture provider" && catalog.options[0].description == "Default description", "Provider names and descriptions survive parsing")
@@ -147,6 +195,23 @@ import MyClipCore
         await model.processNext(immediately: true)
         check(try requests(.opencode, "session/prompt").isEmpty, "Known text-only models never receive screenshot prompts")
         check(try await model.store.snapshot().jobs.first?.state == .failed, "A blocked image batch is failed instead of marked completed")
+        let providerError = root.appendingPathComponent("provider-error-adapter")
+        try "#!/bin/sh\nexport MYCLIP_ACP_SCENARIO=terminal_provider_error\nexec /usr/bin/python3 \(quote(fixture.path))\n"
+            .write(to: providerError, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: providerError.path)
+        model.preferences.qwenworkPath = providerError.path
+        model.preferences.setSelectedModel(nil, for: .qwenwork)
+        await model.loadAgentModels(.qwenwork, refresh: true)
+        let source = try await model.store.snapshot().captures.first!.id
+        let failedJob = try await model.store.enqueue(sourceIDs: [source], agent: .qwenwork)
+        model.preferences.enabledAgent = .qwenwork
+        await model.processNext(immediately: true, jobID: failedJob, agent: .qwenwork)
+        let providerSnapshot = try await model.store.snapshot()
+        let providerRecords = try await model.store.executionRecords(jobID: failedJob)
+        check(providerSnapshot.jobs.first(where: { $0.id == failedJob })?.state == .failed,
+              "A provider failure cannot mark an image organization job completed with no Memory changes")
+        check(providerRecords.last?.error?.contains("model_not_found") == true && providerRecords.last?.stopReason == nil,
+              "The execution record preserves the provider error instead of a successful stop reason")
         let slow = root.appendingPathComponent("slow-adapter")
         try "#!/bin/sh\nexport MYCLIP_ACP_SCENARIO=models_slow\nexec /usr/bin/python3 \(quote(fixture.path))\n"
             .write(to: slow, atomically: true, encoding: .utf8)

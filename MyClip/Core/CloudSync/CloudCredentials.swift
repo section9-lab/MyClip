@@ -33,22 +33,34 @@ public protocol CloudCredentialStorage: Sendable {
 }
 
 public actor CloudKeychain: CloudCredentialStorage {
-    private let service: String
+    private let secrets: KeychainDataStore
     public init(libraryRoot: URL) {
-        service = "cc.vibevibe.myclip.cloud." + CloudMemoryDocument.hash(libraryRoot.standardizedFileURL.path)
+        secrets = KeychainDataStore(service: "cc.vibevibe.myclip.cloud." + CloudMemoryDocument.hash(libraryRoot.standardizedFileURL.path))
     }
     public func read(_ provider: CloudSyncProvider) throws -> CloudCredential? {
-        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
-                                    kSecAttrAccount as String: provider.rawValue, kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+        try secrets.read(provider.rawValue).map { try JSONDecoder().decode(CloudCredential.self, from: $0) }
+    }
+    public func save(_ credential: CloudCredential, for provider: CloudSyncProvider) throws {
+        try secrets.save(JSONEncoder().encode(credential), for: provider.rawValue)
+    }
+    public func remove(_ provider: CloudSyncProvider) throws { try secrets.remove(provider.rawValue) }
+}
+
+public struct KeychainDataStore: Sendable {
+    private let service: String
+    public init(service: String) { self.service = service }
+    public func read(_ account: String, allowInteraction: Bool = true) throws -> Data? {
+        var query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
+                                    kSecAttrAccount as String: account, kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+        if !allowInteraction { query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail }
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess, let data = result as? Data else { throw keychainError(status) }
-        return try JSONDecoder().decode(CloudCredential.self, from: data)
+        return data
     }
-    public func save(_ credential: CloudCredential, for provider: CloudSyncProvider) throws {
-        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: provider.rawValue]
-        let data = try JSONEncoder().encode(credential)
+    public func save(_ data: Data, for account: String) throws {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
         let update = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
         if update == errSecItemNotFound {
             var item = query
@@ -58,8 +70,8 @@ public actor CloudKeychain: CloudCredentialStorage {
             guard status == errSecSuccess else { throw keychainError(status) }
         } else if update != errSecSuccess { throw keychainError(update) }
     }
-    public func remove(_ provider: CloudSyncProvider) throws {
-        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: provider.rawValue]
+    public func remove(_ account: String) throws {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else { throw keychainError(status) }
     }

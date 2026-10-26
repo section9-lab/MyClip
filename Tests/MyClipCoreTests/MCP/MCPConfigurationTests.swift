@@ -131,7 +131,9 @@ final class MCPConfigurationTests: XCTestCase {
     }
 
     func testCodexOfficialCLIUpdatesOnlyMyClipAndIsRepeatable() async throws {
-        let cli = ["/Applications/ChatGPT.app/Contents/Resources/codex", "/Applications/Codex.app/Contents/Resources/codex", "/opt/homebrew/bin/codex"].first { FileManager.default.isExecutableFile(atPath: $0) }
+        let paths = ["/Applications/ChatGPT.app", "/Applications/Codex.app"]
+            .compactMap { BundledCodexExecutable.find(in: URL(fileURLWithPath: $0))?.path } + ["/opt/homebrew/bin/codex"]
+        let cli = paths.first { FileManager.default.isExecutableFile(atPath: $0) }
         guard let cli else { throw XCTSkip("Codex CLI is not installed") }
         let installer = MCPClientInstaller(homeDirectory: root, environment: [:], codexExecutable: URL(fileURLWithPath: cli))
         let url = installer.configurationURL(for: .codex)

@@ -127,18 +127,18 @@ struct MenuBarBoardTests {
             scroll.contentView.scroll(to: .zero)
             scroll.reflectScrolledClipView(scroll.contentView)
         }
-        for (name, width, dark) in [("light", 600.0, false), ("dark", 600.0, true), ("narrow", 360.0, false)] {
+        for (name, width, dark) in [("light", MenuBarBoardLayout.width, false), ("dark", MenuBarBoardLayout.width, true), ("narrow", 360.0, false)] {
             window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
             window.setContentSize(NSSize(width: width, height: 458))
             try await settle()
             let scrolls = scrollViews(in: host)
-            check(scrolls.count == (width < 520 ? 1 : 3), "\(name): the board uses the expected responsive layout")
+            check(scrolls.count == (width < MenuBarBoardLayout.narrowWidth ? 1 : 3), "\(name): the board uses the expected responsive layout")
             check(
                 scrolls.allSatisfy { ($0.documentView?.bounds.width ?? 0) <= $0.contentSize.width + 1 },
                 "\(name): cards fit without horizontal overflow")
             try snapshot(name)
         }
-        window.setContentSize(NSSize(width: 600, height: 458))
+        window.setContentSize(NSSize(width: MenuBarBoardLayout.width, height: 458))
 
         var database: OpaquePointer?
         guard sqlite3_open(root.appendingPathComponent("Library.sqlite").path, &database) == SQLITE_OK, let database else {

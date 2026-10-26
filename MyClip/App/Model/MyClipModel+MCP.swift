@@ -16,9 +16,9 @@ extension MyClipModel {
     func configureMCP() {
         guard mcpEnabled, !configuringMCP, !preview, !preferences.mcpClients.isEmpty else { return }
         let selected = MCPClient.allCases.filter { preferences.mcpClients.contains($0) }
-        let bundledCodex = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex")?
-            .appendingPathComponent("Contents/Resources/codex")
-        let installer = MCPClientInstaller(codexExecutable: bundledCodex.flatMap { FileManager.default.isExecutableFile(atPath: $0.path) ? $0 : nil })
+        let bundledCodex = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex")
+            .flatMap { BundledCodexExecutable.find(in: $0) }
+        let installer = MCPClientInstaller(codexExecutable: bundledCodex)
         configuringMCP = true
         mcpSetupResults = [:]
         Task {

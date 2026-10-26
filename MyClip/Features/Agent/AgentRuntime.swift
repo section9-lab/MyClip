@@ -2,14 +2,18 @@ import AppKit
 import MyClipCore
 
 enum LocalAgentAvailability {
-    case connector, commandLine, desktopOnly, missing
+    case connector, commandLine, desktopConnector, desktopEngine, accountSetup, desktopOnly, missing
 
-    var canSelect: Bool { self == .connector || self == .commandLine }
+    var hasConnector: Bool { self == .connector || self == .desktopConnector }
+    var canSelect: Bool { hasConnector || self == .commandLine || self == .desktopEngine || self == .accountSetup }
     var detail: String {
         switch self {
         case .connector: String(localized: "连接组件已安装")
         case .commandLine: String(localized: "已检测到 · 需安装连接组件")
-        case .desktopOnly: String(localized: "仅检测到桌面端 · 需安装命令行")
+        case .desktopConnector: String(localized: "桌面应用内置引擎可用")
+        case .desktopEngine: String(localized: "已检测到桌面引擎 · 将自动准备连接组件")
+        case .accountSetup: String(localized: "连接账号后即可使用")
+        case .desktopOnly: String(localized: "已检测到桌面端 · 自动整理接口待接入")
         case .missing: String(localized: "未检测到")
         }
     }
@@ -21,6 +25,7 @@ struct AgentRuntime {
     var desktopApplications: [ClipAgent: URL]? = nil
     var homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
     var inheritedEnvironment: [String: String] = ProcessInfo.processInfo.environment
+    var componentManifest: ManagedRuntimeManifest? = nil
 
     var binDirectory: URL { root.appendingPathComponent("node_modules/.bin") }
 
@@ -66,59 +71,67 @@ struct AgentRuntime {
         var directories = (environment["PATH"] ?? "").split(separator: ":").map { URL(fileURLWithPath: String($0)) }
         if !customPath.isEmpty { directories.insert(URL(fileURLWithPath: customPath).deletingLastPathComponent(), at: 0) }
         var candidates = directories.map { $0.appendingPathComponent(agent.cliName) }
-        if agent == .codex, let app = desktopApplication(for: agent) {
-            candidates.append(app.appendingPathComponent("Contents/Resources/codex"))
+        if agent == .codex, let app = desktopApplication(for: agent), let executable = BundledCodexExecutable.find(in: app) {
+            // The ACP package also installs a Codex dependency. It must not shadow
+            // the desktop engine discovered before preparing that connector.
+            if customPath.isEmpty {
+                candidates.removeAll { $0.deletingLastPathComponent().standardizedFileURL == binDirectory.standardizedFileURL }
+            }
+            candidates.append(executable)
+            candidates.append(binDirectory.appendingPathComponent(agent.cliName))
         }
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
     }
 
     func availability(of agent: ClipAgent, customPath: String) -> LocalAgentAvailability {
-        if command(for: agent, customPath: customPath) != nil { return .connector }
+        if let command = command(for: agent, customPath: customPath) {
+            if !customPath.isEmpty { return .connector }
+            let executable = agent == .codex ? cliExecutable(for: agent, customPath: customPath) ?? command.executable : command.executable
+            return usesDesktopBundle(executable, agent: agent) ? .desktopConnector : .connector
+        }
         if !customPath.isEmpty { return .missing }
-        if cliExecutable(for: agent, customPath: customPath) != nil { return .commandLine }
+        if agent == .workbuddy || agent == .qwenwork {
+            return .accountSetup
+        }
+        if let executable = cliExecutable(for: agent, customPath: customPath) {
+            return usesDesktopBundle(executable, agent: agent) ? .desktopEngine : .commandLine
+        }
         return desktopApplication(for: agent) == nil ? .missing : .desktopOnly
     }
 
     func command(for agent: ClipAgent, customPath: String) -> ACPCommand? {
+        if customPath.isEmpty, agent == .workbuddy || agent == .qwenwork {
+            return accountCommand(for: agent)
+        }
         let locations = customPath.isEmpty
             ? (environment["PATH"] ?? "").split(separator: ":").map { URL(fileURLWithPath: String($0)).appendingPathComponent(agent.executableName) }
             : [URL(fileURLWithPath: customPath)]
-        guard let executable = locations.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else {
-            return agent == .qwenwork && customPath.isEmpty ? bundledQwenWorkCommand() : nil
-        }
+        guard let executable = locations.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else { return nil }
         return ACPCommand(executable: executable, arguments: agent.acpArguments, environment: environment)
     }
 
-    private struct QwenWorkEngineManifest: Decodable {
-        let `protocol`: String
-        let runtime: Runtime
-        struct Runtime: Decodable {
-            let kind: String
-            let entrypoint: String
-            let args: [String]
-            let env: [String: String]
+    /// Account connections always use MyClip-managed components, regardless of
+    /// the user's shell, installed desktop applications, or personal Agent config.
+    private func accountCommand(for agent: ClipAgent) -> ACPCommand? {
+        guard agent == .workbuddy || agent == .qwenwork,
+              let manifest = componentManifest ?? (try? ManagedRuntimeManifest.load()),
+              let directory = ManagedAgentRuntime.readyDirectory(root: root, manifest: manifest) else { return nil }
+        var env = environment
+        env["PATH"] = directory.path + ":" + (env["PATH"] ?? "/usr/bin:/bin")
+        if let app = desktopApplication(for: agent), let version = Bundle(url: app)?.infoDictionary?["CFBundleShortVersionString"] as? String {
+            env["MYCLIP_PRODUCT_VERSION"] = version
         }
+        let engine = ACPCommand(executable: directory.appendingPathComponent("opencode"), arguments: ["acp"], environment: env)
+        return SubscriptionAgentCommand.make(provider: agent, node: directory.appendingPathComponent("node"), engine: engine, runtimeRoot: root)
     }
 
-    private func bundledQwenWorkCommand() -> ACPCommand? {
-        guard let app = desktopApplication(for: .qwenwork), let executable = Bundle(url: app)?.executableURL,
-              FileManager.default.isExecutableFile(atPath: executable.path) else { return nil }
-        let components = app.appendingPathComponent("Contents/Resources/agent-sdk/components/flash-cli")
-        let versions = ((try? FileManager.default.contentsOfDirectory(at: components, includingPropertiesForKeys: nil,
-            options: .skipsHiddenFiles)) ?? []).sorted {
-                $0.lastPathComponent.compare($1.lastPathComponent, options: .numeric) == .orderedDescending
-            }
-        for version in versions {
-            guard let data = try? Data(contentsOf: version.appendingPathComponent("engine-manifest.json")),
-                  let manifest = try? JSONDecoder().decode(QwenWorkEngineManifest.self, from: data),
-                  manifest.protocol == "acp-stdio", manifest.runtime.kind == "electron-node" else { continue }
-            let entrypoint = version.appendingPathComponent(manifest.runtime.entrypoint).standardizedFileURL
-            guard entrypoint.path.hasPrefix(version.standardizedFileURL.path + "/"),
-                  FileManager.default.isReadableFile(atPath: entrypoint.path) else { continue }
-            let env = environment.merging(manifest.runtime.env) { _, value in value }
-            return ACPCommand(executable: executable, arguments: [entrypoint.path] + manifest.runtime.args, environment: env)
-        }
-        return nil
+    func usesAccountBridge(_ agent: ClipAgent, customPath: String) -> Bool {
+        customPath.isEmpty && (agent == .workbuddy || agent == .qwenwork)
+    }
+
+    private func usesDesktopBundle(_ executable: URL, agent: ClipAgent) -> Bool {
+        guard let app = desktopApplication(for: agent) else { return false }
+        return executable.resolvingSymlinksInPath().path.hasPrefix(app.resolvingSymlinksInPath().path + "/")
     }
 
     func sessionCommand(for agent: ClipAgent, customPath: String) -> ACPCommand? {
@@ -136,6 +149,11 @@ struct AgentRuntime {
     }
 
     func install(_ agent: ClipAgent) async throws {
+        if agent == .workbuddy || agent == .qwenwork {
+            let manifest = try componentManifest ?? ManagedRuntimeManifest.load()
+            _ = try await ManagedAgentRuntime(root: root, manifest: manifest).prepare()
+            return
+        }
         guard let package = agent.package else {
             throw LibraryError.invalidResult(String(localized: "\(agent.name) 自带 ACP 支持，无需连接组件；请先安装 \(agent.cliName) 命令行。"))
         }

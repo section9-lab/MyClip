@@ -41,8 +41,10 @@ public enum MemoryPrompt {
     }
 
     /// One full organize-batch turn's prompt: the Memory-writing instructions plus the task-discovery contract.
-    public static func organizeBatchPrompt(captures: [ClipCapture], handoff: String? = nil, previousAttempt: String? = nil, tasks: [WorkTask]) -> String {
+    public static func organizeBatchPrompt(captures: [ClipCapture], handoff: String? = nil, previousAttempt: String? = nil,
+                                          tasks: [WorkTask], memories: [KnowledgeEntry] = []) -> String {
         filePrompt(captures: captures, handoff: handoff, previousAttempt: previousAttempt) + "\n" + TaskPrompt.context(tasks: tasks)
+            + "\n" + TaskPrompt.memoryCatalog(memories)
     }
 
     /// A dream's turns in order, each titled for the queue: last week's summary when due, today's pages, then the patrol.

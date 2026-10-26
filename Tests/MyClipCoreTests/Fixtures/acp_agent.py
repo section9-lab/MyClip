@@ -60,6 +60,11 @@ for line in sys.stdin:
         with open(conversation_file + ".requests", "a") as log:
             log.write(json.dumps(request) + "\n")
     if method == "initialize":
+        if scenario.startswith("terminal_provider_"):
+            air = request.get("params", {}).get("clientCapabilities", {}).get("_meta", {}).get("jetbrains", {}).get("air", {})
+            if "sessionFailure" not in air.get("capabilities", []):
+                send({"jsonrpc":"2.0", "id":request["id"], "error":{"code":-32602,"message":"Typed session failure capability missing"}})
+                continue
         if scenario == "models_slow":
             time.sleep(0.5)
         capabilities = {"promptCapabilities":{"image":scenario != "no_images"}}
@@ -103,6 +108,12 @@ for line in sys.stdin:
             result(request, {})
     elif method == "session/prompt":
         prompt_count += 1
+        if scenario.startswith("terminal_provider_"):
+            severity = "warning" if scenario == "terminal_provider_warning" else "error"
+            finish(request, text="Provider response", _meta={"jetbrains":{"air":{"version":1,"sessionFailure":{
+                "id":"provider-error", "revision":1, "category":"provider_error", "severity":severity,
+                "title":"model_not_found: verification model unavailable", "actions":[]}}}})
+            continue
         if conversation_file:
             session = request["params"]["sessionId"]
             conversations[session].append(request["params"]["prompt"][0]["text"])
@@ -223,6 +234,8 @@ for line in sys.stdin:
         elif scenario == "context_usage":
             send({"jsonrpc":"2.0", "method":"session/update", "params":{"sessionId":"s1", "update":{"sessionUpdate":"usage_update", "used":90000,"size":200000,"cost":{"amount":0.125}}}})
             finish(request)
+        elif scenario == "task_recovery_empty":
+            finish(request, '{"tasks":[]}\n已核对，没有有依据的新任务。')
         elif scenario == "thinking":
             send({"jsonrpc":"2.0", "method":"session/update", "params":{"sessionId":"s1", "update":{"sessionUpdate":"agent_thought_chunk", "content":{"type":"text","text":"thinking"}}}})
             finish(request)

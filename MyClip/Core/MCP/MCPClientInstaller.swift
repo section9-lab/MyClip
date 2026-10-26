@@ -99,8 +99,9 @@ public struct MCPClientInstaller: Sendable {
 
     private func installCodex(_ command: ACPCommand) throws {
         let paths = (environment["PATH"] ?? "").split(separator: ":").map { String($0) + "/codex" }
-            + [homeDirectory.appendingPathComponent(".local/bin/codex").path, "/opt/homebrew/bin/codex", "/usr/local/bin/codex",
-               "/Applications/Codex.app/Contents/Resources/codex", "/Applications/ChatGPT.app/Contents/Resources/codex"]
+            + [homeDirectory.appendingPathComponent(".local/bin/codex").path, "/opt/homebrew/bin/codex", "/usr/local/bin/codex"]
+            + ["/Applications/Codex.app", "/Applications/ChatGPT.app"]
+                .compactMap { BundledCodexExecutable.find(in: URL(fileURLWithPath: $0))?.path }
         guard let executable = codexExecutable ?? paths.first(where: { FileManager.default.isExecutableFile(atPath: $0) }).map({ URL(fileURLWithPath: $0) }) else {
             throw LibraryError.invalidResult(String(localized: "未找到 Codex。请先安装 Codex 应用或 CLI，再重试。"))
         }

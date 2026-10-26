@@ -17,6 +17,8 @@ case "$suite" in
     cloud-sync) bash Tests/CloudSync/run.sh "$@" ;;
     scripts)
         node --test Tests/Adapters/test_ephemeral_codex.cjs
+        node --test Tests/SubscriptionAgent/*.test.mjs
+        bash Tests/SubscriptionAgent/run.sh
         PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Tests/Packaging -v
         ;;
     benchmark)

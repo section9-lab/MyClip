@@ -1,0 +1,8 @@
+{
+  "workbuddy": {
+    "endpoint": "https://copilot.tencent.com",
+    "platform": "workbuddy",
+    "protocolClientVersion": "2.0.0",
+    "compatibleProductVersion": "5.9.0"
+  }
+}

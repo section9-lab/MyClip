@@ -49,6 +49,20 @@ struct BackstageView: View {
             AgentBrandIcon(agent: agent, size: 28).frame(height: 28)
             Text(agent.name).font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.85)
             phaseChip(state, enabled: enabled, availability: availability).frame(height: 20)
+            if model.runtime.usesAccountBridge(agent, customPath: model.preferences.path(for: agent)) {
+                Text("运行组件由 MyClip 管理").font(.caption2).foregroundStyle(.secondary)
+                if let account = state.account {
+                    Text(account.account).font(.caption).textSelection(.enabled)
+                    Text(account.plan).font(.caption2).foregroundStyle(.secondary)
+                    if let used = account.creditsUsed, let total = account.creditsTotal {
+                        Text(String(localized: "额度：\(used.formatted()) / \(total.formatted())"))
+                            .font(.caption2).foregroundStyle(.secondary)
+                    } else if let remaining = account.creditsRemaining {
+                        Text(String(localized: "剩余额度：\(remaining.formatted())"))
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
             if let description = agentDescription(agent, state: state, enabled: enabled, availability: availability) {
                 Text(description)
                     .font(.caption).foregroundStyle(state.phase == .failed ? .orange : .secondary)
@@ -62,6 +76,9 @@ struct BackstageView: View {
                     }
                 }.controlSize(.small)
             }
+            if model.authorizingAccounts.contains(agent) {
+                Button("取消授权") { model.cancelAccountAuthorization(agent) }.controlSize(.small)
+            }
             Button { selectedModelAgent = agent } label: {
                 VStack(spacing: 2) {
                     Text("模型").foregroundStyle(.secondary)
@@ -70,9 +87,9 @@ struct BackstageView: View {
                 }.font(.caption)
             }
             .buttonStyle(.bordered).controlSize(.small)
-            .disabled(!availability.canSelect || !model.canConfigureAgentModel(agent) || installing || selecting)
+            .disabled(!availability.hasConnector || !model.canConfigureAgentModel(agent) || installing || selecting)
             .accessibilityLabel(String(localized: "选择 \(agent.name) 的模型"))
-            .help(!availability.canSelect ? String(localized: "先安装 \(agent.name) 命令行")
+            .help(!availability.hasConnector ? String(localized: "请先连接 \(agent.name)，再选择模型")
                   : state.busy ? String(localized: "请等待当前整理结束后再切换模型。") : String(localized: "从 Agent 获取可用模型，应用到后续整理会话"))
             Spacer(minLength: 2)
             Group {
@@ -81,6 +98,10 @@ struct BackstageView: View {
                         if state.phase == .failed { Button("重试连接") { model.connect(agent) } }
                         else { Button("重新连接") { model.connect(agent) }.disabled(state.busy) }
                         if model.hasLoginCommand(agent) { Button("复制登录命令") { model.copyLoginCommand(for: agent) } }
+                        if model.runtime.usesAccountBridge(agent, customPath: model.preferences.path(for: agent)) {
+                            Button("重新授权账号") { model.reauthorizeAccount(agent) }.disabled(state.busy)
+                            Button("刷新账号额度") { model.refreshAgentAccount(agent) }.disabled(state.busy)
+                        }
                         Divider()
                         Button("停用", role: .destructive) { model.disableAgent() }
                     } label: { Text("当前使用").foregroundStyle(Color.accentColor) }
@@ -93,7 +114,7 @@ struct BackstageView: View {
                         Text(useLabel(state, availability: availability)).lineLimit(1).minimumScaleFactor(0.8)
                     }
                     .disabled(model.preview || !availability.canSelect || installing || selecting)
-                    .help(availability.canSelect ? String(localized: "把后续截图交给 \(agent.name) 整理") : String(localized: "先安装 \(agent.name) 命令行"))
+                    .help(availability.canSelect ? String(localized: "把后续截图交给 \(agent.name) 整理") : availability.detail)
                 }
             }.controlSize(.small).frame(height: 24)
         }
@@ -119,7 +140,7 @@ struct BackstageView: View {
 
     private func useLabel(_ state: ClipAgentState, availability: LocalAgentAvailability) -> String {
         if state.available { return String(localized: "使用") }
-        return availability == .connector ? String(localized: "连接并使用") : String(localized: "安装并使用")
+        return availability.hasConnector || availability == .desktopEngine || availability == .accountSetup ? String(localized: "连接并使用") : String(localized: "安装并使用")
     }
 
     @ViewBuilder private func phaseChip(_ state: ClipAgentState, enabled: Bool, availability: LocalAgentAvailability) -> some View {
@@ -131,8 +152,11 @@ struct BackstageView: View {
         case .failed: StatusChip(String(localized: "出错"), tone: .warning)
         case .ready: StatusChip(String(localized: "已连接"), tone: .good)
         case .disconnected:
-            if !availability.canSelect { StatusChip(String(localized: "未检测到"), tone: .neutral) }
+            if availability == .accountSetup { StatusChip(String(localized: "待连接"), tone: .neutral) }
+            else if availability == .desktopOnly { StatusChip(String(localized: "已检测到桌面端"), tone: .neutral) }
+            else if !availability.canSelect { StatusChip(String(localized: "未检测到"), tone: .neutral) }
             else if enabled { StatusChip(String(localized: "待连接"), tone: .neutral) }
+            else if availability == .desktopConnector || availability == .desktopEngine { StatusChip(String(localized: "已检测到桌面引擎"), tone: .neutral) }
         }
     }
 
@@ -141,13 +165,22 @@ struct BackstageView: View {
             if let job = model.latestFailedJob, job.agent == agent, let error = job.error { return error }
             return state.detail.hasSuffix("。") ? state.detail : state.detail + "。"
         }
+        if model.runtime.usesAccountBridge(agent, customPath: model.preferences.path(for: agent)) {
+            guard state.account == nil else { return nil }
+            return availability == .accountSetup
+                ? String(localized: "首次连接将自动准备运行组件，无需预装其他软件。")
+                : String(localized: "登录你的产品账号，读取该账号的模型和额度。")
+        }
         if state.phase == .disconnected, enabled, let retrying = model.jobAwaitingRetry, retrying.agent == agent, let error = retrying.error {
             return String(localized: "\(error) 第 \(retrying.attempts + 1) 次尝试排队中。")
         }
         switch (availability, agent) {
         case (.missing, .codex): return String(localized: "没有找到 Codex 命令行。安装 Codex 桌面端或命令行后再来连接。")
         case (.missing, _): return String(localized: "没有找到 \(agent.cliName) 命令行。安装后再来连接。")
-        case (.desktopOnly, _): return String(localized: "只检测到桌面端。整理需要 \(agent.name) 命令行。")
+        case (.desktopOnly, _): return String(localized: "已安装桌面端，MyClip 尚未接入其自动整理接口。")
+        case (.desktopEngine, _): return String(localized: "使用桌面应用内置引擎，首次连接会自动准备连接组件。")
+        case (.accountSetup, _): return String(localized: "首次连接将自动准备运行组件，无需预装其他软件。")
+        case (.desktopConnector, _): return String(localized: "使用桌面应用内置引擎。")
         case (.commandLine, _), (.connector, _): return nil
         }
     }
@@ -421,6 +454,16 @@ struct AgentModelPickerView: View {
             if let error = state.modelError {
                 Text(error).font(.callout).foregroundStyle(.orange).textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true).accessibilityLabel(String(localized: "模型设置失败：\(error)"))
+            }
+            if !state.available, !state.authMethods.isEmpty {
+                HStack {
+                    ForEach(state.authMethods) { method in
+                        Button(method.name) { model.authenticate(agent, method: method) }.disabled(busy)
+                    }
+                    if model.authorizingAccounts.contains(agent) {
+                        Button("取消授权") { model.cancelAccountAuthorization(agent) }
+                    }
+                }.controlSize(.small)
             }
             if state.modelSelection.current?.supportsImages == false {
                 Text("当前模型不支持图片，请选择支持图片的模型后整理截图。")

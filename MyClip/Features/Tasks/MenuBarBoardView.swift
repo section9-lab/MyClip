@@ -19,7 +19,7 @@ enum MenuBarIcon: String, CaseIterable {
 }
 
 enum MenuBarBoardLayout {
-    static let width: CGFloat = 600
+    static let width: CGFloat = 540
     static let narrowWidth: CGFloat = 520
     static let cardHeight: CGFloat = 96
     static let spacing: CGFloat = 8
@@ -57,6 +57,7 @@ struct MenuBarBoardView: View {
             footer
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .scrollIndicators(.hidden)
         .onExitCommand(perform: dismiss)
         .accessibilityLabel("MyClip 看板")
     }
@@ -118,7 +119,7 @@ struct MenuBarBoardView: View {
         let items = tasks.filter { $0.status == status }
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
-                statusIcon(status).image.foregroundStyle(statusColor(status))
+                statusIcon(status).image.foregroundStyle(status.tint)
                 Text(status.title).fontWeight(.medium)
                 Text(items.count.formatted()).foregroundStyle(.secondary).monospacedDigit()
                 Spacer(minLength: 0)
@@ -134,7 +135,7 @@ struct MenuBarBoardView: View {
         }
         .padding(MenuBarBoardLayout.columnInset)
         .frame(maxWidth: .infinity, maxHeight: scrolls ? .infinity : nil, alignment: .topLeading)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
+        .background { TaskBoardColumnBackground(status: status) }
     }
 
     private func cards(_ items: [WorkTask], status: WorkTaskStatus) -> some View {
@@ -182,13 +183,6 @@ struct MenuBarBoardView: View {
         }
     }
 
-    private func statusColor(_ status: WorkTaskStatus) -> Color {
-        switch status {
-        case .doing: .orange
-        case .done: .accentColor
-        default: .secondary
-        }
-    }
 }
 
 private struct MenuBarTaskCard: View {

@@ -13,6 +13,7 @@ public struct ClipAgentState: Sendable {
     public var modelSelection = ACPModelSelection()
     public var modelsLoaded = false
     public var modelError: String?
+    public var account: AgentAccountInfo?
     public var available: Bool { phase == .ready || phase == .working || phase == .permission }
     public var busy: Bool { [.connecting, .working, .permission, .installing].contains(phase) }
     public var canOpenSession: Bool { !sessionIsEphemeral && available && sessionID.flatMap(UUID.init(uuidString:)) != nil }

@@ -1,17 +1,6 @@
 import SwiftUI
 import MyClipCore
 
-extension WorkTaskStatus {
-    var tint: Color {
-        switch self {
-        case .candidate: .secondary
-        case .todo, .ignored: .secondary
-        case .doing: .orange
-        case .done: .blue
-        }
-    }
-}
-
 private struct TaskEditRequest: Identifiable {
     let id = UUID()
     let task: WorkTask?
@@ -19,7 +8,6 @@ private struct TaskEditRequest: Identifiable {
 
 struct TaskDashboardView: View {
     @ObservedObject var model: MyClipModel
-    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedID: UUID?
     @State private var editing: TaskEditRequest?
     @State private var savedTaskID: UUID?
@@ -75,6 +63,7 @@ struct TaskDashboardView: View {
                 HStack { taskCount; Spacer(minLength: 20); actions }
                 VStack(alignment: .leading, spacing: 12) { taskCount; actions }
             }
+            ingestionStatus
             if let message = model.taskDiscoveryMessage {
                 discoveryNotice(message)
             }
@@ -101,6 +90,35 @@ struct TaskDashboardView: View {
                 }.font(.callout).foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var ingestionStatus: some View {
+        let summary = model.taskIngestionSummary
+        return VStack(alignment: .leading, spacing: 6) {
+            if summary.pendingCount > 0 || summary.failedCount > 0 {
+                ViewThatFits(in: .horizontal) {
+                    HStack {
+                        Text("任务补处理：\(summary.pendingCount) 批等待 · \(summary.failedCount) 批需重试")
+                        if summary.failedCount > 0 { retryIngestionButton }
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("任务补处理：\(summary.pendingCount) 批等待 · \(summary.failedCount) 批需重试")
+                        if summary.failedCount > 0 { retryIngestionButton }
+                    }
+                }
+                if let error = summary.lastError {
+                    DisclosureGroup("补处理原因") { Text(error).textSelection(.enabled) }
+                }
+            }
+            if let date = summary.observedThrough {
+                Text("最近成功识别的截图：\(date.formatted(date: .abbreviated, time: .shortened)) · \(model.library.queue.pendingCount) 条截图待整理")
+            }
+        }.font(.caption).foregroundStyle(.secondary)
+    }
+
+    private var retryIngestionButton: some View {
+        Button("重试补处理") { model.retryTaskIngestionFailures() }
+            .disabled(!model.canStartOrganization).controlSize(.small)
     }
 
     private var taskCount: some View {
@@ -214,13 +232,7 @@ struct TaskDashboardView: View {
             .accessibilityLabel("\(status.title)任务，可上下滚动")
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background {
-            RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .textBackgroundColor))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(status == .todo ? Color.primary.opacity(0.035) : status.tint.opacity(colorScheme == .dark ? 0.12 : 0.07))
-                }
-        }
+        .background { TaskBoardColumnBackground(status: status) }
         .contentShape(Rectangle())
         .dropDestination(for: String.self) { values, _ in
             let ids = values.compactMap(UUID.init(uuidString:)).filter { id in model.workTasks.contains { $0.id == id && $0.status.isOnBoard } }

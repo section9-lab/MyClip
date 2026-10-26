@@ -149,11 +149,12 @@ extension LibraryStore {
                 let fields = try Self.taskFields(title: draft.title, project: draft.project)
                 let quote = draft.evidence.trimmingCharacters(in: .whitespacesAndNewlines)
                 let sources = Set(draft.sourceIDs), memories = Set(draft.memoryIDs)
-                guard draft.suggestedStatus.isOnBoard, !quote.isEmpty, quote.count <= 2400,
-                      !sources.isEmpty || !memories.isEmpty,
-                      sources.isSubset(of: allowedSourceIDs), memories.isSubset(of: allowedMemoryIDs) else {
-                    throw LibraryError.invalidResult(String(localized: "任务缺少有效依据，或引用了本次分析范围之外的来源。"))
+                guard draft.suggestedStatus.isOnBoard, !quote.isEmpty, quote.count <= 2400 else {
+                    throw LibraryError.invalidResult(String(localized: "任务状态或原文依据无效。"))
                 }
+                guard !sources.isEmpty || !memories.isEmpty else { throw LibraryError.invalidResult(String(localized: "任务缺少截图或 Memory 依据。")) }
+                guard sources.isSubset(of: allowedSourceIDs) else { throw LibraryError.invalidResult(String(localized: "截图来源不属于本批；历史截图请通过允许的 Memory 引用，不可混入本批 sourceIDs。")) }
+                guard memories.isSubset(of: allowedMemoryIDs) else { throw LibraryError.invalidResult(String(localized: "Memory 来源不在允许目录中；taskID 是任务编号，不能填入 memoryIDs。")) }
                 var observations: [Date] = []
                 for source in sources {
                     guard let row = try database.run("SELECT captured_at FROM captures WHERE id=?", [source.uuidString]).first,
@@ -193,6 +194,19 @@ extension LibraryStore {
                 changed.insert(id)
             }
             return changed.count
+        }
+    }
+
+    /// A legacy response already imported by the old app needs no model call or new write.
+    func taskEvidenceAlreadyRecorded(_ drafts: [WorkTaskDraft]) throws -> Bool {
+        try drafts.allSatisfy { draft in
+            let fields = try Self.taskFields(title: draft.title, project: draft.project)
+            let row = try draft.taskID.map { try database.run("SELECT id FROM work_tasks WHERE id=?", [$0.uuidString]).first }
+                ?? database.run("SELECT id FROM work_tasks WHERE identity=?", [fields.identity]).first
+            guard let id = row?["id"] else { return false }
+            let fingerprint = Self.memoryHash(draft.evidence.trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
+                + (try Self.taskIDsJSON(Set(draft.sourceIDs))) + "\n" + (try Self.taskIDsJSON(Set(draft.memoryIDs))))
+            return try !database.run("SELECT id FROM work_task_evidence WHERE task_id=? AND fingerprint=?", [id, fingerprint]).isEmpty
         }
     }
 

@@ -19,6 +19,10 @@ struct TaskReportsView: View {
     private var document: WorkTaskReportDocument {
         savedDocument?.id == report.document.id ? savedDocument! : report.document
     }
+    private var sourceTasks: [WorkTask] {
+        let ids = report.referenceTaskIDs.union(document.taskIDs)
+        return model.workTasks.filter { ids.contains($0.id) }
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -88,7 +92,7 @@ struct TaskReportsView: View {
                 }
                 Text("查看任务详情、来源依据与状态记录。任务详情显示当前进度。")
                     .font(.callout).foregroundStyle(.secondary)
-                List(model.workTasks.filter { document.taskIDs.contains($0.id) }) { task in
+                List(sourceTasks) { task in
                     Button {
                         selectedSource = task.id
                         showingSources = false
@@ -117,7 +121,7 @@ struct TaskReportsView: View {
     private var actions: some View {
         HStack(spacing: 10) {
             Button(String(localized: "参考任务"), systemImage: "sidebar.right") { sharing = false; showingSources = true }
-                .disabled(loading || loadError != nil || document.taskIDs.isEmpty)
+                .disabled(loading || loadError != nil || sourceTasks.isEmpty)
             Button(String(localized: "分享"), systemImage: "square.and.arrow.up") { sharing.toggle() }
                 .disabled(loading || loadError != nil || document.taskIDs.isEmpty)
         }.buttonStyle(.bordered).controlSize(.regular).fixedSize(horizontal: true, vertical: false)
@@ -179,7 +183,7 @@ private struct ReportPaper: View {
             ForEach(document.sections) { section in
                 VStack(alignment: .leading, spacing: 20) {
                     Text(section.title).font(.system(size: 18, weight: .semibold))
-                    if section.projects.isEmpty { Text("暂无记录。").foregroundStyle(.secondary) }
+                    if section.projects.isEmpty { Text(section.emptyText).foregroundStyle(.secondary) }
                     ForEach(section.projects) { project in
                         VStack(alignment: .leading, spacing: 12) {
                             ViewThatFits(in: .horizontal) {

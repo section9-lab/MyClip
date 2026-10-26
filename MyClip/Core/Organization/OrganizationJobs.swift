@@ -10,6 +10,8 @@ extension LibraryStore {
     }
 
     public func recoverInterruptedJobs(at date: Date = Date()) throws {
+        try recoverInterruptedTaskIngestions(at: date)
+        try recoverHistoricalTaskIngestions(at: date)
         try database.transaction {
             let running = try database.run("SELECT id,attempts,kind FROM jobs WHERE state='running'")
             guard !running.isEmpty else { return }

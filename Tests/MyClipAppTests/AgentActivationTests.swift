@@ -53,7 +53,7 @@ struct AgentActivationTests {
         try "#!/bin/sh\nexit 0\n".write(to: bundledCLI, atomically: true, encoding: .utf8)
         check(discovery.availability(of: .codex, customPath: "") == .desktopOnly, "A non-executable CLI is not advertised as available")
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: bundledCLI.path)
-        check(discovery.availability(of: .codex, customPath: "") == .commandLine, "Discovery finds the CLI bundled in a renamed desktop app")
+        check(discovery.availability(of: .codex, customPath: "") == .desktopEngine, "Discovery finds the CLI bundled in a renamed desktop app")
         check(discovery.sessionCommand(for: .codex, customPath: "")?.executable == bundledCLI, "Connections use the same bundled CLI that discovery finds")
         let claudeCLI = discoveryBin.appendingPathComponent("claude")
         try "#!/bin/sh\nexit 0\n".write(to: claudeCLI, atomically: true, encoding: .utf8)
@@ -68,15 +68,50 @@ struct AgentActivationTests {
             try contents.write(to: url, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
         }
+        let modernCodexApp = discoveryRoot.appendingPathComponent("Renamed ChatGPT.app")
+        let modernCodex = modernCodexApp.appendingPathComponent("Contents/Resources/codex-cli/bin/codex")
+        try writeExecutable(modernCodex, contents: "#!/bin/sh\nexit 0\n")
+        let modernDiscovery = AgentRuntime(root: discoveryRoot, searchPaths: [], desktopApplications: [.codex: modernCodexApp])
+        check(modernDiscovery.availability(of: .codex, customPath: "") == .desktopEngine,
+              "The current desktop Codex package is available without installing an external CLI")
+        check(modernDiscovery.sessionCommand(for: .codex, customPath: "")?.executable == modernCodex,
+              "Codex connections and MCP setup share current desktop-package discovery")
+        check(LocalAgentAvailability.desktopEngine.canSelect && !LocalAgentAvailability.desktopEngine.hasConnector,
+              "A desktop Codex engine can prepare its missing connector from the application")
+        try writeExecutable(modernDiscovery.binDirectory.appendingPathComponent("codex"), contents: "#!/bin/sh\nexit 0\n")
+        try writeExecutable(modernDiscovery.binDirectory.appendingPathComponent("codex-acp"), contents: "#!/bin/sh\nexit 0\n")
+        check(modernDiscovery.sessionCommand(for: .codex, customPath: "")?.executable == modernCodex
+              && modernDiscovery.availability(of: .codex, customPath: "") == .desktopConnector,
+              "Preparing a connector cannot shadow the desktop engine with its bundled Codex dependency")
+        try FileManager.default.removeItem(at: modernCodex)
+        let nestedCodex = modernCodexApp.appendingPathComponent("Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex")
+        try writeExecutable(nestedCodex, contents: "#!/bin/sh\nexit 0\n")
+        check(BundledCodexExecutable.find(in: modernCodexApp) == nestedCodex,
+              "Codex discovery can fall back to its nested native executable")
         check(ClipAgent.allCases.count == 6, "The Agent catalog includes all six onboarding choices")
         let workbuddyApp = discoveryRoot.appendingPathComponent("WorkBuddy.app")
         let qwenworkApp = discoveryRoot.appendingPathComponent("Renamed QwenWork.app")
         let desktopDiscovery = AgentRuntime(root: discoveryRoot, searchPaths: [],
             desktopApplications: [.workbuddy: workbuddyApp, .qwenwork: qwenworkApp])
-        check(desktopDiscovery.availability(of: .workbuddy, customPath: "") == .desktopOnly,
-              "WorkBuddy desktop detection does not pretend its companion CLI is installed")
-        check(desktopDiscovery.availability(of: .qwenwork, customPath: "") == .desktopOnly,
-              "QwenWork without a bundled engine remains unavailable")
+        check(desktopDiscovery.availability(of: .workbuddy, customPath: "") == .accountSetup,
+              "WorkBuddy account setup is available without its companion CLI")
+        check(desktopDiscovery.availability(of: .qwenwork, customPath: "") == .accountSetup,
+              "QwenWork account setup does not require a bundled desktop engine")
+        let workbuddyHost = workbuddyApp.appendingPathComponent("Contents/MacOS/Buddy Runtime")
+        try writeExecutable(workbuddyHost, contents: "#!/bin/sh\nexit 0\n")
+        let workbuddyInfo = try PropertyListSerialization.data(fromPropertyList: ["CFBundleExecutable": "Buddy Runtime", "CFBundleIdentifier": "myclip.tests.workbuddy"], format: .xml, options: 0)
+        try workbuddyInfo.write(to: workbuddyApp.appendingPathComponent("Contents/Info.plist"))
+        let workbuddyCLI = workbuddyApp.appendingPathComponent("Contents/Resources/app.asar.unpacked/cli")
+        try writeExecutable(workbuddyCLI.appendingPathComponent("bin/codebuddy"), contents: "// Desktop CLI entry\n")
+        check(desktopDiscovery.availability(of: .workbuddy, customPath: "") == .accountSetup,
+              "Incomplete desktop components do not prevent managed account setup")
+        try writeExecutable(workbuddyCLI.appendingPathComponent("dist/codebuddy-lite-wb.mjs"), contents: "// WorkBuddy bundle\n")
+        check(desktopDiscovery.availability(of: .workbuddy, customPath: "") == .accountSetup,
+              "Host-managed desktop components are not mistaken for prepared MyClip components")
+        check(desktopDiscovery.command(for: .workbuddy, customPath: "") == nil,
+              "WorkBuddy never launches a desktop component without a verified external connection")
+        check(desktopDiscovery.command(for: .workbuddy, customPath: discoveryRoot.appendingPathComponent("missing-workbuddy").path) == nil,
+              "An invalid custom WorkBuddy path cannot silently fall back to the desktop engine")
         let qwenworkHost = qwenworkApp.appendingPathComponent("Contents/MacOS/QwenWork")
         try writeExecutable(qwenworkHost, contents: "#!/bin/sh\nexit 0\n")
         let appInfo = try PropertyListSerialization.data(fromPropertyList: ["CFBundleExecutable": "QwenWork", "CFBundleIdentifier": "myclip.tests.qwenwork"], format: .xml, options: 0)
@@ -87,17 +122,14 @@ struct AgentActivationTests {
         let manifest = #"{"protocol":"acp-stdio","runtime":{"kind":"electron-node","entrypoint":"runtime/flash-cli-acp.mjs","args":[],"env":{"ELECTRON_RUN_AS_NODE":"1"}}}"#
         try manifest.write(to: qwenworkVersion.appendingPathComponent("engine-manifest.json"), atomically: true, encoding: .utf8)
         let qwenworkCommand = desktopDiscovery.command(for: .qwenwork, customPath: "")
-        check(qwenworkCommand?.executable.resolvingSymlinksInPath() == qwenworkHost.resolvingSymlinksInPath(),
-              "QwenWork uses its own bundled Electron runtime")
-        check(qwenworkCommand?.arguments.first.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() } == qwenworkEngine.resolvingSymlinksInPath() &&
-              qwenworkCommand?.environment["ELECTRON_RUN_AS_NODE"] == "1",
-              "QwenWork follows its bundled engine manifest instead of an unrelated legacy CLI")
+        check(qwenworkCommand == nil,
+              "QwenWork accounts wait for managed components instead of launching an unauthenticated desktop engine")
         check(desktopDiscovery.command(for: .qwenwork, customPath: discoveryRoot.appendingPathComponent("missing-qwenwork").path) == nil,
               "An invalid custom QwenWork path never falls back to the bundled engine")
         try writeExecutable(discoveryBin.appendingPathComponent("codebuddy"), contents: "#!/bin/sh\nexit 0\n")
-        check(desktopDiscovery.availability(of: .workbuddy, customPath: "") == .connector,
-              "WorkBuddy's companion CLI enables selection")
-        check(desktopDiscovery.command(for: .workbuddy, customPath: "")?.arguments == ["--acp", "--no-session-persistence"],
+        check(desktopDiscovery.availability(of: .workbuddy, customPath: "") == .accountSetup,
+              "A personal WorkBuddy CLI does not replace the managed account connection")
+        check(desktopDiscovery.command(for: .workbuddy, customPath: discoveryBin.appendingPathComponent("codebuddy").path)?.arguments == ["--acp", "--no-session-persistence"],
               "WorkBuddy uses its official ACP entry point without persisting temporary sessions")
         // Model a Finder launch: the inherited PATH has no Node version manager entries.
         let guiDiscovery = AgentRuntime(root: discoveryRoot, desktopApplications: [:], homeDirectory: nvmHome,
@@ -114,6 +146,27 @@ struct AgentActivationTests {
         check(nvmCommand?.arguments == ["acp"], "Discovered OpenCode keeps its ACP arguments")
         check(guiDiscovery.sessionCommand(for: .opencode, customPath: "")?.executable == nvmCommand?.executable,
               "Session commands use the same nvm installation as discovery")
+        let accountRuntime = AgentRuntime(root: discoveryRoot.appendingPathComponent("AccountRuntime"), searchPaths: [nvmBin.path],
+            desktopApplications: [.workbuddy: workbuddyApp, .qwenwork: qwenworkApp])
+        for agent in [ClipAgent.workbuddy, .qwenwork] {
+            check(accountRuntime.availability(of: agent, customPath: "") == .accountSetup,
+                  "\(agent.name) account setup does not assume the user's Node/OpenCode is a compatible managed component")
+            check(accountRuntime.command(for: agent, customPath: "") == nil,
+                  "\(agent.name) waits for verified components before advertising readiness")
+            check(accountRuntime.usesAccountBridge(agent, customPath: ""),
+                  "\(agent.name) keeps account authorization separate from desktop installation discovery")
+            check(accountRuntime.command(for: agent, customPath: "/missing/custom") == nil,
+                  "\(agent.name) custom commands never silently become an account bridge")
+        }
+        check(SubscriptionAgentCommand.allowsAuthorization(URL(string: "https://gateway.qwenwork.cn/device/selectAccounts")!, provider: .qwenwork),
+              "Qwen authorization accepts its product endpoint")
+        check(SubscriptionAgentCommand.allowsAuthorization(URL(string: "https://www.workbuddy.cn/login")!, provider: .workbuddy),
+              "WorkBuddy authorization accepts its product endpoint")
+        for url in ["http://www.workbuddy.cn/login", "https://www.workbuddy.cn.evil.example/login", "https://evil.example/login",
+                    "https://user@www.workbuddy.cn/login", "https://www.workbuddy.cn:1234/login"] {
+            check(!SubscriptionAgentCommand.allowsAuthorization(URL(string: url)!, provider: .workbuddy),
+                  "Account authorization rejects an unrelated or unsafe URL")
+        }
         if let nvmCommand {
             let process = Process()
             let output = Pipe()

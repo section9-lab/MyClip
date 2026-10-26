@@ -4,6 +4,8 @@ public struct ACPCommand: Sendable {
     public var executable: URL
     public var arguments: [String]
     public var environment: [String: String]
+    /// Only commands created by MyClip's account bridge may access this scoped store.
+    public var accountContext: AgentAccountContext?
 
     public init(executable: URL, arguments: [String] = [], environment: [String: String] = [:]) {
         self.executable = executable
@@ -20,6 +22,13 @@ public struct ACPCommand: Sendable {
     /// authenticates exactly like the user's terminal would.
     public static func launchEnvironment(inheriting base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
         base.filter { key, _ in !inheritedAgentPrefixes.contains { key.hasPrefix($0) } }
+    }
+
+    public static func accountEnvironment(inheriting base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
+        let allowed: Set<String> = ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "USER", "LOGNAME", "TZ",
+            "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "all_proxy", "no_proxy",
+            "SSL_CERT_FILE", "SSL_CERT_DIR", "NODE_EXTRA_CA_CERTS", "NODE_USE_ENV_PROXY"]
+        return base.filter { allowed.contains($0.key) }
     }
 }
 
@@ -47,6 +56,8 @@ public struct ACPPermissionRequest: Sendable, Identifiable {
 }
 
 public enum ACPEvent: Sendable {
+    case authorization(URL)
+    case account(AgentAccountInfo)
     case models(sessionID: String, selection: ACPModelSelection)
     case message(sessionID: String, text: String)
     case thinking(sessionID: String)
@@ -140,6 +151,10 @@ private enum JSONValue: Codable, Sendable {
     var string: String? { if case .string(let value) = self { return value }; return nil }
     var integer: Int? { if case .number(let value) = self { return value }; return nil }
     var boolean: Bool { if case .bool(let value) = self { return value }; return false }
+    var optionalBoolean: Bool? { if case .bool(let value) = self { return value }; return nil }
+    var numeric: Double? {
+        switch self { case .number(let value): Double(value); case .decimal(let value): value; default: nil }
+    }
     var array: [JSONValue] { if case .array(let value) = self { return value }; return [] }
     var key: String? { string ?? integer.map(String.init) }
     var formatted: String? {
@@ -191,6 +206,8 @@ public actor ACPClient {
     private var supportsSessionResume = false
     private var conversations: [URL: ACPConversationRecord] = [:]
     private var closed = false
+    private var accountContext: AgentAccountContext?
+    private var accountStorage: (any AgentAccountStorage)?
     private let promptIdleTimeout: Duration
     private let promptMaximumDuration: Duration
     /// Per-prompt ceilings that replace `promptMaximumDuration`, for turns known to run long.
@@ -201,7 +218,9 @@ public actor ACPClient {
     public static let promptIdleSeconds = 600
     public static let promptMaximumSeconds = 1800
 
-    public init(promptIdleTimeout: Duration = .seconds(promptIdleSeconds), promptMaximumDuration: Duration = .seconds(promptMaximumSeconds)) {
+    public init(promptIdleTimeout: Duration = .seconds(promptIdleSeconds), promptMaximumDuration: Duration = .seconds(promptMaximumSeconds),
+                accountStorage: (any AgentAccountStorage)? = nil) {
+        self.accountStorage = accountStorage
         self.promptIdleTimeout = promptIdleTimeout
         self.promptMaximumDuration = promptMaximumDuration
         let stream = AsyncStream<ACPEvent>.makeStream()
@@ -211,11 +230,14 @@ public actor ACPClient {
 
     public func connect(command: ACPCommand) async throws -> ACPHandshake {
         guard process == nil, !closed else { throw ACPError.protocolError(String(localized: "连接已启动。")) }
+        accountContext = command.accountContext
+        if let context = command.accountContext, accountStorage == nil { accountStorage = AgentAccountKeychain(context: context) }
         let child = Process()
         let stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
         child.executableURL = command.executable
         child.arguments = command.arguments
-        child.environment = ACPCommand.launchEnvironment().merging(command.environment) { _, new in new }
+        let base = command.accountContext == nil ? ACPCommand.launchEnvironment() : ACPCommand.accountEnvironment()
+        child.environment = base.merging(command.environment) { _, new in new }
         child.standardInput = stdin
         child.standardOutput = stdout
         child.standardError = stderr
@@ -239,7 +261,11 @@ public actor ACPClient {
         process = child
         let result = try await request("initialize", params: .object([
             "protocolVersion": .number(1),
-            "clientCapabilities": .object([:]),
+            "clientCapabilities": .object([
+                "_meta": .object(["jetbrains": .object(["air": .object([
+                    "version": .number(1), "capabilities": .array([.string("sessionFailure")])
+                ])])])
+            ]),
             "clientInfo": .object(["name": .string("myclip"), "title": .string("MyClip"), "version": .string("1.0.0")])
         ]))
         guard result["protocolVersion"].integer == 1 else {
@@ -308,7 +334,20 @@ public actor ACPClient {
     }
 
     public func authenticate(methodID: String) async throws {
-        _ = try await request("authenticate", params: .object(["methodId": .string(methodID)]), timeout: .seconds(180))
+        _ = try await request("authenticate", params: .object(["methodId": .string(methodID)]), timeout: .seconds(960))
+    }
+
+    public func refreshAccount() async throws {
+        guard accountContext != nil else { return }
+        let info = try await request("myclip/account/status", params: .object([:]))
+        publishAccount(info)
+    }
+
+    private func publishAccount(_ params: JSONValue) {
+        eventContinuation.yield(.account(AgentAccountInfo(account: params["account"].string ?? "",
+            accountID: params["accountID"].string ?? "", plan: params["plan"].string ?? "",
+            organization: params["organization"].string ?? "", creditsUsed: params["credits"]["used"].numeric,
+            creditsTotal: params["credits"]["total"].numeric, creditsRemaining: params["credits"]["remaining"].numeric)))
     }
 
     public func setMode(sessionID: String, modeID: String) async throws {
@@ -359,7 +398,8 @@ public actor ACPClient {
                     return (grouped ? value["options"].array : [value]).compactMap { option in
                         guard let id = option["value"].string, !id.isEmpty, seen.insert(id).inserted else { return nil }
                         return ACPModelOption(id: id, name: option["name"].string ?? id,
-                            description: option["description"].string, group: grouped ? value["name"].string : nil)
+                            description: option["description"].string, group: grouped ? value["name"].string : nil,
+                            supportsImages: option["_meta"]["myclip"]["supportsImages"].optionalBoolean)
                     }
                 }
                 sessionModels[session] = ACPModelSelection(currentID: model["currentValue"].string, options: options, configID: id)
@@ -373,7 +413,8 @@ public actor ACPClient {
             var seen: Set<String> = []
             let options = models["availableModels"].array.compactMap { option -> ACPModelOption? in
                 guard let id = option["modelId"].string, !id.isEmpty, seen.insert(id).inserted else { return nil }
-                return ACPModelOption(id: id, name: option["name"].string ?? id, description: option["description"].string)
+                return ACPModelOption(id: id, name: option["name"].string ?? id, description: option["description"].string,
+                    supportsImages: option["_meta"]["myclip"]["supportsImages"].optionalBoolean)
             }
             sessionModels[session] = ACPModelSelection(currentID: models["currentModelId"].string, options: options, usesLegacyAPI: true)
         }
@@ -403,6 +444,13 @@ public actor ACPClient {
             "sessionId": .string(sessionID), "prompt": .array(blocks)
         ]), timeout: promptIdleTimeout)
         guard let stopReason = result["stopReason"].string else { throw ACPError.protocolError(String(localized: "缺少结束状态。")) }
+        // codex-acp may finish a failed provider turn with end_turn and a typed error.
+        // Read its negotiated metadata instead of treating an error message as successful Memory generation.
+        let air = result["_meta"]["jetbrains"]["air"]
+        let failure = air["sessionFailure"]
+        if air["version"].integer == 1, failure["severity"].string == "error" {
+            throw ACPError.remote(code: -32000, message: failure["title"].string ?? String(localized: "Agent 返回错误。"))
+        }
         return ACPCompletion(text: responses[sessionID] ?? "", stopReason: stopReason, usage: Self.tokenUsage(result), cost: executions[sessionID]?.cost)
     }
 
@@ -566,7 +614,37 @@ public actor ACPClient {
         guard message["jsonrpc"].string == "2.0" else { throw ACPError.protocolError(String(localized: "无效的 JSON-RPC 消息。")) }
         if let method = message["method"].string {
             let params = message["params"]
-            if method == "session/update", let session = params["sessionId"].string {
+            if method.hasPrefix("myclip/account/"), message["id"].key != nil {
+                do {
+                    guard let context = accountContext, let storage = accountStorage else { throw ACPError.protocolError("Account access unavailable") }
+                    let result: JSONValue
+                    switch method {
+                    case "myclip/account/read":
+                        result = try await storage.read().map { try JSONDecoder().decode(JSONValue.self, from: $0) } ?? .null
+                    case "myclip/account/save":
+                        let credential = params["credential"]
+                        let data = try JSONEncoder().encode(credential)
+                        guard data.count <= 64 * 1024, let access = credential["access"].string, !access.isEmpty,
+                              credential["uid"].string != nil else { throw ACPError.protocolError("Invalid account credential") }
+                        try await storage.save(data)
+                        result = .object([:])
+                    case "myclip/account/open_url":
+                        guard let value = params["url"].string, let url = URL(string: value),
+                              SubscriptionAgentCommand.allowsAuthorization(url, provider: context.provider) else {
+                            throw ACPError.protocolError("Invalid authorization URL")
+                        }
+                        eventContinuation.yield(.authorization(url)); result = .object([:])
+                    case "myclip/account/status":
+                        publishAccount(params)
+                        result = .object([:])
+                    default: throw ACPError.protocolError("Unknown account operation")
+                    }
+                    try send(.object(["jsonrpc": .string("2.0"), "id": message["id"], "result": result]))
+                } catch {
+                    try send(.object(["jsonrpc": .string("2.0"), "id": message["id"],
+                        "error": .object(["code": .number(-32603), "message": .string("账号操作失败，请检查授权或系统钥匙串。")])]))
+                }
+            } else if method == "session/update", let session = params["sessionId"].string {
                 let update = params["update"]
                 switch update["sessionUpdate"].string {
                 case "config_option_update":

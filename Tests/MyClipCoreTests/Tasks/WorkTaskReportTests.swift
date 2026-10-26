@@ -102,14 +102,16 @@ final class WorkTaskReportTests: XCTestCase {
         let tasks = try await store.workTasks(), events = try await store.workTaskEvents()
         let document = WorkTaskReport(period: .day, containing: start, tasks: tasks, events: events,
                                       now: end.addingTimeInterval(60), calendar: calendar).document
-        XCTAssertEqual(document.sections.map(\.title), ["一、今日工作与成果", "二、进行中的工作与问题", "三、明日工作计划"])
+        XCTAssertEqual(document.sections.map(\.title), ["一、今日工作与成果", "二、问题与风险", "三、明日工作计划"])
         XCTAssertEqual(document.sections[0].projects.map(\.name), ["MyClip"])
-        XCTAssertEqual(document.sections[0].projects[0].items.map(\.status), [.done])
-        XCTAssertEqual(document.sections[0].projects[0].progress, "完成 1 项")
-        XCTAssertEqual(document.sections[1].projects.flatMap(\.items).map(\.id), [doing, todo])
-        XCTAssertEqual(document.sections[2].projects.flatMap(\.items).map(\.status), [.doing, .todo])
+        XCTAssertEqual(document.sections[0].projects[0].items.map(\.id), [done, doing])
+        XCTAssertEqual(document.sections[0].projects[0].items.map(\.status), [.done, .doing])
+        XCTAssertEqual(document.sections[0].projects[0].progress, "完成 1 项 · 推进中 1 项")
+        XCTAssertEqual(document.sections[1].projects.flatMap(\.items).map(\.id), [todo])
+        XCTAssertEqual(document.sections[1].projects[0].items[0].body, "等待测试环境")
+        XCTAssertTrue(document.sections[2].projects.isEmpty)
         XCTAssertEqual(Set(document.taskIDs), [done, doing, todo])
-        XCTAssertEqual(document.taskIDs.count, 3, "References deduplicate tasks repeated in the next-step outline")
+        XCTAssertEqual(document.sections.flatMap(\.projects).flatMap(\.items).count, 3)
         XCTAssertTrue(document.markdown.contains("## 一、今日工作与成果\n\n### MyClip"))
         XCTAssertTrue(document.markdown.contains("**发布新版**"))
         XCTAssertTrue(document.markdown.contains("等待测试环境"))
@@ -127,7 +129,7 @@ final class WorkTaskReportTests: XCTestCase {
                             ])
         let events = [WorkTaskEvent(id: UUID(), taskID: id, from: nil, to: .doing, date: start, actor: .user)]
         let report = WorkTaskReport(period: .day, containing: start, tasks: [task], events: events, now: end, calendar: calendar)
-        let item = report.document.sections[1].projects[0].items[0]
+        let item = report.document.sections[0].projects[0].items[0]
         XCTAssertEqual(item.status, .doing)
         XCTAssertEqual(item.body, "已完成接口联调，正在验证异常场景。")
         XCTAssertFalse(report.markdown.contains("后来完成"))
@@ -140,15 +142,19 @@ final class WorkTaskReportTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let store = try LibraryStore(root: root)
         let start = date("2026-09-18T00:00:00+08:00")
-        _ = try await store.createWorkTask(title: "原任务", project: "MyClip", at: start)
+        let id = try await store.createWorkTask(title: "原任务", project: "MyClip", at: start)
         let tasks = try await store.workTasks(), events = try await store.workTaskEvents()
         func report(_ period: WorkTaskReportPeriod, _ date: Date) -> WorkTaskReport {
             WorkTaskReport(period: period, containing: date, tasks: tasks, events: events, now: start, calendar: calendar)
         }
         let day = report(.day, start), week = report(.week, start), next = report(.day, start.addingTimeInterval(86400))
+        XCTAssertTrue(day.document.taskIDs.isEmpty, "Creating a todo does not invent progress or a next-period plan")
+        XCTAssertEqual(day.referenceTaskIDs, [id])
+        XCTAssertEqual(day.added, 1)
         var edited = day.document
-        edited.sections[2].projects[0].items[0].title = "整理后的工作安排"
-        edited.sections[2].projects[0].items[0].body = "先确认验收范围，再安排联调。"
+        edited.sections[2].projects = [.init(name: "MyClip", items: [
+            .init(id: id, status: .todo, title: "整理后的工作安排", body: "先确认验收范围，再安排联调。")
+        ])]
         try await store.saveWorkTaskReport(edited)
         let reopened = try LibraryStore(root: root)
         let loaded = try await reopened.savedWorkTaskReport(for: day)
@@ -177,7 +183,8 @@ final class WorkTaskReportTests: XCTestCase {
                                       now: start.addingTimeInterval(60), calendar: calendar).document
         let text = document.plainText
         XCTAssertTrue(text.hasPrefix("工作日报\n"))
-        XCTAssertTrue(text.contains("\n一、今日工作与成果\n暂无记录。\n"))
+        XCTAssertTrue(text.contains("\n二、问题与风险\n暂无记录。\n"))
+        XCTAssertTrue(text.contains("\n三、明日工作计划\n尚未安排。"))
         XCTAssertTrue(text.contains("MyClip · 推进中 1 项\n- [进行中] 修复 <Slack> & 飞书分享：已复制富文本\n  待验证钉钉"))
         XCTAssertFalse(text.contains("**"))
         XCTAssertFalse(text.contains("#"))
@@ -185,6 +192,149 @@ final class WorkTaskReportTests: XCTestCase {
         XCTAssertTrue(html.hasPrefix("<meta charset=\"utf-8\"><h1>工作日报</h1>"))
         XCTAssertTrue(html.contains("<li>[进行中] <b>修复 &lt;Slack&gt; &amp; 飞书分享</b>：已复制富文本<br>待验证钉钉</li>"))
         XCTAssertEqual(document.shareSubject, "工作日报 · \(document.dateTitle)")
+    }
+
+    func testUnchangedBacklogStaysInReferencesWithoutBecomingProgressOrPlans() {
+        let start = date("2026-09-18T00:00:00+08:00")
+        let end = date("2026-09-19T00:00:00+08:00")
+        let now = start.addingTimeInterval(60)
+        let before = start.addingTimeInterval(-60)
+        let doing = WorkTask(id: UUID(), title: "昨日联调", project: "MyClip", status: .doing,
+                             createdAt: before, updatedAt: before, confirmedAt: before, completedAt: nil,
+                             evidence: [
+                                .init(id: UUID(), body: "昨日的进展", sourceIDs: [], memoryIDs: [], date: before),
+                                .init(id: UUID(), body: "尚未发生的进展", sourceIDs: [], memoryIDs: [], date: now.addingTimeInterval(1)),
+                                .init(id: UUID(), body: "下一期的进展", sourceIDs: [], memoryIDs: [], date: end)
+                             ])
+        let todo = WorkTask(id: UUID(), title: "积压待办", project: "MyClip", status: .todo,
+                            createdAt: before, updatedAt: before, confirmedAt: before, completedAt: nil, evidence: [])
+        let tasks = [doing, todo]
+        let events = tasks.map { WorkTaskEvent(id: UUID(), taskID: $0.id, from: nil, to: $0.status, date: before, actor: .user) }
+        let report = WorkTaskReport(period: .day, containing: start, tasks: tasks, events: events, now: now, calendar: calendar)
+        XCTAssertTrue(report.isEmpty)
+        XCTAssertTrue(report.document.sections.allSatisfy { $0.projects.isEmpty })
+        XCTAssertEqual(report.referenceTaskIDs, [doing.id, todo.id])
+        XCTAssertTrue(report.document.taskIDs.isEmpty)
+        for exported in [report.markdown, report.document.plainText, report.document.html] {
+            XCTAssertFalse(exported.contains("昨日"))
+            XCTAssertFalse(exported.contains("积压待办"))
+            XCTAssertFalse(exported.contains("尚未发生"))
+            XCTAssertFalse(exported.contains("下一期的进展"))
+            XCTAssertFalse(exported.contains("下一步安排待补充"))
+            XCTAssertTrue(exported.contains("尚未安排。"))
+        }
+    }
+
+    func testEachPeriodCombinesDistinctEvidenceAndDeduplicatesByTaskID() {
+        let reference = date("2026-09-19T10:00:00+08:00")
+        for period in WorkTaskReportPeriod.allCases {
+            let interval = WorkTaskReport(period: period, containing: reference, tasks: [], events: [], now: reference, calendar: calendar).interval
+            let before = interval.start.addingTimeInterval(-1)
+            let id = UUID()
+            let task = WorkTask(id: id, title: "接口联调", project: "MyClip", status: .doing,
+                                createdAt: before, updatedAt: reference, confirmedAt: before, completedAt: nil,
+                                evidence: [
+                                    .init(id: UUID(), body: " 补充异常场景 ", sourceIDs: [], memoryIDs: [], date: reference),
+                                    .init(id: UUID(), body: "完成接口联调", sourceIDs: [], memoryIDs: [], date: interval.start.addingTimeInterval(1)),
+                                    .init(id: UUID(), body: " 完成接口联调\n", sourceIDs: [], memoryIDs: [], date: interval.start),
+                                    .init(id: UUID(), body: "旧进展", sourceIDs: [], memoryIDs: [], date: before),
+                                    .init(id: UUID(), body: "未来进展", sourceIDs: [], memoryIDs: [], date: interval.end),
+                                    .init(id: UUID(), body: "接口联调", sourceIDs: [], memoryIDs: [], date: interval.start),
+                                    .init(id: UUID(), body: "  \n", sourceIDs: [], memoryIDs: [], date: interval.start)
+                                ])
+            let sameTitle = WorkTask(id: UUID(), title: task.title, project: task.project, status: .doing,
+                                     createdAt: interval.start, updatedAt: interval.start, confirmedAt: interval.start,
+                                     completedAt: nil, evidence: [])
+            let events = [
+                WorkTaskEvent(id: UUID(), taskID: id, from: nil, to: .doing, date: before, actor: .user),
+                WorkTaskEvent(id: UUID(), taskID: sameTitle.id, from: .todo, to: .doing, date: interval.start, actor: .user)
+            ]
+            let report = WorkTaskReport(period: period, containing: reference, tasks: [task, sameTitle, task], events: events,
+                                        now: reference, calendar: calendar)
+            let items = report.document.sections[0].projects.flatMap(\.items)
+            XCTAssertEqual(items.count, 2, "\(period): different IDs with the same title stay separate")
+            XCTAssertEqual(items.first { $0.id == id }?.body, "完成接口联调\n补充异常场景")
+            XCTAssertEqual(report.doing.count, 2)
+            XCTAssertEqual(report.added, 1)
+            XCTAssertTrue(report.document.sections[1].projects.isEmpty)
+            XCTAssertTrue(report.document.sections[2].projects.isEmpty)
+        }
+    }
+
+    func testIssuesContainOnlyBlockersWithoutRepeatingProgressEvidence() {
+        let start = date("2026-09-18T00:00:00+08:00")
+        let before = start.addingTimeInterval(-60)
+        let task = WorkTask(id: UUID(), title: "接口验收", project: "MyClip", status: .doing,
+                            createdAt: before, updatedAt: start, confirmedAt: before, completedAt: nil,
+                            waitingReason: "等待测试环境", evidence: [
+                                .init(id: UUID(), body: "完成接口联调", sourceIDs: [], memoryIDs: [], date: start),
+                                .init(id: UUID(), body: "等待测试环境", sourceIDs: [], memoryIDs: [], date: start)
+                            ])
+        let blocked = WorkTask(id: UUID(), title: "等待确认", project: "MyClip", status: .todo,
+                               createdAt: before, updatedAt: before, confirmedAt: before, completedAt: nil,
+                               waitingReason: "等待客户反馈", evidence: [
+                                .init(id: UUID(), body: "等待客户反馈", sourceIDs: [], memoryIDs: [], date: start)
+                               ])
+        let futureReason = WorkTask(id: UUID(), title: "后来阻塞", project: "MyClip", status: .doing,
+                                    createdAt: before, updatedAt: start.addingTimeInterval(120), confirmedAt: before,
+                                    completedAt: nil, waitingReason: "尚未发生的问题", evidence: [])
+        let tasks = [task, blocked, futureReason]
+        let events = tasks.map { WorkTaskEvent(id: UUID(), taskID: $0.id, from: nil, to: $0.status, date: before, actor: .user) }
+        let document = WorkTaskReport(period: .day, containing: start, tasks: tasks, events: events,
+                                      now: start.addingTimeInterval(60), calendar: calendar).document
+        let outcomes = document.sections[0].projects.flatMap(\.items)
+        let issues = document.sections[1].projects.flatMap(\.items)
+        XCTAssertEqual(outcomes.map(\.id), [task.id])
+        XCTAssertEqual(outcomes[0].body, "完成接口联调")
+        XCTAssertEqual(Set(issues.map(\.id)), [task.id, blocked.id])
+        XCTAssertEqual(Set(issues.map(\.body)), ["等待测试环境", "等待客户反馈"])
+        XCTAssertFalse(document.markdown.contains("尚未发生的问题"))
+        XCTAssertTrue(document.sections[2].projects.isEmpty)
+    }
+
+    func testLoadingLegacyPlansDropsOnlyGeneratedRowsAndKeepsConcreteEdits() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try LibraryStore(root: root)
+        let start = date("2026-09-18T00:00:00+08:00")
+        let report = WorkTaskReport(period: .day, containing: start, tasks: [], events: [], now: start, calendar: calendar)
+        var legacy = report.document
+        let concrete = WorkTaskReportDocument.Item(id: UUID(), status: .doing, title: "安装 Node.js", body: "验证安装结果。")
+        let edited = WorkTaskReportDocument.Item(id: UUID(), status: .todo, title: "确认验收", body: "下一步安排待补充。\n先和客户确认验收范围。")
+        let blockedID = UUID()
+        let copiedIssue = "等待与问题：等待权限\n等待测试环境"
+        legacy.sections[1].projects = [.init(name: "MyClip", items: [
+            .init(id: blockedID, status: .doing, title: "准备验收", body: "已完成联调\n" + copiedIssue)
+        ])]
+        legacy.sections[2].projects = [
+            .init(name: "自动生成", items: [
+                .init(id: UUID(), status: .doing, title: "旧任务", body: "下一步安排待补充。"),
+                .init(id: UUID(), status: .todo, title: "旧阻塞", body: "下一步安排待补充。\n等待与问题：等待测试环境"),
+                .init(id: UUID(), status: .doing, title: "Old task", body: "Next steps to be added."),
+                .init(id: UUID(), status: .todo, title: "Old issue", body: "Next steps to be added.\nWaiting on / Issues: Waiting for approval"),
+                .init(id: blockedID, status: .doing, title: "准备验收", body: "下一步安排待补充。\n" + copiedIssue)
+            ]),
+            .init(name: "MyClip", items: [concrete, edited,
+                .init(id: blockedID, status: .doing, title: "准备验收", body: "下一步安排待补充。\n" + copiedIssue + "\n明早确认环境和验收时间。")
+            ])
+        ]
+        try await store.saveWorkTaskReport(legacy)
+        let url = root.appendingPathComponent("Reports/\(legacy.id).json")
+        let original = try Data(contentsOf: url)
+        let loaded = try await store.savedWorkTaskReport(for: report)
+        let document = try XCTUnwrap(loaded)
+        XCTAssertEqual(document.sections[2].projects.map(\.name), ["MyClip"])
+        let items = document.sections[2].projects.flatMap(\.items)
+        XCTAssertEqual(items.map(\.id), [concrete.id, edited.id, blockedID])
+        XCTAssertEqual(items[0], concrete)
+        XCTAssertEqual(items[1].body, "先和客户确认验收范围。")
+        XCTAssertEqual(items[2].body, "明早确认环境和验收时间。")
+        XCTAssertEqual(try Data(contentsOf: url), original, "Loading does not overwrite saved drafts")
+        for exported in [document.markdown, document.plainText, document.html] {
+            XCTAssertFalse(exported.contains("下一步安排待补充"))
+            XCTAssertFalse(exported.contains("Next steps to be added."))
+            XCTAssertTrue(exported.contains("验证安装结果。"))
+        }
     }
 
     func testShareDestinationsPreferInstalledAppsAndOneLarkBuild() {

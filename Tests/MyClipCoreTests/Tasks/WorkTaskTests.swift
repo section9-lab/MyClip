@@ -266,7 +266,8 @@ final class WorkTaskTests: XCTestCase {
         XCTAssertEqual(try TaskResponse.parse("```json\n" + json + "\n```").count, 1)
         XCTAssertTrue(try TaskResponse.parse("{\"tasks\":[]}").isEmpty)
         XCTAssertThrowsError(try TaskResponse.parse("已经完成"))
-        XCTAssertThrowsError(try TaskResponse.parse(json + "尾部说明"))
+        XCTAssertEqual(try TaskResponse.parse(json + "尾部说明").count, 1)
+        XCTAssertThrowsError(try TaskResponse.parse(json + "\n{\"tasks\":[]}"))
     }
 
     func testWaitingReasonIsEditableWithoutChangingStatus() async throws {

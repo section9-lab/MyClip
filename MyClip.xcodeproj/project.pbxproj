@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		6D43E8CBE7E0191A6ECE641B /* TaskBoardStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3114FA87413F162240090855 /* TaskBoardStyle.swift */; };
 		141B5D09CCC37A312F2B2168 /* AgentStatusIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70B06A8F2D47DD4E505B9838 /* AgentStatusIcon.swift */; };
 		15FFB6046C4B83946F6695FB /* LibraryEmptyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78ABB8589A8DB36E09DA4C14 /* LibraryEmptyView.swift */; };
 		173D685A7D5405C853DA2247 /* MyClipModel+Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52603ED8574A1CB1A053AAE1 /* MyClipModel+Library.swift */; };
@@ -56,6 +57,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		3114FA87413F162240090855 /* TaskBoardStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskBoardStyle.swift; sourceTree = "<group>"; };
 		0334B2B9D358A3A43ECD84DB /* LucideThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = LucideThirdPartyNotices.txt; sourceTree = "<group>"; };
 		0A5636C1E1A34430C1497903 /* KnowledgeLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowledgeLibraryView.swift; sourceTree = "<group>"; };
 		0D3D0BC567D8289A2AC73A4C /* MyClipRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyClipRootView.swift; sourceTree = "<group>"; };
@@ -180,6 +182,7 @@
 				5386358D85297726BFFD0377 /* MenuBarBoardView.swift */,
 				5510D075C5E2E2757C421222 /* ReportShareView.swift */,
 				335D30CE9541EBF8930FEFDE /* TaskDashboardView.swift */,
+				3114FA87413F162240090855 /* TaskBoardStyle.swift */,
 				9DE76E67842510FF0693827A /* TaskDetailView.swift */,
 				9204951212CBA0EC46D14F03 /* TaskReportsView.swift */,
 			);
@@ -417,6 +420,7 @@
 				E14DE260BB8A27741F2BFBFA /* PermissionRequestView.swift in Sources */,
 				4FD2F0D8963A3C2C7C830196 /* ReportShareView.swift in Sources */,
 				BE06ACC337950D7D031E97C2 /* TaskDashboardView.swift in Sources */,
+				6D43E8CBE7E0191A6ECE641B /* TaskBoardStyle.swift in Sources */,
 				88B77B6DA51786D2DEB6201E /* TaskDetailView.swift in Sources */,
 				B73004AE857EE926FBA677B3 /* TaskReportsView.swift in Sources */,
 				69231AE121D380DE9610A0A6 /* WindowImageCapture.swift in Sources */,

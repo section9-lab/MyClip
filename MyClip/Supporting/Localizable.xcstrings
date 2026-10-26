@@ -4114,6 +4114,46 @@
     "MyClip": {
       "shouldTranslate": false
     },
+    "MyClip ACP · OpenCode 执行器": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip ACP · OpenCode-Ausführung"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip ACP · OpenCode executor"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip ACP · Ejecutor OpenCode"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip ACP · Exécuteur OpenCode"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip ACP · OpenCode 実行エンジン"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip ACP · OpenCode 실행 엔진"
+          }
+        }
+      }
+    },
     "MyClip · 截图预览": {
       "localizations": {
         "de": {
@@ -6526,6 +6566,46 @@
         }
       }
     },
+    "二、问题与风险": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "II. Probleme und Risiken"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Issues and Risks"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Problemas y riesgos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Problèmes et risques"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "二、課題とリスク"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. 문제 및 위험"
+          }
+        }
+      }
+    },
     "云端位置不存在或未授权，请检查目标位置后重新连接。": {
       "localizations": {
         "de": {
@@ -7646,6 +7726,46 @@
         }
       }
     },
+    "任务补处理：%lld 批等待 · %lld 批需重试": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufgabenwiederherstellung: %lld Stapel warten · %lld erneut versuchen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Task recovery: %lld batches waiting · %lld need retry"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recuperación: %lld lotes en espera · %lld por reintentar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Récupération : %lld lots en attente · %lld à réessayer"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タスク再処理：%lld バッチ待機 · %lld バッチ要再試行"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "작업 복구: %lld개 배치 대기 · %lld개 재시도 필요"
+          }
+        }
+      }
+    },
     "任务记录格式错误": {
       "localizations": {
         "de": {
@@ -8322,6 +8442,126 @@
           "stringUnit": {
             "state": "translated",
             "value": "Agent 전역 설정을 변경하지 않고 새 세션의 기본 모델 사용"
+          }
+        }
+      }
+    },
+    "使用桌面应用内置引擎。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verwendet die integrierte Desktop-Engine."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses the desktop app’s built-in engine."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa el motor integrado de la aplicación."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utilise le moteur intégré de l’application."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デスクトップアプリ内蔵エンジンを使用します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데스크톱 앱의 내장 엔진을 사용합니다."
+          }
+        }
+      }
+    },
+    "使用桌面应用内置引擎，首次连接会自动准备连接组件。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verwendet die integrierte Desktop-Engine. Der Connector wird bei der ersten Verbindung automatisch eingerichtet."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses the desktop app’s engine. The connector is prepared automatically on first connection."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa el motor de la aplicación. El conector se prepara automáticamente al conectar por primera vez."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utilise le moteur intégré de l’application. Le connecteur est préparé automatiquement à la première connexion."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デスクトップアプリ内蔵エンジンを使用します。初回接続時に接続コンポーネントを自動準備します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데스크톱 앱의 내장 엔진을 사용합니다. 첫 연결 시 구성 요소가 자동으로 준비됩니다."
+          }
+        }
+      }
+    },
+    "使用桌面端相同账号授权，读取其模型和额度。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dasselbe Desktop-Konto autorisieren, um dessen Modelle und Kontingent zu verwenden."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authorize the same account used in the desktop app to access its models and credits."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autoriza la misma cuenta de la aplicación para acceder a sus modelos y créditos."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisez le même compte que dans l’application pour accéder à ses modèles et crédits."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デスクトップ版と同じアカウントを認証し、モデルと利用枠を取得します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데스크톱 앱과 같은 계정을 인증하여 모델과 사용량을 불러옵니다."
           }
         }
       }
@@ -10686,6 +10926,86 @@
         }
       }
     },
+    "刷新账号额度": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontingent aktualisieren"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh account credits"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizar créditos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualiser les crédits"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用枠を更新"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "계정 사용량 새로고침"
+          }
+        }
+      }
+    },
+    "剩余额度：%@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbleibendes Kontingent: %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Credits remaining: %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créditos restantes: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crédits restants : %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "残りの利用枠：%@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "남은 사용량: %@"
+          }
+        }
+      }
+    },
     "剪切": {
       "localizations": {
         "de": {
@@ -11282,6 +11602,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "취소"
+          }
+        }
+      }
+    },
+    "取消授权": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisierung abbrechen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel authorization"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar autorización"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler l’autorisation"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "認証をキャンセル"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "인증 취소"
           }
         }
       }
@@ -13766,6 +14126,46 @@
         }
       }
     },
+    "尚未安排。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noch nicht geplant."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing scheduled yet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aún no hay planes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien de prévu pour le moment."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "まだ予定はありません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 계획이 없습니다."
+          }
+        }
+      }
+    },
     "尚未连接": {
       "localizations": {
         "de": {
@@ -14366,6 +14766,46 @@
         }
       }
     },
+    "已保存有效候选，其余线索将自动核对后补处理。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gültige Kandidaten wurden gespeichert. Übrige Hinweise werden automatisch geprüft und nachverarbeitet."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valid candidates were saved. Remaining leads will be verified and recovered automatically."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se guardaron los candidatos válidos. Los indicios restantes se verificarán y recuperarán automáticamente."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les candidats valides ont été enregistrés. Les autres indices seront vérifiés et récupérés automatiquement."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有効な候補を保存しました。残りの情報は自動で確認して再処理します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "유효한 후보를 저장했습니다. 나머지 단서는 자동 확인 후 복구합니다."
+          }
+        }
+      }
+    },
     "已保存草稿": {
       "localizations": {
         "de": {
@@ -14802,6 +15242,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "복사됨"
+          }
+        }
+      }
+    },
+    "已安装桌面端，MyClip 尚未接入其自动整理接口。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Desktop-App ist installiert; ihre Schnittstelle zur automatischen Verarbeitung ist noch nicht in MyClip integriert."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The desktop app is installed; MyClip has not integrated its automatic organization interface yet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La aplicación está instalada; MyClip aún no ha integrado su interfaz de organización automática."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’application est installée ; MyClip n’a pas encore intégré son interface d’organisation automatique."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デスクトップアプリはインストール済みですが、MyClip の自動整理には未対応です。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데스크톱 앱은 설치되어 있지만 MyClip의 자동 정리와 아직 연동되지 않았습니다."
           }
         }
       }
@@ -15326,6 +15806,166 @@
         }
       }
     },
+    "已检测到桌面引擎": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop-Engine erkannt"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop engine found"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor de escritorio detectado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moteur de bureau détecté"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デスクトップエンジン検出済み"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데스크톱 엔진 감지됨"
+          }
+        }
+      }
+    },
+    "已检测到桌面引擎 · 将自动准备连接组件": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop-Engine erkannt · Connector wird automatisch eingerichtet"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop engine found · connector setup is automatic"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor de escritorio detectado · configuración automática del conector"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moteur de bureau détecté · préparation automatique du connecteur"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デスクトップエンジン検出済み · 接続コンポーネントを自動準備"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데스크톱 엔진 감지됨 · 연결 구성 요소 자동 준비"
+          }
+        }
+      }
+    },
+    "已检测到桌面端": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop-App erkannt"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop app found"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aplicación de escritorio detectada"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Application de bureau détectée"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デスクトップアプリ検出済み"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데스크톱 앱 감지됨"
+          }
+        }
+      }
+    },
+    "已检测到桌面端 · 自动整理接口待接入": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop-App erkannt · Verarbeitungsintegration ausstehend"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop app found · organization integration pending"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aplicación detectada · integración de organización pendiente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Application détectée · intégration d’organisation à venir"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デスクトップアプリ検出済み · 自動整理の接続は未対応"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데스크톱 앱 감지됨 · 자동 정리 연동 대기"
+          }
+        }
+      }
+    },
     "已检测到鼠标移动后 5 秒内的点击，等待单击或双击结束后截图": {
       "localizations": {
         "de": {
@@ -15442,6 +16082,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld회 자동으로 다시 시도했으나 성공하지 못했습니다."
+          }
+        }
+      }
+    },
+    "已补处理历史任务线索。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frühere Aufgabenhinweise wurden nachverarbeitet."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historical task leads have been recovered."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se han recuperado los indicios de tareas anteriores."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les indices des tâches précédentes ont été récupérés."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "過去のタスク情報を再処理しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 작업 단서를 복구했습니다."
           }
         }
       }
@@ -15886,6 +16566,46 @@
         }
       }
     },
+    "应用缺少运行组件清单，请重新下载完整版本。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime manifest is missing. Download the complete app again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Laufzeitliste fehlt. Lade die vollständige App erneut herunter."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falta el manifiesto del entorno. Vuelve a descargar la aplicación completa."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le manifeste est absent. Téléchargez à nouveau l’application complète."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "実行環境の一覧がありません。完全版のアプリを再ダウンロードしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 구성 요소 목록이 없습니다. 전체 앱을 다시 다운로드하세요."
+          }
+        }
+      }
+    },
     "建议": {
       "localizations": {
         "de": {
@@ -16082,6 +16802,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 파일 참조"
+          }
+        }
+      }
+    },
+    "当前 Mac 的处理器暂不支持此运行组件。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This runtime does not support your Mac’s processor."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Laufzeit unterstützt den Prozessor deines Mac nicht."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este entorno no admite el procesador de tu Mac."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet environnement ne prend pas en charge le processeur de votre Mac."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この Mac のプロセッサは実行環境に対応していません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 Mac의 프로세서는 해당 실행 구성 요소를 지원하지 않습니다."
           }
         }
       }
@@ -16608,40 +17368,40 @@
     },
     "待连接": {
       "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Verbindung ausstehend"
-          }
-        },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pending Connection"
+            "value": "Not connected"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht verbunden"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Por conectar"
+            "value": "Sin conectar"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "En attente de connexion"
+            "value": "Non connecté"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "接続待ち"
+            "value": "未接続"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "연결 대기"
+            "value": "연결 안 됨"
           }
         }
       }
@@ -18402,6 +19162,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "인증 콜백이 없습니다. 다시 시도하세요."
+          }
+        }
+      }
+    },
+    "授权已取消": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisierung abgebrochen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authorization cancelled"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorización cancelada"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisation annulée"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "認証をキャンセルしました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "인증이 취소되었습니다"
           }
         }
       }
@@ -20566,6 +21366,46 @@
         }
       }
     },
+    "无法打开授权页面，请检查默认浏览器。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Autorisierungsseite lässt sich nicht öffnen. Prüfe den Standardbrowser."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to open authorization. Check your default browser."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo abrir la autorización. Comprueba el navegador predeterminado."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d’ouvrir l’autorisation. Vérifiez le navigateur par défaut."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "認証ページを開けません。デフォルトのブラウザを確認してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "인증 페이지를 열 수 없습니다. 기본 브라우저를 확인하세요."
+          }
+        }
+      }
+    },
     "无法打开数据库": {
       "localizations": {
         "de": {
@@ -22042,6 +22882,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "최소화"
+          }
+        }
+      }
+    },
+    "最近成功识别的截图：%@ · %lld 条截图待整理": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zuletzt analysierte Aufnahme: %@ · %lld Aufnahmen warten"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest successfully analyzed capture: %@ · %lld captures waiting"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Última captura analizada: %@ · %lld capturas en espera"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernière capture analysée : %@ · %lld captures en attente"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最後に解析できたスクリーンショット：%@ · %lld 件待機"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "최근 분석한 스크린샷: %@ · %lld개 대기"
           }
         }
       }
@@ -24006,6 +24886,86 @@
         }
       }
     },
+    "桌面应用内置引擎可用": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop-Engine verfügbar"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop app engine available"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor integrado de escritorio disponible"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moteur intégré de l’application disponible"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デスクトップアプリ内蔵エンジンを利用可能"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데스크톱 앱 내장 엔진 사용 가능"
+          }
+        }
+      }
+    },
+    "桌面账号可接入 · 将准备 ACP 执行组件": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop-Konto verfügbar · ACP-Ausführung wird vorbereitet"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop account supported · ACP executor will be prepared"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuenta disponible · Se preparará el ejecutor ACP"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compte disponible · Préparation de l’exécuteur ACP"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デスクトップアカウント対応 · ACP 実行環境を準備します"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데스크톱 계정 지원 · ACP 실행 구성 요소 준비"
+          }
+        }
+      }
+    },
     "梦的范围": {
       "localizations": {
         "de": {
@@ -24962,6 +25922,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "이전 사본 제거 중: %@"
+          }
+        }
+      }
+    },
+    "正在补处理任务线索": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufgabenhinweise werden nachverarbeitet"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recovering task leads"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recuperando indicios de tareas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Récupération des indices de tâches"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タスク情報を再処理中"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "작업 단서 복구 중"
           }
         }
       }
@@ -27202,6 +28202,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "비워 두면 내 드라이브에 저장합니다. 지정한 폴더는 이 OAuth 앱에 접근 권한이 있어야 합니다. 첫 동기화 후 Drive에서 전용 폴더를 이동할 수도 있습니다."
+          }
+        }
+      }
+    },
+    "登录你的产品账号，读取该账号的模型和额度。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in to your product account to load its models and allowance."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Melde dich bei deinem Produktkonto an, um dessen Modelle und Kontingent zu laden."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inicia sesión en tu cuenta del producto para cargar sus modelos y cuota."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connectez-vous à votre compte du produit pour charger ses modèles et son quota."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "製品のアカウントにログインして、そのモデルと利用枠を取得します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "제품 계정에 로그인하여 해당 계정의 모델과 사용 한도를 불러옵니다."
           }
         }
       }
@@ -30726,6 +31766,46 @@
         }
       }
     },
+    "自动补处理已停止，可点 AI 更新进展重试。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die automatische Wiederherstellung wurde angehalten. Über die KI-Fortschrittsaktualisierung erneut versuchen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic recovery stopped. Use AI Update Progress to retry."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La recuperación automática se detuvo. Usa Actualizar progreso con IA para reintentar."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La récupération automatique s’est arrêtée. Relancez-la avec la mise à jour IA."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動再処理が停止しました。AI の進捗更新から再試行できます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "자동 복구가 중지되었습니다. AI 진행 상황 업데이트로 재시도하세요."
+          }
+        }
+      }
+    },
     "范围": {
       "localizations": {
         "de": {
@@ -30922,6 +32002,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "성과, 진행 상황 또는 다음 단계 계획 보충"
+          }
+        }
+      }
+    },
+    "补处理原因": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grund der Wiederherstellung"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recovery details"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detalles de recuperación"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Détails de récupération"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再処理の理由"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "복구 사유"
           }
         }
       }
@@ -32082,6 +33202,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "먼저 연결 설정에서 구성요소를 설치하십시오."
+          }
+        }
+      }
+    },
+    "请先连接 %@，再选择模型": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor der Modellwahl mit %@ verbinden"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect %@ before selecting a model"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conecta %@ antes de elegir un modelo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connectez %@ avant de choisir un modèle"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ に接続してからモデルを選択してください"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에 연결한 후 모델을 선택하세요"
           }
         }
       }
@@ -33286,6 +34446,206 @@
         }
       }
     },
+    "运行组件下载地址无效。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The runtime download address is invalid."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Download-Adresse der Laufzeit ist ungültig."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La dirección de descarga del entorno no es válida."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’adresse de téléchargement est invalide."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "実行環境のダウンロード先が無効です。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 구성 요소 다운로드 주소가 잘못되었습니다."
+          }
+        }
+      }
+    },
+    "运行组件下载失败，请检查网络后重试。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime download failed. Check your connection and try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download fehlgeschlagen. Prüfe deine Verbindung und versuche es erneut."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error al descargar. Comprueba la conexión y vuelve a intentarlo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec du téléchargement. Vérifiez la connexion et réessayez."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "実行環境をダウンロードできませんでした。ネットワークを確認して再試行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다운로드에 실패했습니다. 네트워크를 확인하고 다시 시도하세요."
+          }
+        }
+      }
+    },
+    "运行组件无法在当前系统启动，请重新下载应用或重试。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime could not start on this system. Download the app again or retry."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Laufzeit startet auf diesem System nicht. Lade die App erneut herunter oder versuche es nochmals."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El entorno no pudo iniciarse en este sistema. Descarga la aplicación de nuevo o reinténtalo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’environnement ne démarre pas sur ce système. Téléchargez à nouveau l’application ou réessayez."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このシステムで実行環境を起動できません。アプリを再ダウンロードするか再試行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "현재 시스템에서 실행 구성 요소를 시작할 수 없습니다. 앱을 다시 다운로드하거나 재시도하세요."
+          }
+        }
+      }
+    },
+    "运行组件校验失败，请重新连接以重试下载。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime verification failed. Reconnect to download again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prüfung fehlgeschlagen. Verbinde dich erneut, um den Download zu wiederholen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error de verificación. Vuelve a conectar para descargar de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec de la vérification. Reconnectez-vous pour relancer le téléchargement."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "実行環境の検証に失敗しました。再接続してダウンロードし直してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 구성 요소 검증에 실패했습니다. 다시 연결하여 다운로드하세요."
+          }
+        }
+      }
+    },
+    "运行组件由 MyClip 管理": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime managed by MyClip"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laufzeit von MyClip verwaltet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entorno gestionado por MyClip"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Environnement géré par MyClip"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "実行環境は MyClip が管理"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip이 실행 구성 요소 관리"
+          }
+        }
+      }
+    },
     "近 %lld 天 Token": {
       "localizations": {
         "de": {
@@ -34442,6 +35802,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "계정 연결…"
+          }
+        }
+      }
+    },
+    "连接账号后即可使用": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect your account to get started"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konto verbinden und loslegen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conecta tu cuenta para empezar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connectez votre compte pour commencer"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントを接続して利用開始"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "계정을 연결하여 시작"
           }
         }
       }
@@ -35606,6 +37006,46 @@
         }
       }
     },
+    "重新授权账号": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konto erneut autorisieren"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authorize account again"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver a autorizar la cuenta"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autoriser à nouveau le compte"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントを再認証"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "계정 다시 인증"
+          }
+        }
+      }
+    },
     "重新整理这批素材": {
       "localizations": {
         "de": {
@@ -35842,6 +37282,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "다시 시도하고 계속"
+          }
+        }
+      }
+    },
+    "重试补处理": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiederherstellung erneut versuchen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry recovery"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintentar recuperación"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer la récupération"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再処理を再試行"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "복구 재시도"
           }
         }
       }
@@ -36486,6 +37966,46 @@
         }
       }
     },
+    "额度：%@ / %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontingent: %1$@ / %2$@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Credits: %1$@ / %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créditos: %1$@ / %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crédits : %1$@ / %2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用枠：%1$@ / %2$@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "사용량: %1$@ / %2$@"
+          }
+        }
+      }
+    },
     "飞书": {
       "localizations": {
         "de": {
@@ -36562,6 +38082,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "첫 동기화 시 MyClip Memory 전용 폴더를 만듭니다."
+          }
+        }
+      }
+    },
+    "首次连接会准备共享 ACP 执行器，然后授权桌面端使用的同一账号。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei der ersten Verbindung wird die gemeinsame ACP-Ausführung vorbereitet und dasselbe Desktop-Konto autorisiert."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The first connection prepares the shared ACP executor, then authorizes the same account used in the desktop app."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La primera conexión prepara el ejecutor ACP compartido y autoriza la misma cuenta de la aplicación."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La première connexion prépare l’exécuteur ACP partagé et autorise le même compte que dans l’application."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "初回接続で共有 ACP 実行環境を準備し、デスクトップ版と同じアカウントを認証します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "처음 연결할 때 공유 ACP 실행 구성 요소를 준비하고 데스크톱 앱과 같은 계정을 인증합니다."
+          }
+        }
+      }
+    },
+    "首次连接将自动准备运行组件，无需预装其他软件。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime components are prepared on first connection. No other software is required."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Laufzeit wird beim ersten Verbinden vorbereitet. Weitere Software ist nicht erforderlich."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los componentes se preparan al conectar por primera vez. No necesitas instalar otro software."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les composants sont préparés à la première connexion. Aucun autre logiciel requis."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "初回接続時に実行環境を自動準備します。他のソフトの事前インストールは不要です。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "처음 연결할 때 실행 구성 요소를 자동 준비합니다. 다른 소프트웨어를 미리 설치할 필요가 없습니다."
           }
         }
       }

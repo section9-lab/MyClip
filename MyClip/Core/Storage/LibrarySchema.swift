@@ -164,6 +164,7 @@ extension LibraryStore {
             try database.script("PRAGMA user_version=15;")
         }
         if version < 16 { try Self.migrateAutomaticWorkTasks(database) }
+        try Self.prepareTaskIngestions(database)
         // Edge text shares the link's rowid, so removing a link (directly or by cascade) removes its searchable text.
         try database.script("""
             CREATE TRIGGER IF NOT EXISTS memory_links_forget AFTER DELETE ON memory_links BEGIN

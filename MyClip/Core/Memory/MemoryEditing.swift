@@ -29,7 +29,8 @@ extension LibraryStore {
         return rejected
     }
 
-    public func finishMemoryEditing(jobID: UUID, previousRevisions: [UUID: Int]) throws -> Int {
+    public func finishMemoryEditing(jobID: UUID, previousRevisions: [UUID: Int], taskResponse: String? = nil,
+                                    taskMemoryIDs: Set<UUID> = []) throws -> Int {
         guard let row = try database.run("SELECT * FROM jobs WHERE id=? AND state='running'", [jobID.uuidString]).first else {
             throw LibraryError.invalidResult(String(localized: "整理任务未在执行。"))
         }
@@ -83,6 +84,9 @@ extension LibraryStore {
         let handoff = HandoffPrompt.make(job: task, captures: batchCaptures, changedPaths: changedPaths,
             deletedCount: deleted, completedAt: completedAt, lint: try memoryLint(), rolledBack: rejected)
         try database.transaction {
+            if let taskResponse {
+                try insertTaskIngestion(id: jobID, jobID: jobID, response: taskResponse, sourceIDs: Set(task.sourceIDs), memoryIDs: taskMemoryIDs, at: completedAt)
+            }
             try database.run("UPDATE jobs SET state='completed',error=NULL WHERE id=?", [jobID.uuidString])
             try database.run("UPDATE job_times SET finished_at=? WHERE id=?", [String(completedAt.timeIntervalSince1970), jobID.uuidString])
             try database.run("INSERT INTO vault_meta(key,value) VALUES('organization_handoff',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [handoff])
