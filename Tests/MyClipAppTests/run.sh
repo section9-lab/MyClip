@@ -47,6 +47,12 @@ if $needs_app; then
     xcodebuild -quiet -project MyClip.xcodeproj -scheme MyClip -configuration Debug \
         -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "$test_build" CODE_SIGNING_ALLOWED=NO build
     products="$test_build/Build/Products/Debug"
+    # Standalone test executables reuse the app's objects but have their own
+    # Bundle.main. Include Swift package resources beside them, as the app does.
+    for resource in "$products"/*.bundle "$products/MyClip.app/Contents/Resources/"*.bundle; do
+        [[ -d "$resource" ]] || continue
+        /usr/bin/ditto "$resource" "$test_build/bin/$(basename "$resource")"
+    done
     app_objects=()
     while IFS= read -r object; do
         [[ "$object" == */MyClipMain.o ]] || app_objects+=("$object")
