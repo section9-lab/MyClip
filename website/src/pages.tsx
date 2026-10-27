@@ -23,6 +23,31 @@ function TextLink({
   );
 }
 
+function DemoVideo({
+  className,
+  descriptionId,
+}: {
+  className?: string;
+  descriptionId: string;
+}) {
+  return (
+    <video
+      className={cn("h-auto w-full rounded-lg border bg-muted", className)}
+      width="1600"
+      height="1000"
+      controls
+      playsInline
+      preload="metadata"
+      poster={href("images/myclip-demo-poster.jpg")}
+      aria-label="MyClip desktop demo with sample data and illustrated Agent interactions"
+      aria-describedby={descriptionId}
+    >
+      <source src={href("images/myclip-demo.mp4")} type="video/mp4" />
+      <a href={href("images/myclip-demo.mp4")}>Download the demo video</a>
+    </video>
+  );
+}
+
 function HomeSection({
   id,
   title,
@@ -87,7 +112,7 @@ export function HomePage() {
                 Download for Mac
               </a>
             </Button>
-            <TextLink href={href("demo/")}>Watch the demo</TextLink>
+            <TextLink href="#demo">Watch the demo</TextLink>
           </div>
           <p className="mt-4 text-xs leading-6 text-muted-foreground">
             Apple Silicon & Intel · macOS 13+ · Node.js 22+ · Agent account
@@ -95,28 +120,23 @@ export function HomePage() {
           </p>
         </section>
 
-        <figure className="pb-8 sm:pb-10">
-          <a
-            href={href("demo/")}
-            aria-label="Watch the MyClip desktop demonstration"
-            className="block overflow-hidden rounded-lg border"
+        <figure id="demo" className="pb-8 sm:pb-10">
+          <DemoVideo descriptionId="home-demo-caption" />
+          <figcaption
+            id="home-demo-caption"
+            className="mt-3 flex flex-wrap justify-between gap-x-6 gap-y-1 text-xs leading-6 text-muted-foreground"
           >
-            <img
-              className="h-auto w-full"
-              src={href("images/myclip-demo-poster.jpg")}
-              alt="MyClip’s Memory view, showing linked Markdown notes in the desktop demo"
-              width="1600"
-              height="1000"
-              fetchPriority="high"
-            />
-          </a>
-          <figcaption className="mt-3 flex flex-wrap justify-between gap-x-6 gap-y-1 text-xs leading-6 text-muted-foreground">
-            <span>Memory view · Demo data · Chinese interface</span>
+            <span>
+              45-second silent video · HTML reconstruction · Sample data ·
+              Chinese interface.
+              <br />
+              The Codex and Claude interactions are illustrations.
+            </span>
             <a
               href={href("demo/")}
               className="rounded-sm underline underline-offset-4"
             >
-              45-second walkthrough
+              Open demo page
             </a>
           </figcaption>
         </figure>
@@ -325,20 +345,11 @@ export function DemoPage() {
           A 45-second walkthrough of the app, from setup to looking up a note
           with Codex or Claude.
         </p>
-        <video
-          className="mt-6 h-auto w-full rounded-lg border bg-muted"
-          width="1600"
-          height="1000"
-          controls
-          playsInline
-          preload="metadata"
-          poster={href("images/myclip-demo-poster.jpg")}
-          aria-label="MyClip desktop demo with sample data and illustrated Agent interactions"
+        <DemoVideo className="mt-6" descriptionId="demo-caption" />
+        <p
+          id="demo-caption"
+          className="mt-3 text-xs leading-6 text-muted-foreground"
         >
-          <source src={href("images/myclip-demo.mp4")} type="video/mp4" />
-          <a href={href("images/myclip-demo.mp4")}>Download the demo video</a>
-        </video>
-        <p className="mt-3 text-xs leading-6 text-muted-foreground">
           Silent video · HTML reconstruction · Sample data · Chinese interface.
           The Codex and Claude interactions are illustrations.
         </p>
