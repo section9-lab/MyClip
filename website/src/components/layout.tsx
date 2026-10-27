@@ -47,7 +47,7 @@ export function Layout({
             rel="alternate"
             type="text/markdown"
             href={absolute(guideMarkdownPath(guide.slug))}
-            title={`${guide.client} setup (Markdown)`}
+            title={`${guide.title} (Markdown)`}
           />
         )}
         {noIndex && <meta name="robots" content="noindex" />}
@@ -120,7 +120,7 @@ export function Layout({
                       selected && "underline",
                     )}
                   >
-                    {guide.client}
+                    {guide.label}
                   </a>
                 );
               })}

@@ -17,8 +17,19 @@ export function absolute(path = "") {
 
 export const guides = [
   {
+    slug: "search-screen-history",
+    label: "Screen history",
+    category: "Using MyClip",
+    title: "How to search your screen history on Mac",
+    pageTitle: "How to Search Screen History on Mac — MyClip",
+    description:
+      "Find a captured screen in MyClip: search its text, filter by app or date, and open the original screenshot to check what you saw.",
+    source: "docs/guides/search-screen-history.md",
+  },
+  {
     slug: "codex",
-    client: "Codex",
+    label: "Codex",
+    category: "MCP setup",
     title: "Connect MyClip to Codex",
     pageTitle: "Codex MCP Memory Setup for Mac — MyClip",
     description:
@@ -27,7 +38,8 @@ export const guides = [
   },
   {
     slug: "claude-code",
-    client: "Claude Code",
+    label: "Claude Code",
+    category: "MCP setup",
     title: "Connect MyClip to Claude Code",
     pageTitle: "Claude Code MCP Memory Setup for Mac — MyClip",
     description:

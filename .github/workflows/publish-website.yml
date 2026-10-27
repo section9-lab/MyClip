@@ -6,6 +6,7 @@ on:
     paths:
       - "website/**"
       - "docs/integrations/**"
+      - "docs/guides/**"
       - "docs/images/myclip-icon.png"
       - "docs/images/myclip-demo-poster.jpg"
       - "docs/images/myclip-demo.mp4"
@@ -14,6 +15,7 @@ on:
     paths:
       - "website/**"
       - "docs/integrations/**"
+      - "docs/guides/**"
       - ".github/workflows/publish-website.yml"
   workflow_dispatch:
 

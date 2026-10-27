@@ -135,6 +135,11 @@ export function HomePage() {
               </div>
             ))}
           </dl>
+          <div className="mt-5">
+            <TextLink href={href("guides/search-screen-history/")}>
+              How to search your screen history
+            </TextLink>
+          </div>
         </HomeSection>
 
         <HomeSection id="setup" title="Use it with your Agent">
@@ -144,11 +149,13 @@ export function HomePage() {
             search and read your saved notes.
           </p>
           <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3">
-            {guides.map((guide) => (
-              <TextLink key={guide.slug} href={href(`guides/${guide.slug}/`)}>
-                {guide.client} setup
-              </TextLink>
-            ))}
+            {guides
+              .filter((guide) => guide.category === "MCP setup")
+              .map((guide) => (
+                <TextLink key={guide.slug} href={href(`guides/${guide.slug}/`)}>
+                  {guide.label} setup
+                </TextLink>
+              ))}
           </div>
           <p className="mt-4 text-muted-foreground">
             Also supports Claude Desktop, Cursor, OpenCode, and WorkBuddy. MCP
@@ -222,42 +229,61 @@ export function GuidePage({ guide, html }: { guide: Guide; html: string }) {
     >
       <main id="content" className="mx-auto max-w-5xl px-5 py-12 sm:px-8">
         <div className="grid gap-10 lg:grid-cols-4 lg:gap-16">
-          <aside className="space-y-5">
+          <aside className="hidden space-y-5 lg:block">
             <p className="flex items-center gap-2 text-sm font-medium">
               <BookOpen className="size-4" aria-hidden="true" />
-              MCP setup guides
+              Guides
             </p>
-            <nav
-              aria-label="Integration guides"
-              className="flex flex-wrap gap-2 lg:flex-col"
-            >
-              {guides.map((item) => (
-                <a
-                  key={item.slug}
-                  href={href(`guides/${item.slug}/`)}
-                  aria-current={item.slug === guide.slug ? "page" : undefined}
-                  className={cn(
-                    "rounded-lg px-3 py-2 text-sm hover:bg-muted",
-                    item.slug === guide.slug
-                      ? "bg-muted font-medium text-foreground"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {item.client}
-                </a>
+            <nav aria-label="MyClip guides" className="space-y-5">
+              {(["Using MyClip", "MCP setup"] as const).map((category) => (
+                <div key={category}>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    {category}
+                  </p>
+                  <div className="flex flex-wrap gap-2 lg:flex-col">
+                    {guides
+                      .filter((item) => item.category === category)
+                      .map((item) => (
+                        <a
+                          key={item.slug}
+                          href={href(`guides/${item.slug}/`)}
+                          aria-current={
+                            item.slug === guide.slug ? "page" : undefined
+                          }
+                          className={cn(
+                            "rounded-lg px-3 py-2 text-sm hover:bg-muted",
+                            item.slug === guide.slug
+                              ? "bg-muted font-medium text-foreground"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {item.label}
+                        </a>
+                      ))}
+                  </div>
+                </div>
               ))}
             </nav>
             <p className="hidden text-xs leading-6 text-muted-foreground lg:block">
-              Local stdio server
-              <br />
-              Two read-only tools
-              <br />
+              {guide.category === "MCP setup" ? (
+                <>
+                  Local stdio server
+                  <br />
+                  Two read-only tools
+                  <br />
+                </>
+              ) : (
+                <>
+                  Timeline search uses local OCR.
+                  <br />
+                </>
+              )}
               macOS 13+
             </p>
           </aside>
           <article className="min-w-0 lg:col-span-3">
             <p className="text-sm text-muted-foreground">
-              Setup / {guide.client}
+              {guide.category} / {guide.label}
             </p>
             <h1 className="mt-3 text-3xl leading-tight font-semibold tracking-tight sm:text-4xl">
               {guide.title}
@@ -337,11 +363,13 @@ export function DemoPage() {
           <TextLink href={`${site.repository}/releases/latest`}>
             Download MyClip
           </TextLink>
-          {guides.map((guide) => (
-            <TextLink key={guide.slug} href={href(`guides/${guide.slug}/`)}>
-              {guide.client} setup
-            </TextLink>
-          ))}
+          {guides
+            .filter((guide) => guide.category === "MCP setup")
+            .map((guide) => (
+              <TextLink key={guide.slug} href={href(`guides/${guide.slug}/`)}>
+                {guide.label} setup
+              </TextLink>
+            ))}
         </div>
       </main>
     </Layout>

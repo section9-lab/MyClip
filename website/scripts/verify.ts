@@ -172,7 +172,7 @@ for (const { path, markdown } of documents) {
 }
 
 const sitemap = await readFile(resolve(root, "sitemap.xml"), "utf8");
-assert.equal((sitemap.match(/<loc>/g) ?? []).length, 4);
+assert.equal((sitemap.match(/<loc>/g) ?? []).length, pages.length - 1);
 for (const path of [
   "",
   "demo/",

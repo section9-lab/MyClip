@@ -45,7 +45,7 @@ await writeFile(
     "MyClip is an open-source macOS app. It captures the focused application window, or that window's display when selected, and uses your chosen Agent to organize captures into searchable notes and tasks. It does not automatically import every AI conversation.",
     "Requires macOS 13+, Node.js 22+, and an account for your selected Agent. Apple Silicon and Intel builds are available from GitHub Releases.",
     "Screenshots and Markdown notes are stored on your Mac; OCR runs on-device. AI organization may use the selected Agent's cloud service. Connected MCP clients can retrieve saved notes and may receive short profile and current-focus summaries when they connect. The memory_search and memory_get tools are read-only: they do not edit notes, take screenshots, or start AI organization. Turn off MCP access in Settings to pause it.",
-    "## Setup guides",
+    "## Guides",
     guides
       .map(
         (guide) =>
