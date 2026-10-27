@@ -8,8 +8,9 @@ Requires macOS 13+, Node.js 22+, and an account for your selected Agent. Apple S
 
 Screenshots and Markdown notes are stored on your Mac; OCR runs on-device. AI organization may use the selected Agent's cloud service. Connected MCP clients can retrieve saved notes and may receive short profile and current-focus summaries when they connect. The memory_search and memory_get tools are read-only: they do not edit notes, take screenshots, or start AI organization. Turn off MCP access in Settings to pause it.
 
-## Setup guides
+## Guides
 
+- [How to search your screen history on Mac](https://section9-lab.github.io/MyClip/guides/search-screen-history/index.md): Find a captured screen in MyClip: search its text, filter by app or date, and open the original screenshot to check what you saw.
 - [Connect MyClip to Codex](https://section9-lab.github.io/MyClip/guides/codex/index.md): Set up MyClip's local MCP server, check the connection, and search saved notes from Codex.
 - [Connect MyClip to Claude Code](https://section9-lab.github.io/MyClip/guides/claude-code/index.md): Connect Claude Code to MyClip, then search and read the notes saved on your Mac.
 
