@@ -12,3 +12,7 @@ xcuserdata/
 
 # macOS
 .DS_Store
+
+# Website build tools and static output
+node_modules/
+website/dist/

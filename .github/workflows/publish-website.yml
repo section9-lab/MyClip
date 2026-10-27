@@ -1,0 +1,66 @@
+name: Publish website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "docs/integrations/**"
+      - "docs/images/myclip-icon.png"
+      - "docs/images/myclip-demo-poster.jpg"
+      - "docs/images/myclip-demo.mp4"
+      - ".github/workflows/publish-website.yml"
+  pull_request:
+    paths:
+      - "website/**"
+      - "docs/integrations/**"
+      - ".github/workflows/publish-website.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  website:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci --prefix website
+      - run: npm run check --prefix website
+      - run: npm run build --prefix website
+      - run: npm run verify --prefix website
+      - name: Check out existing published files
+        if: github.event_name != 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: published
+      - name: Publish static pages without removing existing media
+        if: github.event_name != 'pull_request'
+        run: |
+          cp -R website/dist/MyClip/. published/
+          cd published
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish MyClip product site from ${GITHUB_SHA}"
+            git push origin HEAD:gh-pages
+          fi
+      - name: Request the branch-based Pages build
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds"
