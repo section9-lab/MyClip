@@ -4,7 +4,7 @@ export const site = {
   basePath: "/MyClip/",
   repository: "https://github.com/section9-lab/MyClip",
   description:
-    "AI screen memory for macOS. Capture your work as searchable Markdown notes and tasks. Let Codex and Claude Code recall saved context through a built-in MCP server.",
+    "Searchable screen history for macOS. MyClip turns screenshots into Markdown notes and tasks, with MCP access for Codex and Claude Code.",
 } as const;
 
 export function href(path = "") {
@@ -19,19 +19,19 @@ export const guides = [
   {
     slug: "codex",
     client: "Codex",
-    title: "Give Codex access to your Mac work memories",
+    title: "Connect MyClip to Codex",
     pageTitle: "Codex MCP Memory Setup for Mac — MyClip",
     description:
-      "Connect MyClip's local MCP server to Codex. Search work memories captured on your Mac, read linked notes, and cite the source evidence.",
+      "Set up MyClip's local MCP server, check the connection, and search saved notes from Codex.",
     source: "docs/integrations/codex.md",
   },
   {
     slug: "claude-code",
     client: "Claude Code",
-    title: "Search your Mac work memories from Claude Code",
+    title: "Connect MyClip to Claude Code",
     pageTitle: "Claude Code MCP Memory Setup for Mac — MyClip",
     description:
-      "Set up MyClip MCP for Claude Code on macOS. Retrieve screen-derived work context with read-only memory search, setup examples, and troubleshooting.",
+      "Connect Claude Code to MyClip, then search and read the notes saved on your Mac.",
     source: "docs/integrations/claude-code.md",
   },
 ] as const;

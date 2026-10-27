@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
-import { ArrowUpRight, Download } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { absolute, guides, href, site } from "../content";
 import { cn } from "../lib/utils";
-import { Button } from "./ui/button";
 
 interface LayoutProps {
   title: string;
@@ -74,8 +73,8 @@ export function Layout({
         >
           Skip to content
         </a>
-        <header className="border-b">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
+        <header className="mx-auto max-w-5xl px-5 sm:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b py-5">
             <a
               href={href()}
               aria-label="MyClip home"
@@ -91,45 +90,43 @@ export function Layout({
             </a>
             <nav
               aria-label="Main navigation"
-              className="flex flex-wrap items-center gap-1 sm:gap-2"
+              className="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm"
             >
-              <Button asChild variant="ghost">
-                <a href={href("#how-it-works")}>Overview</a>
-              </Button>
+              <a
+                className="rounded-sm underline-offset-4 hover:underline"
+                href={href("#how-it-works")}
+              >
+                Overview
+              </a>
               {guides.map((guide) => {
                 const selected = path === `guides/${guide.slug}/`;
                 return (
-                  <Button
+                  <a
                     key={guide.slug}
-                    asChild
-                    variant="ghost"
-                    className={cn(selected && "bg-muted")}
+                    href={href(`guides/${guide.slug}/`)}
+                    aria-current={selected ? "page" : undefined}
+                    className={cn(
+                      "rounded-sm underline-offset-4 hover:underline",
+                      selected && "underline",
+                    )}
                   >
-                    <a
-                      href={href(`guides/${guide.slug}/`)}
-                      aria-current={selected ? "page" : undefined}
-                    >
-                      {guide.client}
-                    </a>
-                  </Button>
+                    {guide.client}
+                  </a>
                 );
               })}
-              <Button
-                asChild
-                variant="outline"
-                className="hidden sm:inline-flex"
+              <a
+                className="rounded-sm underline-offset-4 hover:underline"
+                href={site.repository}
               >
-                <a href={`${site.repository}/releases/latest`}>
-                  <Download aria-hidden="true" /> Download
-                </a>
-              </Button>
+                GitHub
+              </a>
             </nav>
           </div>
         </header>
         {children}
-        <footer className="border-t">
-          <div className="mx-auto flex max-w-6xl flex-col justify-between gap-6 px-5 py-8 text-sm text-muted-foreground sm:flex-row sm:px-8">
-            <p>MyClip · AI screen memory for Mac</p>
+        <footer className="mx-auto max-w-5xl px-5 sm:px-8">
+          <div className="flex flex-col justify-between gap-5 border-t py-6 text-xs text-muted-foreground sm:flex-row">
+            <p>MyClip · Open source</p>
             <nav
               aria-label="Footer navigation"
               className="flex flex-wrap gap-x-6 gap-y-3"
