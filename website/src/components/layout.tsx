@@ -51,7 +51,18 @@ export function Layout({
           />
         )}
         {noIndex && <meta name="robots" content="noindex" />}
-        <link rel="icon" type="image/png" href={href("assets/myclip.png")} />
+        <link rel="icon" type="image/x-icon" href={href("favicon.ico")} />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="256x256"
+          href={href("favicon.png")}
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="180x180"
+          href={href("apple-touch-icon.png")}
+        />
         <link rel="stylesheet" href={href("assets/site.css")} />
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content={site.name} />

@@ -22,6 +22,7 @@ Open <http://127.0.0.1:4173/>. Output lives in the ignored `website/dist/` direc
 - `src/styles.css`: shared shadcn tokens and Tailwind CSS. Icons use Lucide. There are no scripted animations or client-side state dependencies.
 - `../docs/guides/` and `../docs/integrations/`: Markdown guides shared between GitHub and the website.
 - `public/`: static files copied unchanged to the site root, including the Google Search Console verification file. Keep verification files after ownership verification so subsequent builds preserve access. Google verification HTML is excluded from formatting to preserve the supplied bytes.
+- Root favicon files reuse `../docs/images/myclip-icon.png`: `favicon.ico` contains 16, 32, 48, 64, 128, and 256 px variants, `favicon.png` retains the 256 px source, and `apple-touch-icon.png` is 180 px. The shared layout advertises these files on every page.
 - `llms.txt` and `guides/*/index.md`: generated documentation entry points for clients that read Markdown. The guide exports use the same tracked sources as the HTML pages.
 - `scripts/verify.ts`: checks generated metadata, internal links and fragments, HTML landmarks, image alternatives, and sitemap coverage.
 
