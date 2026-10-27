@@ -69,4 +69,4 @@ Screenshots and Markdown memories are stored on your Mac. AI organization may se
 
 Both MCP tools are read-only: they do not edit memories, trigger capture, or start AI organization. Turn off **MyClip MCP service** to pause memory queries and connection summaries. Keep MyClip open when you want to capture new work; quit it to stop capture.
 
-Continue with the [MyClip product overview](https://section9-lab.github.io/MyClip/) or the [Claude Code setup guide](https://section9-lab.github.io/MyClip/guides/claude-code/).
+Continue with the [MyClip product overview](https://myclip.vibevibe.cc/) or the [Claude Code setup guide](https://myclip.vibevibe.cc/guides/claude-code/).

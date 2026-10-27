@@ -10,12 +10,12 @@ Screenshots and Markdown notes are stored on your Mac; OCR runs on-device. AI or
 
 ## Guides
 
-- [How to search your screen history on Mac](https://section9-lab.github.io/MyClip/guides/search-screen-history/index.md): Find a captured screen in MyClip: search its text, filter by app or date, and open the original screenshot to check what you saw.
-- [Connect MyClip to Codex](https://section9-lab.github.io/MyClip/guides/codex/index.md): Set up MyClip's local MCP server, check the connection, and search saved notes from Codex.
-- [Connect MyClip to Claude Code](https://section9-lab.github.io/MyClip/guides/claude-code/index.md): Connect Claude Code to MyClip, then search and read the notes saved on your Mac.
+- [How to search your screen history on Mac](https://myclip.vibevibe.cc/guides/search-screen-history/index.md): Find a captured screen in MyClip: search its text, filter by app or date, and open the original screenshot to check what you saw.
+- [Connect MyClip to Codex](https://myclip.vibevibe.cc/guides/codex/index.md): Set up MyClip's local MCP server, check the connection, and search saved notes from Codex.
+- [Connect MyClip to Claude Code](https://myclip.vibevibe.cc/guides/claude-code/index.md): Connect Claude Code to MyClip, then search and read the notes saved on your Mac.
 
 ## Project links
 
-- [Product overview](https://section9-lab.github.io/MyClip/): Features, installation, and privacy information.
+- [Product overview](https://myclip.vibevibe.cc/): Features, installation, and privacy information.
 - [Downloads](https://github.com/section9-lab/MyClip/releases/latest): Apple Silicon and Intel DMGs.
 - [Source code](https://github.com/section9-lab/MyClip): Native app source, documentation, and issue tracking.

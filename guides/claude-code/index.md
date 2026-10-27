@@ -82,4 +82,4 @@ MyClip stores screenshots and notes locally. AI organization may use your select
 
 `memory_search` and `memory_get` do not modify memories or trigger new captures. Turn off MyClip's MCP service to pause access and connection summaries. MyClip captures new work while the app is open; quit the app to stop capture.
 
-See the [MyClip product overview](https://section9-lab.github.io/MyClip/) and the [Codex setup guide](https://section9-lab.github.io/MyClip/guides/codex/) for another supported client.
+See the [MyClip product overview](https://myclip.vibevibe.cc/) and the [Codex setup guide](https://myclip.vibevibe.cc/guides/codex/) for another supported client.
