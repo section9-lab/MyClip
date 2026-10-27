@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
-import { absolute, guides, href, site } from "../content";
+import { absolute, guideMarkdownPath, guides, href, site } from "../content";
 import { cn } from "../lib/utils";
 
 interface LayoutProps {
@@ -19,6 +19,7 @@ export function Layout({
   children,
 }: LayoutProps) {
   const canonical = absolute(path);
+  const guide = guides.find((item) => path === `guides/${item.slug}/`);
   const schema = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
@@ -40,6 +41,15 @@ export function Layout({
         <title>{title}</title>
         <meta name="description" content={description} />
         <link rel="canonical" href={canonical} />
+        {!noIndex && <link rel="describedby" href={absolute("llms.txt")} />}
+        {guide && (
+          <link
+            rel="alternate"
+            type="text/markdown"
+            href={absolute(guideMarkdownPath(guide.slug))}
+            title={`${guide.client} setup (Markdown)`}
+          />
+        )}
         {noIndex && <meta name="robots" content="noindex" />}
         <link rel="icon" type="image/png" href={href("assets/myclip.png")} />
         <link rel="stylesheet" href={href("assets/site.css")} />

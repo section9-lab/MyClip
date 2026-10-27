@@ -37,3 +37,7 @@ export const guides = [
 ] as const;
 
 export type Guide = (typeof guides)[number];
+
+export function guideMarkdownPath(slug: Guide["slug"]) {
+  return `guides/${slug}/index.md`;
+}
