@@ -24,9 +24,11 @@ function TextLink({
 }
 
 function DemoVideo({
+  autoPlay = false,
   className,
   descriptionId,
 }: {
+  autoPlay?: boolean;
   className?: string;
   descriptionId: string;
 }) {
@@ -35,6 +37,8 @@ function DemoVideo({
       className={cn("h-auto w-full rounded-lg border bg-muted", className)}
       width="1600"
       height="1000"
+      autoPlay={autoPlay}
+      muted={autoPlay}
       controls
       playsInline
       preload="metadata"
@@ -121,7 +125,7 @@ export function HomePage() {
         </section>
 
         <figure id="demo" className="pb-8 sm:pb-10">
-          <DemoVideo descriptionId="home-demo-caption" />
+          <DemoVideo autoPlay descriptionId="home-demo-caption" />
           <figcaption
             id="home-demo-caption"
             className="mt-3 flex flex-wrap justify-between gap-x-6 gap-y-1 text-xs leading-6 text-muted-foreground"
