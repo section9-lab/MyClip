@@ -12,13 +12,13 @@
 MyClip is a local-first macOS app that turns screenshots of your work into searchable Markdown memories and tasks. Its built-in **Model Context Protocol (MCP) server** lets **Codex**, **Claude Code**, and other MCP clients search saved work context and follow it back to source captures.
 
 <p align="center">
-  <a href="https://section9-lab.github.io/MyClip/">Website</a> · <a href="https://github.com/section9-lab/MyClip/releases/latest">Download for Mac</a> · <a href="docs/integrations/codex.md">Codex setup</a> · <a href="docs/integrations/claude-code.md">Claude Code setup</a>
+  <a href="https://myclip.vibevibe.cc/">Website</a> · <a href="https://github.com/section9-lab/MyClip/releases/latest">Download for Mac</a> · <a href="docs/integrations/codex.md">Codex setup</a> · <a href="docs/integrations/claude-code.md">Claude Code setup</a>
 </p>
 
 <p align="center">
-  <a href="https://section9-lab.github.io/MyClip/demo/"><img src="docs/images/myclip-demo.gif" alt="MyClip desktop demo: onboarding, Memory, Timeline, Kanban, Reports, Backstage, Settings, and memory recall in Codex and Claude" width="1000"></a>
+  <a href="https://myclip.vibevibe.cc/demo/"><img src="docs/images/myclip-demo.gif" alt="MyClip desktop demo: onboarding, Memory, Timeline, Kanban, Reports, Backstage, Settings, and memory recall in Codex and Claude" width="1000"></a>
 </p>
-<p align="center"><a href="https://section9-lab.github.io/MyClip/demo/">Watch HD video</a></p>
+<p align="center"><a href="https://myclip.vibevibe.cc/demo/">Watch HD video</a></p>
 
 ## Search and recall your work
 

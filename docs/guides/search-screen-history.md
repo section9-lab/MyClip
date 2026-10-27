@@ -6,7 +6,7 @@ This guide covers searching screenshots already saved by MyClip. The separate **
 
 ## 1. Start saving screens you want to find later
 
-If you are new to MyClip, [download the Mac app](https://github.com/section9-lab/MyClip/releases/latest), move it to Applications, and finish onboarding. You need macOS 13+, Node.js 22+, and an account for your chosen organizing Agent. Grant Screen Recording and Accessibility permissions when prompted. See the [installation notes](https://section9-lab.github.io/MyClip/#download) if macOS blocks the first launch.
+If you are new to MyClip, [download the Mac app](https://github.com/section9-lab/MyClip/releases/latest), move it to Applications, and finish onboarding. You need macOS 13+, Node.js 22+, and an account for your chosen organizing Agent. Grant Screen Recording and Accessibility permissions when prompted. See the [installation notes](https://myclip.vibevibe.cc/#download) if macOS blocks the first launch.
 
 In **Settings → Screenshot** (Chinese interface: **设置 → 截图**), check the capture scope and mouse and keyboard triggers. MyClip captures the focused window by default; you can instead choose the display containing that window. Captures follow the enabled activity triggers rather than recording a continuous video.
 
@@ -61,7 +61,7 @@ If the capture has linked memories, the detail view also lets you open those not
 
 ## Ask Codex or Claude about saved work
 
-Once your chosen Agent has organized captures into **Memory**, you can search those notes through MyClip's local MCP server. Follow the [Codex setup guide](https://section9-lab.github.io/MyClip/guides/codex/) or [Claude Code setup guide](https://section9-lab.github.io/MyClip/guides/claude-code/).
+Once your chosen Agent has organized captures into **Memory**, you can search those notes through MyClip's local MCP server. Follow the [Codex setup guide](https://myclip.vibevibe.cc/guides/codex/) or [Claude Code setup guide](https://myclip.vibevibe.cc/guides/claude-code/).
 
 For example:
 
@@ -73,4 +73,4 @@ MCP searches saved memories rather than performing a Timeline OCR search. Its tw
 
 Screenshots, OCR text, and Markdown notes are saved in your local MyClip library. OCR runs on your Mac. AI organization may send captures to your selected Agent's cloud service; connected MCP clients receive retrieved notes and may receive short profile and current-focus summaries when they connect.
 
-Review capture scope, excluded apps, and retention in Settings before leaving MyClip running. Quit the app to stop capture. See [storage and privacy](https://section9-lab.github.io/MyClip/#privacy) for the product overview, or [watch the demo](https://section9-lab.github.io/MyClip/demo/) to see the app's main views.
+Review capture scope, excluded apps, and retention in Settings before leaving MyClip running. Quit the app to stop capture. See [storage and privacy](https://myclip.vibevibe.cc/#privacy) for the product overview, or [watch the demo](https://myclip.vibevibe.cc/demo/) to see the app's main views.

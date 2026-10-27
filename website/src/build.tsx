@@ -8,7 +8,7 @@ import { absolute, guideMarkdownPath, guides, site } from "./content";
 import { DemoPage, GuidePage, HomePage, NotFoundPage } from "./pages";
 
 const repository = fileURLToPath(new URL("../../", import.meta.url));
-const output = resolve(repository, "website/dist/MyClip");
+const output = resolve(repository, "website/dist");
 await rm(output, { recursive: true, force: true });
 await mkdir(resolve(output, "assets"), { recursive: true });
 await mkdir(resolve(output, "images"), { recursive: true });
@@ -74,6 +74,11 @@ await cp(
   resolve(output, "images/myclip-demo.mp4"),
 );
 await writeFile(resolve(output, ".nojekyll"), "");
+await writeFile(resolve(output, "CNAME"), `${new URL(site.origin).hostname}\n`);
+await writeFile(
+  resolve(output, "robots.txt"),
+  `User-agent: *\nAllow: /\n\nSitemap: ${absolute("sitemap.xml")}\n`,
+);
 
 const urls = ["", "demo/", ...guides.map((guide) => `guides/${guide.slug}/`)];
 await writeFile(

@@ -1,7 +1,7 @@
 export const site = {
   name: "MyClip",
-  origin: "https://section9-lab.github.io",
-  basePath: "/MyClip/",
+  origin: "https://myclip.vibevibe.cc",
+  basePath: "/",
   repository: "https://github.com/section9-lab/MyClip",
   description:
     "Searchable screen history for macOS. MyClip turns screenshots into Markdown notes and tasks, with MCP access for Codex and Claude Code.",

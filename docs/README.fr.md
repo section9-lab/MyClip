@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://section9-lab.github.io/MyClip/demo/"><img src="images/myclip-demo.gif" alt="Démo de MyClip : configuration initiale, Memory, Timeline, Kanban, Reports, Backstage, réglages et rappel de mémoire avec Codex et Claude" width="1000"></a>
+  <a href="https://myclip.vibevibe.cc/demo/"><img src="images/myclip-demo.gif" alt="Démo de MyClip : configuration initiale, Memory, Timeline, Kanban, Reports, Backstage, réglages et rappel de mémoire avec Codex et Claude" width="1000"></a>
 </p>
-<p align="center"><a href="https://section9-lab.github.io/MyClip/demo/">Voir en haute définition</a></p>
+<p align="center"><a href="https://myclip.vibevibe.cc/demo/">Voir en haute définition</a></p>
 
 MyClip capture votre travail et l’organise avec l’agent IA de votre choix :
 

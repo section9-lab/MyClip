@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsx src/build.tsx && tailwindcss -i src/styles.css -o dist/MyClip/assets/site.css --minify",
+    "build": "tsx src/build.tsx && tailwindcss -i src/styles.css -o dist/assets/site.css --minify",
     "check": "tsc --noEmit && eslint . && prettier --check .",
     "format": "prettier --write .",
     "verify": "tsx scripts/verify.ts",

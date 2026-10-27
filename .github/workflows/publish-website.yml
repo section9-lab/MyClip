@@ -52,7 +52,7 @@ jobs:
       - name: Publish static pages without removing existing media
         if: github.event_name != 'pull_request'
         run: |
-          cp -R website/dist/MyClip/. published/
+          cp -R website/dist/. published/
           cd published
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

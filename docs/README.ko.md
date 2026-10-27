@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://section9-lab.github.io/MyClip/demo/"><img src="images/myclip-demo.gif" alt="MyClip 데스크톱 데모: 온보딩, Memory, Timeline, Kanban, Reports, Backstage, 설정 및 Codex와 Claude의 메모리 검색" width="1000"></a>
+  <a href="https://myclip.vibevibe.cc/demo/"><img src="images/myclip-demo.gif" alt="MyClip 데스크톱 데모: 온보딩, Memory, Timeline, Kanban, Reports, Backstage, 설정 및 Codex와 Claude의 메모리 검색" width="1000"></a>
 </p>
-<p align="center"><a href="https://section9-lab.github.io/MyClip/demo/">HD 영상 보기</a></p>
+<p align="center"><a href="https://myclip.vibevibe.cc/demo/">HD 영상 보기</a></p>
 
 MyClip은 작업 화면을 기록하고 선택한 AI 에이전트로 정리합니다.
 

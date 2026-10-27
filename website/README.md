@@ -1,6 +1,6 @@
 # MyClip product website
 
-Source for <https://section9-lab.github.io/MyClip/>. The product overview, demo wrapper, screen history guide, and MCP setup guides are rendered to static HTML. Visitors do not download React or require JavaScript to read the pages or follow download links.
+Source for <https://myclip.vibevibe.cc/>. The product overview, demo wrapper, screen history guide, and MCP setup guides are rendered to static HTML. Visitors do not download React or require JavaScript to read the pages or follow download links.
 
 ## Build and preview
 
@@ -14,7 +14,7 @@ npm run verify --prefix website
 npm run preview --prefix website
 ```
 
-Open <http://127.0.0.1:4173/MyClip/>. Output lives in the ignored `website/dist/MyClip/` directory. The project base path is deliberate: the same URLs work locally and on GitHub Pages.
+Open <http://127.0.0.1:4173/>. Output lives in the ignored `website/dist/` directory. The site uses the root path on its custom domain, so assets and navigation resolve the same way locally and in production.
 
 - `src/content.ts`: canonical origin, base path, shared description, and guide metadata.
 - `src/pages.tsx`: product page, demo page, and reusable guide layout.
@@ -28,7 +28,7 @@ Build dependencies are isolated here because the native Swift application has no
 
 ## Publication
 
-The `Publish website` workflow runs checks and builds on relevant pushes to `main`, then copies the output into the existing `gh-pages` branch without deleting other published files. It explicitly requests a Pages build because a push made with `GITHUB_TOKEN` does not trigger one automatically. The repository's existing branch-based GitHub Pages deployment remains in place. A manual workflow run is also available.
+The `Publish website` workflow runs checks and builds on relevant pushes to `main`, then copies the output into the existing `gh-pages` branch without deleting other published files, including Google verification files. The build generates a root `CNAME` containing `myclip.vibevibe.cc` so subsequent publications preserve the custom domain. It explicitly requests a Pages build because a push made with `GITHUB_TOKEN` does not trigger one automatically. The repository's existing branch-based GitHub Pages deployment remains in place. A manual workflow run is also available.
 
 The existing 45-second MP4 and poster are reused. The website build owns the published `/demo/` wrapper; the original HyperFrames composition and export workflow in `docs/demo/` remain separate.
 
@@ -38,10 +38,10 @@ The workflow needs Contents write permission for `gh-pages` and Pages write perm
 
 Each indexable page has a unique title and description, a self-referencing canonical, social metadata, readable HTML, and links to the other pages. The homepage includes SoftwareApplication structured data without invented ratings. `sitemap.xml` lists the homepage, demo, and all guides. The custom 404 is marked `noindex`.
 
-The build generates `/MyClip/llms.txt` with a concise project summary and links to the Markdown guides. Indexable HTML pages advertise it with `rel="describedby"`; guide pages also provide `rel="alternate" type="text/markdown"` links. The exports are for documentation access, not a Google ranking signal. The sitemap lists canonical HTML pages rather than their Markdown copies. No duplicate `site.xml` or nonstandard `llm.xml` files are generated.
+The build generates `/llms.txt` with a concise project summary and links to the Markdown guides. Indexable HTML pages advertise it with `rel="describedby"`; guide pages also provide `rel="alternate" type="text/markdown"` links. The exports are for documentation access, not a Google ranking signal. The sitemap lists canonical HTML pages rather than their Markdown copies. No duplicate `site.xml` or nonstandard `llm.xml` files are generated.
 
-`robots.txt` is host-wide and belongs at `https://section9-lab.github.io/robots.txt`; putting one under `/MyClip/` would not govern this project. Its absence does not prohibit crawling. No project-level robots file is generated.
+The build generates `https://myclip.vibevibe.cc/robots.txt` at the custom domain's root. It allows crawling and advertises `https://myclip.vibevibe.cc/sitemap.xml`. The sitemap, canonical links, social metadata, and guide links all use the custom domain.
 
-To measure Google discovery, verify the URL-prefix property `https://section9-lab.github.io/MyClip/` in Google Search Console using an account you control. Add the exact verification tag or file supplied by Google, submit `https://section9-lab.github.io/MyClip/sitemap.xml`, and inspect the page URLs. Verification credentials and Search Console access are not fabricated or included in this repository.
+To measure Google discovery, verify the URL-prefix property `https://myclip.vibevibe.cc/` in Google Search Console using an account you control, or use an already verified `vibevibe.cc` Domain property. Add the exact verification tag, file, or DNS record supplied by Google as needed, submit `https://myclip.vibevibe.cc/sitemap.xml`, and inspect the page URLs. Verification credentials and Search Console access are not fabricated or included in this repository. Keep the old GitHub Pages resource for migration monitoring and confirm its URLs redirect to the corresponding custom-domain pages.
 
 Use Search Console query impressions and clicks to distinguish branded discovery from category and integration searches. Track download conversions only after choosing an analytics approach; no tracking has been added by this change. Sitemap submission and good metadata do not guarantee indexing or rankings.

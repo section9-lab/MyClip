@@ -11,13 +11,13 @@
 MyClip 是一款优先在本地保存数据的 macOS 应用，将工作截图整理为可搜索的 Markdown 记忆和任务。内置 **Model Context Protocol（MCP）服务**，让 **Codex**、**Claude Code** 等客户端检索已保存的工作上下文，并追溯来源截图。
 
 <p align="center">
-  <a href="https://section9-lab.github.io/MyClip/">产品官网（英文）</a> · <a href="https://github.com/section9-lab/MyClip/releases/latest">下载 Mac 版</a> · <a href="integrations/codex.md">Codex 接入指南（英文）</a> · <a href="integrations/claude-code.md">Claude Code 接入指南（英文）</a>
+  <a href="https://myclip.vibevibe.cc/">产品官网（英文）</a> · <a href="https://github.com/section9-lab/MyClip/releases/latest">下载 Mac 版</a> · <a href="integrations/codex.md">Codex 接入指南（英文）</a> · <a href="integrations/claude-code.md">Claude Code 接入指南（英文）</a>
 </p>
 
 <p align="center">
-  <a href="https://section9-lab.github.io/MyClip/demo/"><img src="images/myclip-demo.gif" alt="MyClip 桌面演示：首次使用、Memory、Timeline、Kanban、Reports、Backstage、设置，以及 Codex 和 Claude 记忆召回" width="1000"></a>
+  <a href="https://myclip.vibevibe.cc/demo/"><img src="images/myclip-demo.gif" alt="MyClip 桌面演示：首次使用、Memory、Timeline、Kanban、Reports、Backstage、设置，以及 Codex 和 Claude 记忆召回" width="1000"></a>
 </p>
-<p align="center"><a href="https://section9-lab.github.io/MyClip/demo/">观看高清版</a></p>
+<p align="center"><a href="https://myclip.vibevibe.cc/demo/">观看高清版</a></p>
 
 ## 搜索和找回工作上下文
 

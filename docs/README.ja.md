@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://section9-lab.github.io/MyClip/demo/"><img src="images/myclip-demo.gif" alt="MyClip デスクトップデモ：初期設定、Memory、Timeline、Kanban、Reports、Backstage、設定、Codex と Claude でのメモリ検索" width="1000"></a>
+  <a href="https://myclip.vibevibe.cc/demo/"><img src="images/myclip-demo.gif" alt="MyClip デスクトップデモ：初期設定、Memory、Timeline、Kanban、Reports、Backstage、設定、Codex と Claude でのメモリ検索" width="1000"></a>
 </p>
-<p align="center"><a href="https://section9-lab.github.io/MyClip/demo/">HD版を見る</a></p>
+<p align="center"><a href="https://myclip.vibevibe.cc/demo/">HD版を見る</a></p>
 
 MyClip は作業画面を記録し、選択した AI エージェントで整理します。
 

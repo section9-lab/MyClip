@@ -12,7 +12,7 @@ import {
   site,
 } from "../src/content";
 
-const root = fileURLToPath(new URL("../dist/MyClip/", import.meta.url));
+const root = fileURLToPath(new URL("../dist/", import.meta.url));
 const repository = fileURLToPath(new URL("../../", import.meta.url));
 const pages = [
   "index.html",
@@ -29,6 +29,13 @@ async function verifyReference(
   source: string,
 ) {
   const url = new URL(reference, base);
+  assert(
+    !(
+      url.origin === "https://section9-lab.github.io" &&
+      url.pathname.startsWith("/MyClip/")
+    ),
+    `${source}: link uses the custom domain ${reference}`,
+  );
   if (url.origin !== site.origin) return;
   assert(
     url.pathname.startsWith(site.basePath),
@@ -185,7 +192,17 @@ assert(!sitemap.includes("index.md"));
 assert(
   (await readFile(resolve(root, "assets/site.css"), "utf8")).length > 1000,
 );
-assert.equal(href(), "/MyClip/");
+assert.equal(href(), "/");
+assert.equal(
+  await readFile(resolve(root, "CNAME"), "utf8"),
+  `${new URL(site.origin).hostname}\n`,
+  "CNAME: published domain survives subsequent builds",
+);
+assert.equal(
+  await readFile(resolve(root, "robots.txt"), "utf8"),
+  `User-agent: *\nAllow: /\n\nSitemap: ${absolute("sitemap.xml")}\n`,
+  "robots.txt: allows crawling and points to the canonical sitemap",
+);
 console.log(
   `Verified ${pages.length} pages, ${documents.length} text documents, ${checkedLinks} internal references, metadata, sitemap, structured data, and static HTML access.`,
 );
