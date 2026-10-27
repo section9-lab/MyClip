@@ -12,6 +12,7 @@ const output = resolve(repository, "website/dist");
 await rm(output, { recursive: true, force: true });
 await mkdir(resolve(output, "assets"), { recursive: true });
 await mkdir(resolve(output, "images"), { recursive: true });
+await cp(resolve(repository, "website/public"), output, { recursive: true });
 
 async function page(path: string, content: ReactNode) {
   const destination = resolve(output, path);
