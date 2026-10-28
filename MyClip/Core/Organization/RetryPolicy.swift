@@ -34,17 +34,21 @@ public enum RetryPolicy {
         }
         if let urlError = error as? URLError {
             switch urlError.code {
-            case .timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost, .dnsLookupFailed: return .transient
+            case .timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
+                 .secureConnectionFailed, .serverCertificateHasBadDate, .serverCertificateUntrusted,
+                 .serverCertificateHasUnknownRoot, .serverCertificateNotYetValid: return .transient
             default: return .permanent
             }
         }
-        return classifyMessage(error.localizedDescription)
+        return classify(message: error.localizedDescription)
     }
 
     private static func classifyRemote(code: Int, message: String) -> Verdict {
         if [401, 403, 404].contains(code) { return .permanent }
         if [408, 425, 429, 500, 502, 503, 504, 529].contains(code) { return .transient }
-        return classifyMessage(message)
+        // JSON-RPC internal errors are recoverable unless they describe an account/configuration problem.
+        if code == -32603, !permanentMarkers.contains(where: message.lowercased().contains) { return .transient }
+        return classify(message: message)
     }
 
     private static let permanentMarkers = [
@@ -54,10 +58,14 @@ public enum RetryPolicy {
     private static let transientMarkers = [
         "timeout", "timed out", "connection refused", "connection reset", "econnreset", "econnrefused", "socket hang up",
         "overloaded", "rate limit", "rate_limit", "too many requests", "temporarily", "try again", "service unavailable",
-        "bad gateway", "gateway timeout", "internal server error", "network", "429", "500", "502", "503", "504", "529"
+        "bad gateway", "gateway timeout", "internal server error", "network", "429", "500", "502", "503", "504", "529",
+        "certificate verification", "certificate verify", "unable to verify", "cert_has_expired", "cert_not_yet_valid",
+        "self signed certificate", "self-signed certificate", "self_signed_cert", "unable_to_verify_leaf_signature", "unable_to_get_issuer_cert",
+        "tls handshake", "fetch failed", "响应超时", "连接已关闭", "通信错误", "整理被中断"
     ]
 
-    private static func classifyMessage(_ message: String) -> Verdict {
+    /// Also used for durable failures written by an older app version. Retrying never changes TLS verification.
+    public static func classify(message: String) -> Verdict {
         let text = message.lowercased()
         if permanentMarkers.contains(where: text.contains) { return .permanent }
         if transientMarkers.contains(where: text.contains) { return .transient }

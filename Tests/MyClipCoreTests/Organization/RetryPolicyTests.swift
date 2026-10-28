@@ -36,6 +36,88 @@ final class RetryPolicyTests: XCTestCase {
         XCTAssertEqual(RetryPolicy.classify(NSError(domain: "Test", code: 1, userInfo: [NSLocalizedDescriptionKey: "disk full"])), .permanent)
     }
 
+    func testCertificateAndInternalErrorsUseBoundedRetries() {
+        for message in ["Internal error: unknown certificate verification error", "certificate verify failed",
+                        "unable to verify the first certificate", "CERT_HAS_EXPIRED", "SELF_SIGNED_CERT_IN_CHAIN",
+                        "unable_to_verify_leaf_signature", "fetch failed", "Agent 响应超时，可以重试。"] {
+            XCTAssertEqual(RetryPolicy.classify(ACPError.remote(code: -32000, message: message)), .transient, message)
+            XCTAssertEqual(RetryPolicy.classify(message: message), .transient, "Persisted error: \(message)")
+        }
+        XCTAssertEqual(RetryPolicy.classify(ACPError.remote(code: -32603, message: "Internal error")), .transient)
+        for code in [URLError.Code.secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasUnknownRoot,
+                     .serverCertificateHasBadDate, .serverCertificateNotYetValid] {
+            XCTAssertEqual(RetryPolicy.classify(URLError(code)), .transient)
+        }
+        XCTAssertEqual(RetryPolicy.classify(ACPError.remote(code: -32603, message: "Authentication required")), .permanent)
+        XCTAssertEqual(RetryPolicy.classify(message: "Invalid API key: fetch failed"), .permanent)
+    }
+
+    func testLegacyCertificatePauseRecoversWithoutResettingAttempts() async throws {
+        let store = try LibraryStore(root: directory)
+        try await store.record(image: fixtureImage(), context: fixtureContext(at: 100), agent: .opencode, organize: true)
+        let claimed = try await store.claimNextJob(at: date(400))
+        let first = try XCTUnwrap(claimed)
+        let error = "Internal error: unknown certificate verification error"
+        try await store.finishJob(id: first.id, state: .failed, error: error)
+        let failedAt = Date()
+        let reopened = try LibraryStore(root: directory)
+
+        let wrongAgent = try await reopened.recoverRetryableOrganizationFailure(agent: .codex, at: failedAt)
+        XCTAssertFalse(wrongAgent, "Recovery keeps the failed batch on its selected Agent")
+        let recovered = try await reopened.recoverRetryableOrganizationFailure(agent: .opencode, at: failedAt)
+        XCTAssertTrue(recovered)
+        let snapshot = try await reopened.snapshot()
+        let retry = try XCTUnwrap(snapshot.jobs.first)
+        XCTAssertFalse(snapshot.queue.paused)
+        XCTAssertNil(snapshot.queue.pauseReason)
+        XCTAssertEqual(retry.id, first.id)
+        XCTAssertEqual(retry.attempts, 1)
+        XCTAssertEqual(retry.error, error)
+        XCTAssertTrue(retry.isAwaitingRetry)
+        XCTAssertEqual(try XCTUnwrap(retry.retryAt).timeIntervalSince(failedAt), RetryPolicy.delay(afterAttempt: 1), accuracy: 1)
+        let early = try await reopened.claimNextJob(at: failedAt)
+        XCTAssertNil(early, "Restoring a paused queue still respects backoff")
+        let duplicate = try await reopened.recoverRetryableOrganizationFailure(agent: .opencode, at: failedAt)
+        XCTAssertFalse(duplicate, "Repeated worker ticks do not reschedule the batch")
+        let next = try await reopened.claimNextJob(at: try XCTUnwrap(retry.retryAt))
+        XCTAssertEqual(next?.id, first.id)
+        XCTAssertEqual(next?.attempts, 2)
+    }
+
+    func testRecoveryRespectsManualPausePermanentFailureAndAttemptLimit() async throws {
+        let store = try LibraryStore(root: directory)
+        try await store.record(image: fixtureImage(), context: fixtureContext(at: 100), agent: .opencode, organize: true)
+        let claimed = try await store.claimNextJob(at: date(400))
+        let first = try XCTUnwrap(claimed)
+        try await store.finishJob(id: first.id, state: .failed, error: "Authentication required")
+        var recovered = try await store.recoverRetryableOrganizationFailure(agent: .opencode)
+        XCTAssertFalse(recovered, "A login problem requires user action")
+
+        try await store.retryJob(id: first.id)
+        for attempt in 1...RetryPolicy.maxAttempts {
+            _ = try await store.claimNextJob(immediately: true, jobID: first.id)
+            if attempt < RetryPolicy.maxAttempts {
+                try await store.scheduleRetry(id: first.id, error: "timeout", at: date(500))
+            }
+        }
+        try await store.finishJob(id: first.id, state: .failed, error: "Internal error: unknown certificate verification error")
+        recovered = try await store.recoverRetryableOrganizationFailure(agent: .opencode)
+        XCTAssertFalse(recovered, "Background recovery cannot reset an exhausted budget")
+        let exhausted = try await store.snapshot()
+        XCTAssertTrue(exhausted.queue.paused)
+        XCTAssertEqual(exhausted.jobs.first?.attempts, RetryPolicy.maxAttempts)
+
+        try await store.retryJob(id: first.id)
+        _ = try await store.claimNextJob(immediately: true, jobID: first.id)
+        try await store.finishJob(id: first.id, state: .failed, error: "certificate verify failed")
+        try await store.setOrganizationPaused(true)
+        recovered = try await store.recoverRetryableOrganizationFailure(agent: .opencode)
+        XCTAssertFalse(recovered, "A later manual pause revokes automatic recovery")
+        let paused = try await store.snapshot()
+        XCTAssertTrue(paused.queue.paused)
+        XCTAssertNil(paused.queue.pauseReason)
+    }
+
     func testAttemptsAreCappedWithGrowingBackoff() {
         XCTAssertTrue(RetryPolicy.canRetry(afterAttempt: 1))
         XCTAssertTrue(RetryPolicy.canRetry(afterAttempt: 5))

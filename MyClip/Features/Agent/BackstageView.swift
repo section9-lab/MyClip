@@ -162,7 +162,7 @@ struct BackstageView: View {
 
     private func agentDescription(_ agent: ClipAgent, state: ClipAgentState, enabled: Bool, availability: LocalAgentAvailability) -> String? {
         if state.phase == .failed {
-            if let job = model.latestFailedJob, job.agent == agent, let error = job.error { return error }
+            if model.agentRetryAt[agent] == nil, let job = model.latestFailedJob, job.agent == agent, let error = job.error { return error }
             return state.detail.hasSuffix("。") ? state.detail : state.detail + "。"
         }
         if model.runtime.usesAccountBridge(agent, customPath: model.preferences.path(for: agent)) {
@@ -171,7 +171,8 @@ struct BackstageView: View {
                 ? String(localized: "首次连接将自动准备运行组件，无需预装其他软件。")
                 : String(localized: "登录你的产品账号，读取该账号的模型和额度。")
         }
-        if state.phase == .disconnected, enabled, let retrying = model.jobAwaitingRetry, retrying.agent == agent, let error = retrying.error {
+        if state.phase == .disconnected, enabled, !model.processingPaused,
+           let retrying = model.jobAwaitingRetry, retrying.agent == agent, let error = retrying.error {
             return String(localized: "\(error) 第 \(retrying.attempts + 1) 次尝试排队中。")
         }
         switch (availability, agent) {
@@ -340,7 +341,7 @@ struct BackstageView: View {
     }
 
     private func jobChipTitle(_ job: ClipJob) -> String {
-        if job.isAwaitingRetry { return String(localized: "等待第 \(job.attempts + 1) 次尝试") }
+        if job.isAwaitingRetry, !model.processingPaused { return String(localized: "等待第 \(job.attempts + 1) 次尝试") }
         return jobLabel(job)
     }
 

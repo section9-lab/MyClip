@@ -8,7 +8,7 @@
 | `bash Scripts/test.sh cloud-sync` | Google Drive / Notion 同步协议、恢复、自动调度、OAuth 回调及原生云端面板，不需要账号或 XCTest |
 | `bash Scripts/test.sh scripts` | `Adapters/` 下的 Node 适配器测试与 `Packaging/` 下的 Python 打包测试 |
 | `bash Scripts/test.sh benchmark` | 构建真实 MCP，运行 `benchmark/tests/`，不调用付费模型 |
-| `bash Scripts/test.sh app` | 十一组原生应用测试，包含 Agent 与模型选择、采集生命周期、过滤、文档、目录、看板与菜单栏、滚动和 Backstage 响应性 |
+| `bash Scripts/test.sh app` | 原生应用测试，包含 Agent 激活、模型选择与失败恢复、采集生命周期、过滤、文档、目录、看板与菜单栏、滚动和 Backstage 响应性 |
 
 单独执行某组核心测试或某个应用测试：
 
@@ -17,6 +17,7 @@ bash Scripts/test.sh core --filter MemoryPromptTests
 bash Scripts/test.sh app MemoryDirectoryTests
 bash Scripts/test.sh app AgentActivationTests CaptureLifecycleTests
 bash Scripts/test.sh app AgentModelTests
+bash Scripts/test.sh app AgentRecoveryTests
 bash Scripts/test.sh app AgentModelPickerTests -- build/agent-model-picker/screenshots
 bash Scripts/test.sh app TaskBoardScrollTests -- /tmp/myclip-task-board.png
 bash Scripts/test.sh app MenuBarBoardTests -- build/menu-bar-validation
@@ -30,6 +31,8 @@ bash Scripts/test.sh app BackstageResponsivenessTests
 `MenuBarBoardTests` 检查三列独立滚动、窄窗口、加载与读取失败、菜单栏展开收起及打开和退出应用的行为，不需要完整 Xcode 或 XCTest。传入截图目录可保存原生浅色、深色和错误状态截图。
 
 `AgentModelTests` 使用真实 ACP 夹具子进程、独立偏好域和临时资料库，验证六种 Agent 的动态列表与独立保存、新会话重应用、新旧协议、配置更新、失败保留、失效模型、工作中禁用和图片能力拦截；不调用付费模型。`AgentModelPickerTests` 验证六个 Agent 的长列表滚动及加载、空、错误、工作中和深色面板，并可保存截图。这些结果不表示六家服务的账号均已通过真实端到端调用。
+
+`AgentRecoveryTests` 使用真实应用调度器、SQLite 队列和 ACP 子进程，验证连接失败退避恢复、证书错误自动重试、登录失败保留、手动暂停与停用保护，以及启动后自动恢复旧版本误暂停的队列。不需要完整 Xcode，不修改真实资料库或调用付费模型。
 
 `BackstageResponsivenessTests` 验证静态图标更新不会触发重复重绘、鼠标跟踪区域能够复用，以及执行记录在嵌套滚动、进度变化、完成、缩放、隐藏和重新显示时保持固定高度。它通过父子关系定位内层记录列表，避免将侧边栏或外层页面当成被测列表；独立计时器会在主线程失去响应时终止测试。相关问题见 [Backstage 布局卡顿](../docs/backstage-layout-hang.md)。
 

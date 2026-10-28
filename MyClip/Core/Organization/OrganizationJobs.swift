@@ -57,7 +57,7 @@ extension LibraryStore {
         guard state == .failed || state == .cancelled else { throw LibraryError.invalidResult(String(localized: "不可直接完成任务")) }
         try database.transaction {
             guard try !database.run("SELECT id FROM jobs WHERE id=? AND state IN ('running','queued')", [id.uuidString]).isEmpty else { return }
-            try database.run("UPDATE jobs SET state=?,error=? WHERE id=?", [state.rawValue, error, id.uuidString])
+            try database.run("UPDATE jobs SET state=?,error=?,retry_at=NULL WHERE id=?", [state.rawValue, error, id.uuidString])
             try database.run("UPDATE job_times SET finished_at=? WHERE id=?", [String(Date().timeIntervalSince1970), id.uuidString])
             if state == .failed { try setOrganizationPaused(true, reason: error ?? String(localized: "整理失败，请手动重试。")) }
         }
@@ -80,6 +80,29 @@ extension LibraryStore {
         try database.transaction {
             guard try !database.run("SELECT id FROM jobs WHERE id=? AND state='running'", [id.uuidString]).isEmpty else { return }
             try requeue(id: id, error: error, at: date)
+        }
+    }
+
+    /// Reclassify the failure that owns a persisted pause without resetting its retry budget. This also repairs queues
+    /// stopped by older builds that treated transport/certificate errors as permanent. Manual pauses have no reason.
+    @discardableResult
+    public func recoverRetryableOrganizationFailure(agent: ClipAgent, at date: Date = Date()) throws -> Bool {
+        try database.transaction {
+            guard let settings = try database.run("SELECT paused,pause_reason FROM organization_queue WHERE id=1").first,
+                  settings["paused"] == "1", let reason = settings["pause_reason"],
+                  RetryPolicy.classify(message: reason) == .transient,
+                  let row = try database.run("""
+                    SELECT j.*,t.finished_at FROM jobs j LEFT JOIN job_times t ON t.id=j.id
+                    WHERE j.state='failed' AND j.error=? ORDER BY t.finished_at DESC,j.rowid DESC LIMIT 1
+                    """, [reason]).first,
+                  row["agent"] == agent.rawValue, row["kind"] == ClipJobKind.batch.rawValue,
+                  let id = row["id"].flatMap(UUID.init(uuidString:)) else { return false }
+            let attempts = Int(row["attempts"] ?? "0") ?? 0
+            guard RetryPolicy.canRetry(afterAttempt: attempts) else { return false }
+            let finished = row["finished_at"].flatMap(Double.init).map(Date.init(timeIntervalSince1970:)) ?? date
+            try requeue(id: id, error: reason, at: finished.addingTimeInterval(RetryPolicy.delay(afterAttempt: attempts)))
+            try setOrganizationPaused(false)
+            return true
         }
     }
 

@@ -60,6 +60,10 @@ for line in sys.stdin:
         with open(conversation_file + ".requests", "a") as log:
             log.write(json.dumps(request) + "\n")
     if method == "initialize":
+        if scenario in ("connect_certificate", "connect_authentication"):
+            message = "Internal error: unknown certificate verification error" if scenario == "connect_certificate" else "Authentication required"
+            send({"jsonrpc":"2.0", "id":request["id"], "error":{"code":-32603,"message":message}})
+            continue
         if scenario.startswith("terminal_provider_"):
             air = request.get("params", {}).get("clientCapabilities", {}).get("_meta", {}).get("jetbrains", {}).get("air", {})
             if "sessionFailure" not in air.get("capabilities", []):
@@ -108,6 +112,9 @@ for line in sys.stdin:
             result(request, {})
     elif method == "session/prompt":
         prompt_count += 1
+        if scenario == "prompt_certificate":
+            send({"jsonrpc":"2.0", "id":request["id"], "error":{"code":-32603,"message":"Internal error: unknown certificate verification error"}})
+            continue
         if scenario.startswith("terminal_provider_"):
             severity = "warning" if scenario == "terminal_provider_warning" else "error"
             finish(request, text="Provider response", _meta={"jetbrains":{"air":{"version":1,"sessionFailure":{

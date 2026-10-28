@@ -178,6 +178,7 @@ final class MyClipModel: ObservableObject {
     @Published var authorizingAccounts: Set<ClipAgent> = []
     var accountAuthorizationTasks: [ClipAgent: Task<Void, Never>] = [:]
     var modelImageCapabilities: [ClipAgent: [String: Bool]] = [:]
+    var agentRetryAt: [ClipAgent: Date] = [:]
     @Published var permissions: [ClipPermission] = []
     @Published var currentJob: ClipJob?
     @Published var activityText = "" { didSet { lastActivityAt = Date() } }
@@ -247,6 +248,7 @@ final class MyClipModel: ObservableObject {
                 refreshPermissions()
                 if !preview {
                     await cleanupIfNeeded()
+                    await recoverOrganizationIfNeeded()
                     if !processingPaused { await processNext() }
                     await refresh()
                 }

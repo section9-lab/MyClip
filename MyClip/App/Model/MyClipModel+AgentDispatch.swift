@@ -287,8 +287,13 @@ extension MyClipModel {
         guard let enabled = preferences.enabledAgent else { return String(localized: "等待选择 Agent · \(count) 条等待") }
         if library.queue.pauseReason != nil { return String(localized: "整理已停止 · \(count) 条等待") }
         if processingPaused { return String(localized: "整理已暂停 · \(count) 条等待") }
+        let readyAt = max(library.queue.readyAt ?? date, agentRetryAt[enabled] ?? date)
+        let seconds = max(0, Int(ceil(readyAt.timeIntervalSince(date))))
+        let countdown = seconds == 0 ? String(localized: "即将") : String(localized: "约 \(seconds / 60) 分 \(seconds % 60) 秒后")
         switch state(enabled).phase {
-        case .failed: return String(localized: "\(enabled.name) 出错 · \(count) 条等待")
+        case .failed:
+            if agentRetryAt[enabled] != nil { return String(localized: "\(count) 条等待 · \(countdown)整理") }
+            return String(localized: "\(enabled.name) 出错 · \(count) 条等待")
         case .connecting: return String(localized: "正在连接 \(enabled.name) · \(count) 条等待")
         case .installing: return String(localized: "正在安装 \(enabled.name) 连接组件 · \(count) 条等待")
         default: break
@@ -297,8 +302,6 @@ extension MyClipModel {
         if discoveringTasks { return String(localized: "\(count) 条等待 · 正在识别任务") }
         if let next = library.queue.nextAgent, next != enabled { return String(localized: "\(count) 条等待 · 请启用 \(next.name) 继续原任务") }
         if let agent, library.queue.nextAgent != agent { return String(localized: "\(count) 条等待 · 前方还有其他 Agent 的截图") }
-        let seconds = max(0, Int(ceil((library.queue.readyAt ?? date).timeIntervalSince(date))))
-        let countdown = seconds == 0 ? String(localized: "即将") : String(localized: "约 \(seconds / 60) 分 \(seconds % 60) 秒后")
         if let retrying = jobAwaitingRetry {
             return String(localized: "\(count) 条等待 · \(countdown)第 \(retrying.attempts + 1) 次尝试上一批")
         }
@@ -333,6 +336,7 @@ extension MyClipModel {
         agents[agent]?.authMethods = handshake.authMethods
         guard handshake.supportsImages else { throw ACPError.unsupportedImages }
         _ = try await session(for: agent, using: client, applyingSavedModel: applyingSavedModel)
+        agentRetryAt[agent] = nil
         agents[agent]?.phase = .ready
         agents[agent]?.detail = String(localized: "已就绪 · 每批独立整理")
         return client
@@ -565,7 +569,7 @@ extension MyClipModel {
                 } else {
                     let attemptsNote = job.attempts > 1 ? String(localized: "已自动重试 \(job.attempts - 1) 次仍未成功。") : ""
                     try await store.finishJob(id: job.id, state: .failed, error: attemptsNote + error.localizedDescription)
-                    setFailure(job.agent, error)
+                    setFailure(job.agent, error, automaticallyRetry: false)
                 }
             }
             await releaseSession(job.agent)
@@ -721,9 +725,25 @@ extension MyClipModel {
         }
     }
 
-    private func setFailure(_ agent: ClipAgent, _ error: any Error) {
+    private func setFailure(_ agent: ClipAgent, _ error: any Error, automaticallyRetry: Bool = true) {
         agents[agent]?.phase = .failed
-        agents[agent]?.detail = firstLine(error)
+        let retryable = automaticallyRetry && preferences.enabledAgent == agent && RetryPolicy.classify(error) == .transient
+        agents[agent]?.detail = retryable ? String(localized: "\(firstLine(error)) · 将自动重试") : firstLine(error)
+        agentRetryAt[agent] = retryable ? Date().addingTimeInterval(RetryPolicy.delay(afterAttempt: 1)) : nil
+    }
+
+    /// Runs before the worker's pause check, so a retryable pause cannot prevent its own recovery.
+    func recoverOrganizationIfNeeded(at date: Date = Date()) async {
+        guard !preview, !dispatching, currentJob == nil, !discoveringTasks, configuringAgentModels.isEmpty,
+              let agent = preferences.enabledAgent, !state(agent).busy else { return }
+        if state(agent).phase == .failed {
+            guard let retryAt = agentRetryAt[agent], date >= retryAt else { return }
+            agentRetryAt[agent] = nil
+            agents[agent]?.phase = .disconnected
+        }
+        do {
+            if try await store.recoverRetryableOrganizationFailure(agent: agent, at: date) { await refresh() }
+        } catch { notice = error.localizedDescription }
     }
 
     private func firstLine(_ error: any Error) -> String {
