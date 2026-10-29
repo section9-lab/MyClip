@@ -38525,6 +38525,98 @@
           }
         }
       }
+    },
+    "匿名使用统计": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share anonymous usage"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anonyme Nutzung teilen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partager l’utilisation anonyme"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compartir uso anónimo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匿名の使用状況を共有"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "익명 사용 통계 공유"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匿名使用统计"
+          }
+        }
+      }
+    },
+    "仅统计日活与版本，不上传截图、剪贴板、记忆或对话内容。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Counts daily activity and app versions. Screenshots, clipboard contents, memories and conversations are never sent."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erfasst tägliche Nutzung und App-Versionen. Screenshots, Zwischenablage, Erinnerungen und Gespräche werden nicht gesendet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compte l’activité quotidienne et les versions. Aucune capture, donnée du presse-papiers, mémoire ou conversation n’est envoyée."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra la actividad diaria y las versiones. No envía capturas, portapapeles, recuerdos ni conversaciones."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日ごとの利用状況とバージョンのみを集計します。スクリーンショット、クリップボード、メモリ、会話内容は送信しません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "일일 활동과 앱 버전만 집계합니다. 스크린샷, 클립보드, 메모리 및 대화 내용은 전송하지 않습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅统计日活与版本，不上传截图、剪贴板、记忆或对话内容。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

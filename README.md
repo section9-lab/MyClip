@@ -57,6 +57,10 @@ MyClip also includes setup for Claude Desktop, Cursor, OpenCode, and WorkBuddy. 
 
 Connected clients receive retrieved memory content and may receive short summaries of updated profile and current-focus notes when they connect. Their own data settings apply. Turn off the MCP service in MyClip Settings to pause access.
 
+## Anonymous usage statistics
+
+The app sends anonymous app-launch and daily-activity events to Mixpanel. Use **Share anonymous usage** in Settings to turn this off. Application content is not included. See the [analytics and privacy details](docs/analytics.md).
+
 ## Contributing
 
 See [development](docs/development.md) for the native app and [website maintenance](website/README.md) for the static product site and search metadata.

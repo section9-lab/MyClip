@@ -6,6 +6,7 @@ import MyClipCore
 struct MyClipSettingsView: View {
     @ObservedObject var model: MyClipModel
     @State private var showMCPHelp = false
+    @ObservedObject private var usageAnalytics = AppAnalytics.shared
 
     var body: some View {
         @ObservedObject var preferences = model.preferences
@@ -159,6 +160,11 @@ struct MyClipSettingsView: View {
     private var aboutSection: some View {
         SettingsSection(symbol: "paperclip", tint: .pink, title: String(localized: "关于 MyClip"),
                         description: String(localized: "截图，成为记忆。MyClip 根据你的操作自动截图，并交给已启用的 Agent 整理成可搜索的记忆。")) {
+            SettingsRow(String(localized: "匿名使用统计"), subtitle: String(localized: "仅统计日活与版本，不上传截图、剪贴板、记忆或对话内容。")) {
+                Toggle(String(localized: "匿名使用统计"), isOn: Binding(
+                    get: { usageAnalytics.isEnabled }, set: { usageAnalytics.setEnabled($0) }
+                )).labelsHidden().toggleStyle(.switch).controlSize(.small)
+            }
             SettingsRow(String(localized: "版本")) {
                 Text(appVersion).foregroundStyle(.secondary).monospacedDigit()
             }

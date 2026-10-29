@@ -13,6 +13,7 @@ final class MyClipAppDelegate: NSObject, NSApplicationDelegate {
         ProcessInfo.processInfo.disableAutomaticTermination("MyClip keeps its menu bar and capture queue available")
         installMenus()
         let preview = CommandLine.arguments.contains("--preview")
+        if !preview { ForegroundUsageTracker.shared.start() }
         if preview && CommandLine.arguments.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
         let root: URL
         if preview {
@@ -23,6 +24,13 @@ final class MyClipAppDelegate: NSObject, NSApplicationDelegate {
         do {
             let model = try MyClipModel(root: root, preview: preview)
             self.model = model
+            if !preview {
+                let captureHandler = model.captureService.onCapture
+                model.captureService.onCapture = { image, context in
+                    await captureHandler?(image, context)
+                    AppAnalytics.shared.recordActivity()
+                }
+            }
             model.onOpenWindow = { [weak self] in self?.showWindow() }
             menuBar = MyClipMenuBarController(model: model)
             model.start()
@@ -38,7 +46,7 @@ final class MyClipAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) { model?.refreshPermissions() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
-    func applicationWillTerminate(_ notification: Notification) { model?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { AppAnalytics.shared.flush(); model?.stop() }
 
     /// A language change only reaches the already-resolved bundle after a restart, the same as System Settings'
     /// per-app language. The running instance stops its capture and queue before the new one takes over.
