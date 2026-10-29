@@ -65,6 +65,9 @@ extension LibraryStore {
             CREATE VIRTUAL TABLE IF NOT EXISTS memory_edge_search USING fts5(fact, section, terms, tokenize='porter unicode61');
             CREATE TABLE IF NOT EXISTS protected_entries (id TEXT PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE);
             CREATE TABLE IF NOT EXISTS job_times (id TEXT PRIMARY KEY REFERENCES jobs(id), started_at REAL, finished_at REAL);
+            CREATE TABLE IF NOT EXISTS job_memory_changes (
+                job_id TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE, payload TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS token_usage (
                 id TEXT PRIMARY KEY, agent TEXT NOT NULL, job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
                 recorded_at REAL NOT NULL, total_tokens INTEGER, input_tokens INTEGER, output_tokens INTEGER,

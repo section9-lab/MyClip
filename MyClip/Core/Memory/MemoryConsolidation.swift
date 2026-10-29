@@ -160,7 +160,7 @@ extension LibraryStore {
     /// Settles whatever a dream turn left on disk, like a batch without new screenshots: a deleted root file comes back,
     /// a bad write goes back to its last good revision, and cited evidence is recomputed from each changed body.
     @discardableResult
-    public func settleConsolidation(previousRevisions: [UUID: Int]) throws -> Int {
+    public func settleConsolidation(previousRevisions: [UUID: Int], jobID: UUID? = nil) throws -> Int {
         // No starting point means the turn never began; without one every page would look edited.
         guard !previousRevisions.isEmpty else { return 0 }
         let directory = root.appendingPathComponent("Memory")
@@ -190,7 +190,9 @@ extension LibraryStore {
             }
         }
         try publishMemoryFiles()
-        return changed.count + Set(previousRevisions.keys).subtracting(entries.map(\.id)).count
+        let deletedIDs = Set(previousRevisions.keys).subtracting(entries.map(\.id))
+        if let jobID { try recordMemoryChanges(jobID: jobID, written: changed, deletedIDs: deletedIDs) }
+        return changed.count + deletedIDs.count
     }
 
     /// Ends a dream. Files are settled either way; the queue is never paused. A finished dream moves the review baseline
@@ -201,7 +203,7 @@ extension LibraryStore {
             throw LibraryError.invalidResult(String(localized: "整理任务未在执行。"))
         }
         let dream = try job(row)
-        let changed = try settleConsolidation(previousRevisions: previousRevisions)
+        let changed = try settleConsolidation(previousRevisions: previousRevisions, jobID: jobID)
         try database.transaction {
             if error == nil {
                 let started = try database.run("SELECT started_at FROM job_times WHERE id=?", [jobID.uuidString]).first?["started_at"].flatMap(Double.init)

@@ -720,13 +720,13 @@ extension MyClipModel {
         } catch {
             do {
                 if !cancelledJobs.contains(job.id), interruptedJobs.contains(job.id) || Task.isCancelled {
-                    try await store.settleConsolidation(previousRevisions: before)
+                    try await store.settleConsolidation(previousRevisions: before, jobID: job.id)
                     try await store.interruptOrganizationJob(id: job.id)
                 } else if cancelledJobs.contains(job.id) || error is CancellationError {
-                    try await store.settleConsolidation(previousRevisions: before)
+                    try await store.settleConsolidation(previousRevisions: before, jobID: job.id)
                     try await store.finishJob(id: job.id, state: .cancelled)
                 } else if RetryPolicy.classify(error) == .transient, job.attempts < MemoryDream.maxAttempts {
-                    try await store.settleConsolidation(previousRevisions: before)
+                    try await store.settleConsolidation(previousRevisions: before, jobID: job.id)
                     try await store.scheduleRetry(id: job.id, error: error.localizedDescription, at: Date().addingTimeInterval(MemoryDream.retryDelay))
                 } else {
                     try await store.finishDream(jobID: job.id, previousRevisions: before, error: String(localized: "\(firstLine(error))。明天会再做。"))

@@ -25,7 +25,7 @@ struct ExecutionDetailView: View {
 
     private var writtenPaths: [String] {
         var seen: Set<String> = []
-        return tools.filter { $0.kind == "edit" }.flatMap { $0.locations.map(\.path) + $0.content.compactMap(\.path) }
+        return tools.filter { $0.kind == "edit" && $0.status == "completed" }.flatMap { $0.locations.map(\.path) + $0.content.compactMap(\.path) }
             .map { $0.components(separatedBy: "/Memory/").last ?? $0 }
             .filter { seen.insert($0).inserted }
     }
@@ -67,7 +67,7 @@ struct ExecutionDetailView: View {
                     } else {
                         toolsSection
                         sequenceSection
-                        if !writtenPaths.isEmpty { writtenSection }
+                        memorySection
                     }
                     tokenSection
                     actions
@@ -187,13 +187,37 @@ struct ExecutionDetailView: View {
         }
     }
 
-    private var writtenSection: some View {
+    private var memorySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel(String(localized: "写入"))
-            FlowLayout(spacing: 6) {
-                ForEach(writtenPaths, id: \.self) { path in
-                    Text(path).font(.caption).padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6)).textSelection(.enabled)
+            sectionLabel(String(localized: "Memory 文件变更"))
+            if let changes = currentJob.memoryChanges {
+                if changes.count == 0 {
+                    Text("未保存 Memory 文件变更").font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(changes.written) { file in
+                    let entry = model.library.entries.first { $0.id == file.id }
+                    Button {
+                        dismiss()
+                        model.openMemoryEntry(file.id)
+                    } label: {
+                        Label(file.path, systemImage: "doc.text")
+                            .font(.callout).multilineTextAlignment(.leading)
+                    }
+                    .buttonStyle(.link)
+                    .disabled(entry == nil)
+                    .help(entry == nil ? String(localized: "此记忆已被删除") : String(localized: "在 Memory 中查看"))
+                }
+                if !changes.deletedIDs.isEmpty {
+                    Text("已删除 \(changes.deletedIDs.count) 个 Memory 文件").font(.caption).foregroundStyle(.secondary)
+                }
+            } else if !isLive {
+                Text("未记录实际文件变更；工具调用列表不代表全部文件操作。")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if !writtenPaths.isEmpty {
+                    Text("工具报告的写入").font(.caption).foregroundStyle(.secondary)
+                    ForEach(writtenPaths, id: \.self) { path in
+                        Text(path).font(.caption).textSelection(.enabled)
+                    }
                 }
             }
         }

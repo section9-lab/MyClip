@@ -42,11 +42,13 @@ extension LibraryStore {
         let rejected = try restoreRejectedMemoryFiles()
         let entries = try snapshot().entries
         let changed = entries.filter { previousRevisions[$0.id] != $0.revision }
-        let deleted = Set(previousRevisions.keys).subtracting(entries.map(\.id)).count
+        let deletedIDs = Set(previousRevisions.keys).subtracting(entries.map(\.id))
+        let deleted = deletedIDs.count
         let batchCaptures = try availableCaptures(ids: task.sourceIDs)
         let batchDate = batchCaptures.map(\.date).max()
         var restored = 0
         var changedPaths: [String] = []
+        var written: [KnowledgeEntry] = []
         try database.transaction {
             for entry in changed {
                 let previous = try previousRevisions[entry.id].map {
@@ -72,9 +74,11 @@ extension LibraryStore {
                     revision: entry.revision + 1, agent: task.agent, sourceIDs: sources, relativePath: entry.relativePath,
                     contextSourceIDs: context, observedAt: observed)
                 changedPaths.append(entry.relativePath)
+                written.append(entry)
             }
         }
         try publishMemoryFiles()
+        try recordMemoryChanges(jobID: jobID, written: written, deletedIDs: deletedIDs)
         // A rolled-back file re-runs the batch with the reason in the agent's prompt. Once retries are used up the batch
         // still completes: the instruction moves into the handoff for the next run, and the user is never asked to act.
         if !rejected.isEmpty, RetryPolicy.canRetry(afterAttempt: task.attempts) {

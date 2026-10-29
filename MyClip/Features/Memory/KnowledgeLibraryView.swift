@@ -83,7 +83,7 @@ struct KnowledgeLibraryView: View {
     @State private var showingCloudSync = false
 
     private var selected: KnowledgeEntry? {
-        (model.results.entries + model.library.entries).first { $0.id == model.selectedEntry }
+        model.selectedMemoryEntry
     }
 
     var body: some View {

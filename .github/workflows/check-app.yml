@@ -74,6 +74,8 @@ jobs:
             runner: macos-26-intel
     steps:
       - uses: actions/checkout@v4
+      - name: Verify memory persistence and execution records
+        run: swift test --filter 'JobMemoryChangesTests|DirectMemoryEditingTests|MemoryConsolidationTests|ExecutionRecordTests'
       - name: Build and test native app
         run: bash Scripts/test.sh app
 

@@ -371,6 +371,9 @@ struct BackstageView: View {
             Text(job.kind == .dream ? String(localized: "已停止，明天会再做") : String(localized: "素材已回到队列")).foregroundStyle(.secondary)
         case .completed:
             HStack(spacing: 10) {
+                if let changes = job.memoryChanges {
+                    Text(changes.count == 0 ? String(localized: "已整理，Memory 无需更新") : String(localized: "已更新 \(changes.count) 个 Memory 文件"))
+                }
                 if job.kind == .dream, let plan = job.dreamPlan { Text(dreamScope(plan)) }
                 if job.attempts > 1 { Text("第 \(job.attempts) 次尝试成功") }
                 Text(usage?.totalTokens.map { "Token \($0.formatted())" } ?? String(localized: "Token 未记录")).monospacedDigit()

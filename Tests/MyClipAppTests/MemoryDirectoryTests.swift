@@ -95,6 +95,16 @@ struct MemoryDirectoryTests {
         } else {
             check(false, "Directory supports native folder expansion")
         }
+        let original = model.library.entries.first { $0.relativePath == "Wiki/Projects/Detail.md" }!
+        try await model.store.updateEntry(id: original.id, title: original.title, body: "# Updated document\n\nNewly saved memory.", expectedRevision: original.revision)
+        await model.refresh()
+        model.search = "old search"
+        model.memoryFolder = "Wiki"
+        model.results.entries = [original] // A search result can predate the latest saved revision.
+        model.openMemoryEntry(original.id)
+        check(model.page == .memory && model.selectedEntry == original.id, "A saved-file result opens its Memory document")
+        check(model.search.isEmpty && model.memoryFolder == nil, "Opening a saved file clears the previous search and folder")
+        check(model.selectedMemoryEntry?.body.contains("Newly saved memory") == true, "The reader prefers the saved revision over a stale search result")
         print("Memory directory checks: \(failures) failure(s)")
         if failures > 0 { exit(1) }
     }

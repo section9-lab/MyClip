@@ -11,6 +11,18 @@ public enum ClipJobState: String, Codable, Sendable {
 /// A batch turns new screenshots into memory; a dream reorganizes the memory that already exists.
 public enum ClipJobKind: String, Sendable { case batch, dream }
 
+/// Files actually saved by the vault, independent of which tools an agent reports.
+public struct JobMemoryChanges: Codable, Sendable, Equatable {
+    public struct File: Codable, Sendable, Equatable, Identifiable {
+        public let id: UUID
+        public let path: String
+    }
+
+    public var written: [File] = []
+    public var deletedIDs: Set<UUID> = []
+    public var count: Int { written.count + deletedIDs.count }
+}
+
 public struct ClipJob: Identifiable, Sendable {
     public let id: UUID
     public let agent: ClipAgent
@@ -25,6 +37,8 @@ public struct ClipJob: Identifiable, Sendable {
     public var kind: ClipJobKind = .batch
     /// The pages a dream was given, fixed when it was queued.
     public var dreamPlan: ConsolidationPlan?
+    /// Nil for older jobs whose saved-file result was not recorded.
+    public var memoryChanges: JobMemoryChanges?
 
     public init(id: UUID, agent: ClipAgent, state: ClipJobState, createdAt: Date, sourceIDs: [UUID], error: String?,
                 attempts: Int = 0, retryAt: Date? = nil) {

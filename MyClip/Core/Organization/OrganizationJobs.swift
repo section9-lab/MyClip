@@ -167,7 +167,29 @@ extension LibraryStore {
             result.dreamPlan = try database.run("SELECT plan FROM dream_plans WHERE job_id=?", [id.uuidString]).first?["plan"]
                 .flatMap { try? JSONDecoder().decode(ConsolidationPlan.self, from: Data($0.utf8)) }
         }
+        result.memoryChanges = try jobMemoryChanges(jobID: id)
         return result
+    }
+
+    func jobMemoryChanges(jobID: UUID) throws -> JobMemoryChanges? {
+        try database.run("SELECT payload FROM job_memory_changes WHERE job_id=?", [jobID.uuidString]).first?["payload"]
+            .map { try JSONDecoder().decode(JobMemoryChanges.self, from: Data($0.utf8)) }
+    }
+
+    /// Keep valid writes from earlier attempts when another file forces the same job to retry.
+    func recordMemoryChanges(jobID: UUID, written: [KnowledgeEntry], deletedIDs: Set<UUID>) throws {
+        var changes = try jobMemoryChanges(jobID: jobID) ?? JobMemoryChanges()
+        var files = Dictionary(uniqueKeysWithValues: changes.written.map { ($0.id, $0) })
+        for id in deletedIDs { files[id] = nil }
+        changes.deletedIDs.formUnion(deletedIDs)
+        for entry in written {
+            files[entry.id] = .init(id: entry.id, path: entry.relativePath)
+            changes.deletedIDs.remove(entry.id)
+        }
+        changes.written = files.values.sorted { $0.path < $1.path }
+        let payload = String(decoding: try JSONEncoder().encode(changes), as: UTF8.self)
+        try database.run("INSERT INTO job_memory_changes(job_id,payload) VALUES(?,?) ON CONFLICT(job_id) DO UPDATE SET payload=excluded.payload",
+                         [jobID.uuidString, payload])
     }
 
     public func organizationHandoff() throws -> String? {

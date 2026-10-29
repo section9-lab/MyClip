@@ -2,6 +2,17 @@ import Foundation
 import MyClipCore
 
 extension MyClipModel {
+    var selectedMemoryEntry: KnowledgeEntry? {
+        (library.entries + results.entries).first { $0.id == selectedEntry }
+    }
+
+    func openMemoryEntry(_ id: UUID) {
+        search = ""
+        memoryFolder = nil
+        selectedEntry = id
+        open(.memory)
+    }
+
     func save(_ entry: KnowledgeEntry, title: String, body: String) async -> Bool {
         do {
             try await store.updateEntry(id: entry.id, title: title, body: body, expectedRevision: entry.revision)
