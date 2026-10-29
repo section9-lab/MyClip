@@ -41,6 +41,7 @@ class UpdateFeedTests(unittest.TestCase):
             "SURequireSignedFeed": True, "SUVerifyUpdateBeforeExtraction": True,
         }
         (app / "Contents/Info.plist").write_bytes(plistlib.dumps(cls.info))
+        subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True, capture_output=True)
         cls.archive_name = f"MyClip-1.2.3-{cls.architecture}.dmg"
         cls.archive = cls.fixture / cls.archive_name
         subprocess.run(["hdiutil", "create", "-volname", "MyClip Update Fixture", "-srcfolder", str(app),
@@ -53,6 +54,7 @@ class UpdateFeedTests(unittest.TestCase):
         for directory in ["Scripts", "MyClip/Supporting", "docs/releases", "dist"]:
             (self.root / directory).mkdir(parents=True)
         shutil.copy(ROOT / "Scripts/generate_update_feed.sh", self.root / "Scripts")
+        shutil.copy(ROOT / "Scripts/verify_update_key.swift", self.root / "Scripts")
         (self.root / "MyClip/Supporting/Info.plist").write_bytes(plistlib.dumps(self.info))
         (self.root / "docs/releases/v1.2.3.md").write_text("# Fixture release\n\nA signed update.\n")
         shutil.copy(self.archive, self.root / "dist" / self.archive_name)
@@ -110,6 +112,13 @@ class UpdateFeedTests(unittest.TestCase):
         self.assertNotEqual(self.generate().returncode, 0)
         self.assertFalse(self.feed.exists())
 
+    def test_invalid_signing_key_never_publishes_a_feed(self):
+        for key in ["not-a-key", "", "AAAA"]:
+            with self.subTest(key=key):
+                self.environment["MYCLIP_SPARKLE_PRIVATE_KEY"] = key
+                self.assertNotEqual(self.generate().returncode, 0)
+                self.assertFalse(self.feed.exists())
+
     def test_universal_or_unknown_architecture_is_rejected(self):
         for architecture in ["universal", "i386", ""]:
             with self.subTest(architecture=architecture):
@@ -135,6 +144,7 @@ class UpdateFeedTests(unittest.TestCase):
             str(ROOT / "Tests/Updates/UpdaterLifecycleChecks.swift"), "-o", str(executable)
         ], capture_output=True, text=True)
         self.assertEqual(compile_result.returncode, 0, compile_result.stdout + compile_result.stderr)
+        subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True, capture_output=True)
         result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

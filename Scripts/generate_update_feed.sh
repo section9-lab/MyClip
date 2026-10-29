@@ -21,13 +21,16 @@ test -f "$notes"
 test -x "$sparkle_bin/generate_appcast"
 test -x "$sparkle_bin/sign_update"
 
+printf '%s' "$MYCLIP_SPARKLE_PRIVATE_KEY" | swift Scripts/verify_update_key.swift MyClip/Supporting/Info.plist
+
 feed_work="$(mktemp -d)"
 trap 'rm -rf "$feed_work"' EXIT
 cp "dist/$archive" "$feed_work/$archive"
 cp "$notes" "$feed_work/${archive%.dmg}.md"
 
 # generate_appcast reads the built app's versions, minimum OS, architecture and
-# public key, and refuses to sign an archive whose embedded key does not match.
+# public key. The independent check above rejects a mismatched signing key;
+# some Sparkle tool builds only warn about that mismatch and still return success.
 # SURequireSignedFeed also makes it sign the XML and embedded release notes.
 printf '%s' "$MYCLIP_SPARKLE_PRIVATE_KEY" | "$sparkle_bin/generate_appcast" \
     --ed-key-file - --embed-release-notes \

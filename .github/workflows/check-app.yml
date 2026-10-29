@@ -7,6 +7,7 @@ on:
       - 'MyClip/**'
       - 'MyClip.xcodeproj/**'
       - 'project.yml'
+      - 'Package.swift'
       - 'Scripts/**'
       - 'Tests/**'
       - '.github/workflows/check-app.yml'
@@ -16,6 +17,7 @@ on:
       - 'MyClip/**'
       - 'MyClip.xcodeproj/**'
       - 'project.yml'
+      - 'Package.swift'
       - 'Scripts/**'
       - 'Tests/**'
       - '.github/workflows/check-app.yml'
@@ -28,8 +30,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Select affected checks
+    runs-on: ubuntu-latest
+    outputs:
+      native: ${{ steps.scope.outputs.native }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          base = os.environ.get("BASE_SHA", "")
+          native = True
+          if base and base != "0" * 40:
+              try:
+                  subprocess.run(["git", "fetch", "--no-tags", "--depth=1", "origin", base], check=True, capture_output=True)
+                  paths = subprocess.check_output(["git", "diff", "--name-only", base, "HEAD"], text=True).splitlines()
+                  native = any(path.startswith(("MyClip/", "MyClip.xcodeproj/", "Tests/MyClipAppTests/"))
+                               or path in {"project.yml", "Package.swift", "Scripts/test.sh", "Scripts/package_dmg.sh"}
+                               for path in paths)
+              except subprocess.CalledProcessError:
+                  pass  # If comparison is unavailable, conservatively run the full native suite.
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              print("native=" + str(native).lower(), file=output)
+          PY
+
   app:
     name: Native app (${{ matrix.arch }})
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
@@ -42,13 +74,37 @@ jobs:
             runner: macos-26-intel
     steps:
       - uses: actions/checkout@v4
+      - name: Build and test native app
+        run: bash Scripts/test.sh app
+
+  updates:
+    name: Signed updates (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-26
+          - arch: x86_64
+            runner: macos-26-intel
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download pinned Sparkle test tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p build/sparkle-tools
+          version="$(python3 -c 'import json; print(next(p["state"]["version"] for p in json.load(open("MyClip.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"))["pins"] if p["identity"] == "sparkle"))')"
+          gh release download "$version" --repo sparkle-project/Sparkle --pattern Sparkle-for-Swift-Package-Manager.zip --dir build
+          echo '4c2e48a3e50ebcc2c88a58a4c7264a1a99c3c31857ce754357afb9cdb323022a  build/Sparkle-for-Swift-Package-Manager.zip' | shasum -a 256 -c -
+          unzip -q build/Sparkle-for-Swift-Package-Manager.zip -d build/sparkle-tools
       - name: Check packaging and analytics
         run: |
           python3 -m unittest discover -s Tests/Packaging -v
           bash Scripts/test_analytics.sh
-      - name: Build and test native app
-        run: bash Scripts/test.sh app
       - name: Check signed update feeds with temporary test keys
         env:
-          SPARKLE_BIN: build/app-tests/SourcePackages/artifacts/sparkle/Sparkle/bin
+          SPARKLE_BIN: build/sparkle-tools/bin
         run: bash Scripts/test.sh updates

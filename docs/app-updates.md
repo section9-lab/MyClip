@@ -16,7 +16,7 @@ The first release with Sparkle must be installed manually. Older MyClip versions
 
 1. Increase **both** `CFBundleShortVersionString` and the monotonically increasing **`CFBundleVersion`**. Sparkle compares build numbers, not just the display version.
 2. Add `docs/releases/v<version>.md`, commit the source and push the matching version tag as usual.
-3. `Release DMG` builds both architectures with the existing community certificate. `Scripts/generate_update_feed.sh` uses the pinned Sparkle tools from SwiftPM to sign the DMG and generate each feed, including version, minimum OS, hardware requirements and embedded release notes from the built app.
+3. `Release DMG` builds both architectures with the existing community certificate. `Scripts/generate_update_feed.sh` independently derives the signing key's public identity with CryptoKit and matches it against the committed `SUPublicEDKey` before invoking Sparkle; Sparkle tools can otherwise only warn about mismatches. It then uses the pinned tools from SwiftPM to sign the DMG and generate each feed, including version, minimum OS, hardware requirements and embedded release notes from the built app.
 4. After both builds and signatures pass, CI uploads the DMGs, both appcasts, certificate and checksums to a draft, then publishes it as the latest release. Already published release assets cannot be overwritten. A retry can finish an existing draft.
 
 To initialize the key for another repository or recover it from a backup, use Sparkle's official `generate_keys --account cc.vibevibe.myclip` tool. Export with `-x` into a temporary file with mode `0600`, set the Actions secret using `gh secret set MYCLIP_SPARKLE_PRIVATE_KEY < <temporary-file>`, then delete the exported file. Match the tool's public key to the committed plist. Do not generate a replacement key for an already released app.
@@ -30,4 +30,4 @@ bash Scripts/test.sh app
 bash Scripts/test.sh updates
 ```
 
-Before the first production release, also exercise installation between two differently versioned test builds in an isolated application directory. Signature and feed tests do not by themselves verify replacing a running app on a user's machine.
+An isolated local installation smoke check on 2026-10-29 also exercised the actual Sparkle installer: a temporary app downloaded a signed feed and archive, replaced build 1 with build 2, relaunched, and preserved an adjacent data fixture. The installed `/Applications/MyClip.app` was not used or modified. Repeat this exercise when changing installation or relaunch behavior; feed signature tests alone do not cover replacing a running app.
