@@ -60,6 +60,8 @@ for line in sys.stdin:
         with open(conversation_file + ".requests", "a") as log:
             log.write(json.dumps(request) + "\n")
     if method == "initialize":
+        if scenario == "connect_hang":
+            continue
         if scenario in ("connect_certificate", "connect_authentication"):
             message = "Internal error: unknown certificate verification error" if scenario == "connect_certificate" else "Authentication required"
             send({"jsonrpc":"2.0", "id":request["id"], "error":{"code":-32603,"message":message}})
@@ -246,7 +248,7 @@ for line in sys.stdin:
         elif scenario == "thinking":
             send({"jsonrpc":"2.0", "method":"session/update", "params":{"sessionId":"s1", "update":{"sessionUpdate":"agent_thought_chunk", "content":{"type":"text","text":"thinking"}}}})
             finish(request)
-        elif scenario in ("hang", "cancel_usage"):
+        elif scenario in ("hang", "hang_ignore_cancel", "cancel_usage"):
             send({"jsonrpc":"2.0", "method":"session/update", "params":{"sessionId":"s1", "update":{"sessionUpdate":"tool_call", "toolCallId":"waiting", "title":"等待取消", "status":"in_progress"}}})
         else:
             content = request["params"]["prompt"]
@@ -256,6 +258,8 @@ for line in sys.stdin:
             else:
                 finish(request)
     elif method == "session/cancel" and pending_prompt:
+        if scenario == "hang_ignore_cancel":
+            continue
         if scenario == "permission_after_cancel":
             send({"jsonrpc":"2.0", "id":"permission-7", "method":"session/request_permission", "params":{
                 "sessionId":"s1", "toolCall":{"toolCallId":"tool1", "title":"迟到的授权请求"},

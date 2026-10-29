@@ -63,6 +63,37 @@ extension LibraryStore {
         }
     }
 
+    /// A user stop/switch retains the old execution as history and returns its
+    /// unfinished inputs to the queue, where the next selected Agent can own them.
+    public func interruptOrganizationJob(id: UUID) throws {
+        try database.transaction {
+            guard let row = try database.run("SELECT * FROM jobs WHERE id=? AND state IN ('running','queued')", [id.uuidString]).first else { return }
+            let interrupted = try job(row)
+            if interrupted.kind == .batch {
+                try database.run("""
+                    INSERT INTO pending_captures(capture_id,agent,queued_at)
+                        SELECT s.capture_id,j.agent,min(c.captured_at,CAST(? AS REAL)) FROM job_sources s
+                        JOIN jobs j ON j.id=s.job_id JOIN captures c ON c.id=s.capture_id WHERE j.id=?
+                        ON CONFLICT(capture_id,agent) DO UPDATE SET queued_at=min(pending_captures.queued_at,excluded.queued_at)
+                    """, [String(Date().addingTimeInterval(-OrganizationQueue.interval).timeIntervalSince1970), id.uuidString])
+            }
+            try database.run("UPDATE jobs SET state='cancelled',error=?,retry_at=NULL WHERE id=?",
+                [String(localized: "整理已停止，未完成的截图已重新排队。"), id.uuidString])
+            try database.run("UPDATE job_times SET finished_at=? WHERE id=?", [String(Date().timeIntervalSince1970), id.uuidString])
+            // Switching is a user action, not a provider retry: let the next
+            // Agent resume the interrupted inputs without another five-minute wait.
+            try database.run("UPDATE organization_queue SET last_started_at=NULL WHERE id=1")
+        }
+    }
+
+    /// A retry owned by the previous Agent must not block a newly selected one.
+    public func handoffQueuedOrganizationJobs(to agent: ClipAgent) throws {
+        for row in try database.run("SELECT id FROM jobs WHERE state='queued' AND agent!=?", [agent.rawValue]) {
+            if let id = row["id"].flatMap(UUID.init(uuidString:)) { try interruptOrganizationJob(id: id) }
+        }
+        try reassignPendingCaptures(to: agent)
+    }
+
     /// A manual retry starts the attempt count over; the user has looked at the failure.
     public func retryJob(id: UUID) throws {
         guard let row = try database.run("SELECT * FROM jobs WHERE id=? AND state IN ('failed','cancelled')", [id.uuidString]).first else { return }

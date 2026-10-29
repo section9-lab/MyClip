@@ -93,12 +93,35 @@ extension MyClipModel {
     func enable(_ agent: ClipAgent) {
         guard !preview, state(agent).available else { return }
         preferences.enabledAgent = agent
-        Task { await refresh() }
+        interruptAgentWork(except: agent)
+        Task {
+            do { try await store.handoffQueuedOrganizationJobs(to: agent) }
+            catch { notice = error.localizedDescription }
+            await refresh()
+        }
     }
 
     func disableAgent() {
         guard !preview else { return }
         preferences.enabledAgent = nil
+        interruptAgentWork()
+    }
+
+    private func interruptAgentWork(except enabled: ClipAgent? = nil) {
+        if let task = organizationTask, let agent = organizationAgent, agent != enabled {
+            if let job = currentJob { interruptedJobs.insert(job.id) }
+            permissions.removeAll { $0.agent == agent }
+            if let client = sessionCoordinator.client(agent) {
+                let session = state(agent).sessionID
+                Task {
+                    // Preserve final usage when the adapter cooperates, but an
+                    // unresponsive adapter cannot hold the queue indefinitely.
+                    await client.cancelAndClose(sessionID: session)
+                    task.cancel()
+                }
+            } else { task.cancel() }
+        }
+        if let agent = discoveryAgent, agent != enabled { cancelTaskDiscovery() }
     }
 
     func copyClaudeLoginCommand() { copyLoginCommand(for: .claude) }
@@ -325,17 +348,21 @@ extension MyClipModel {
     }
 
     private func connectedClient(_ agent: ClipAgent, applyingSavedModel: Bool = true) async throws -> ACPClient {
+        try Task.checkCancellation()
         if let client = sessionCoordinator.client(agent), state(agent).available { return client }
         guard let command = try runtime.organizationCommand(for: agent, customPath: preferences.path(for: agent)) else {
             throw ACPError.disconnected(String(localized: "请先在连接设置中安装组件。"))
         }
         await releaseSession(agent)
+        try Task.checkCancellation()
         agents[agent]?.phase = .connecting
         agents[agent]?.detail = String(localized: "正在连接…")
         let (client, handshake) = try await sessionCoordinator.open(agent, command: command)
+        try Task.checkCancellation()
         agents[agent]?.authMethods = handshake.authMethods
         guard handshake.supportsImages else { throw ACPError.unsupportedImages }
         _ = try await session(for: agent, using: client, applyingSavedModel: applyingSavedModel)
+        try Task.checkCancellation()
         agentRetryAt[agent] = nil
         agents[agent]?.phase = .ready
         agents[agent]?.detail = String(localized: "已就绪 · 每批独立整理")
@@ -485,15 +512,32 @@ extension MyClipModel {
         guard canStartOrganization, let enabled = preferences.enabledAgent else { return }
         // Reserve dispatch before the first await so timer ticks and repeated clicks cannot race.
         dispatching = true
-        defer { dispatching = false }
+        organizationAgent = enabled
+        let task = Task { await runNext(immediately: immediately, jobID: jobID, agent: agent, enabled: enabled) }
+        organizationTask = task
+        await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
+        organizationTask = nil
+        organizationAgent = nil
+        dispatching = false
+    }
+
+    private func runNext(immediately: Bool, jobID: UUID?, agent: ClipAgent?, enabled: ClipAgent) async {
         do {
+            try Task.checkCancellation()
             try await store.recoverHistoricalTaskIngestions()
+            try Task.checkCancellation()
+            guard preferences.enabledAgent == enabled else { return }
             if jobID == nil, !state(enabled).busy, state(enabled).phase != .failed,
                let stage = try await store.claimNextTaskIngestion() {
+                if Task.isCancelled || preferences.enabledAgent != enabled {
+                    try await store.releaseTaskIngestion(stage.id)
+                    return
+                }
                 await repairTaskIngestion(stage, agent: enabled)
                 return
             }
-            try await store.reassignPendingCaptures(to: enabled)
+            try await store.handoffQueuedOrganizationJobs(to: enabled)
+            try Task.checkCancellation()
             // Once a day, when nothing is waiting and the user has been away, the queue gets a dream.
             if jobID == nil { try await store.enqueueDreamIfDue(agent: enabled) }
             let queue = try await store.organizationQueue()
@@ -505,6 +549,7 @@ extension MyClipModel {
             guard target == preferences.enabledAgent, !state(target).busy, state(target).phase != .failed,
                   let job = try await store.claimNextJob(immediately: immediately, jobID: jobID) else { return }
             currentJob = job
+            if Task.isCancelled || target != preferences.enabledAgent { interruptedJobs.insert(job.id) }
             currentJobStartedAt = Date()
             activityText = String(localized: "正在连接 \(job.agent.name) ACP…")
             await refresh()
@@ -512,6 +557,7 @@ extension MyClipModel {
                 await dream(job)
                 await releaseSession(job.agent)
                 cancelledJobs.remove(job.id)
+                interruptedJobs.remove(job.id)
                 currentJob = nil
                 currentJobStartedAt = nil
                 activityText = ""
@@ -521,7 +567,7 @@ extension MyClipModel {
             do {
                 let previousRevisions = try await store.beginMemoryEditing(jobID: job.id)
                 try await withAgentSession(job.agent) { client, session in
-                    if cancelledJobs.contains(job.id) { throw CancellationError() }
+                    if cancelledJobs.contains(job.id) || interruptedJobs.contains(job.id) { throw CancellationError() }
                     agents[job.agent]?.phase = .working
                     agents[job.agent]?.detail = String(localized: "正在整理 \(job.sourceIDs.count) 条记录")
                     activityText = String(localized: "正在读取 \(job.sourceIDs.count) 条记录…")
@@ -538,7 +584,7 @@ extension MyClipModel {
                         text: MemoryPrompt.organizeBatchPrompt(captures: captures, handoff: handoff, previousAttempt: job.attempts > 1 ? job.error : nil,
                                                               tasks: existingTasks, memories: taskMemories),
                         images: data, jobID: job.id)
-                    if cancelledJobs.contains(job.id) || result.stopReason == "cancelled" { throw CancellationError() }
+                    if cancelledJobs.contains(job.id) || interruptedJobs.contains(job.id) || result.stopReason == "cancelled" { throw CancellationError() }
                     guard result.stopReason == "end_turn" else { throw LibraryError.agentStopped }
                     activityText = String(localized: "正在同步 Memory 文件…")
                     let changedCount = try await store.finishMemoryEditing(jobID: job.id, previousRevisions: previousRevisions,
@@ -556,7 +602,11 @@ extension MyClipModel {
                     agents[job.agent]?.lastCompleted = Date()
                 }
             } catch {
-                if cancelledJobs.contains(job.id) || error is CancellationError {
+                if !cancelledJobs.contains(job.id), interruptedJobs.contains(job.id) || Task.isCancelled {
+                    try await store.interruptOrganizationJob(id: job.id)
+                    agents[job.agent]?.phase = .disconnected
+                    agents[job.agent]?.detail = String(localized: "整理已取消")
+                } else if cancelledJobs.contains(job.id) || error is CancellationError {
                     try await store.finishJob(id: job.id, state: .cancelled)
                     agents[job.agent]?.phase = .disconnected
                     agents[job.agent]?.detail = String(localized: "整理已取消")
@@ -574,15 +624,19 @@ extension MyClipModel {
             }
             await releaseSession(job.agent)
             cancelledJobs.remove(job.id)
+            interruptedJobs.remove(job.id)
             currentJob = nil
             currentJobStartedAt = nil
             activityText = ""
             await refresh()
         } catch {
-            if let job = currentJob { await releaseSession(job.agent) }
+            if let job = currentJob {
+                await releaseSession(job.agent)
+                interruptedJobs.remove(job.id)
+            }
             currentJob = nil
             currentJobStartedAt = nil
-            notice = error.localizedDescription
+            if !Task.isCancelled { notice = error.localizedDescription }
         }
     }
 
@@ -596,7 +650,7 @@ extension MyClipModel {
     private func repairTaskIngestion(_ stage: TaskIngestion, agent: ClipAgent) async {
         discoveringTasks = true
         discoveryAgent = agent
-        taskDiscovery = Task {
+        let task = Task {
             defer { discoveringTasks = false; discoveryAgent = nil; taskDiscovery = nil }
             do {
                 try await withAgentSession(agent) { client, session in
@@ -621,16 +675,22 @@ extension MyClipModel {
                 }
             } catch {
                 do {
-                    try await store.failTaskIngestion(stage.id, error: error.localizedDescription,
-                        retryable: !Task.isCancelled && RetryPolicy.classify(error) == .transient)
-                    showTaskIngestionFailure(try await store.taskIngestion(stage.id), memorySaved: stage.jobID != nil)
+                    if Task.isCancelled {
+                        try await store.releaseTaskIngestion(stage.id)
+                        taskDiscoveryMessage = String(localized: "任务识别已取消。")
+                    } else {
+                        try await store.failTaskIngestion(stage.id, error: error.localizedDescription,
+                            retryable: RetryPolicy.classify(error) == .transient)
+                        showTaskIngestionFailure(try await store.taskIngestion(stage.id), memorySaved: stage.jobID != nil)
+                    }
                 } catch { notice = error.localizedDescription }
             }
-            agents[agent]?.phase = .ready
-            agents[agent]?.detail = String(localized: "已就绪 · 每批独立整理")
+            agents[agent]?.phase = Task.isCancelled ? .disconnected : .ready
+            agents[agent]?.detail = Task.isCancelled ? String(localized: "任务识别已取消。") : String(localized: "已就绪 · 每批独立整理")
             await refresh()
         }
-        await taskDiscovery?.value
+        taskDiscovery = task
+        await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
     }
 
     /// Runs a dream turn by turn. It never pauses the queue or marks the Agent failed: a dropped connection gets one
@@ -644,12 +704,12 @@ extension MyClipModel {
             try await withAgentSession(job.agent) { client, session in
                 agents[job.agent]?.phase = .working
                 for (index, turn) in turns.enumerated() {
-                    if cancelledJobs.contains(job.id) { throw CancellationError() }
+                    if cancelledJobs.contains(job.id) || interruptedJobs.contains(job.id) { throw CancellationError() }
                     activityText = String(localized: "做梦中 · \(turn.title)（\(index + 1)/\(turns.count)）")
                     agents[job.agent]?.detail = activityText
                     let result = try await trackedPrompt(client, agent: job.agent, session: session, text: turn.text, images: [],
                                                          jobID: job.id, maximumDuration: MemoryDream.turnLimit)
-                    if cancelledJobs.contains(job.id) || result.stopReason == "cancelled" { throw CancellationError() }
+                    if cancelledJobs.contains(job.id) || interruptedJobs.contains(job.id) || result.stopReason == "cancelled" { throw CancellationError() }
                     guard result.stopReason == "end_turn" else { throw LibraryError.agentStopped }
                 }
             }
@@ -659,7 +719,10 @@ extension MyClipModel {
             agents[job.agent]?.lastCompleted = Date()
         } catch {
             do {
-                if cancelledJobs.contains(job.id) || error is CancellationError {
+                if !cancelledJobs.contains(job.id), interruptedJobs.contains(job.id) || Task.isCancelled {
+                    try await store.settleConsolidation(previousRevisions: before)
+                    try await store.interruptOrganizationJob(id: job.id)
+                } else if cancelledJobs.contains(job.id) || error is CancellationError {
                     try await store.settleConsolidation(previousRevisions: before)
                     try await store.finishJob(id: job.id, state: .cancelled)
                 } else if RetryPolicy.classify(error) == .transient, job.attempts < MemoryDream.maxAttempts {
@@ -676,6 +739,8 @@ extension MyClipModel {
 
     private func trackedPrompt(_ client: ACPClient, agent: ClipAgent, session: String, text: String,
                                images: [Data], jobID: UUID? = nil, maximumDuration: Duration? = nil) async throws -> ACPCompletion {
+        try Task.checkCancellation()
+        if let jobID, interruptedJobs.contains(jobID) { throw CancellationError() }
         guard images.isEmpty || state(agent).modelSelection.current?.supportsImages != false else {
             throw LibraryError.invalidResult(String(localized: "当前模型不支持图片。请在 Backstage 选择支持图片的模型后重试。"))
         }

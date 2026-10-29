@@ -34,6 +34,8 @@ bash Scripts/test.sh app BackstageResponsivenessTests
 
 `AgentRecoveryTests` 使用真实应用调度器、SQLite 队列和 ACP 子进程，验证连接失败退避恢复、证书错误自动重试、登录失败保留、手动暂停与停用保护，以及启动后自动恢复旧版本误暂停的队列。不需要完整 Xcode，不修改真实资料库或调用付费模型。
 
+`AgentSwitchingTests` 验证停用和切换时会中断旧 Agent、保留最终用量、把未完成截图交给新 Agent，并覆盖不响应取消、连接卡住、快速连续切换、旧重试阻塞和任务补处理中断。测试使用独立资料库和 ACP 子进程，不调用真实模型。
+
 `BackstageResponsivenessTests` 验证静态图标更新不会触发重复重绘、鼠标跟踪区域能够复用，以及执行记录在嵌套滚动、进度变化、完成、缩放、隐藏和重新显示时保持固定高度。它通过父子关系定位内层记录列表，避免将侧边栏或外层页面当成被测列表；独立计时器会在主线程失去响应时终止测试。相关问题见 [Backstage 布局卡顿](../docs/backstage-layout-hang.md)。
 
 `CloudSync/` 使用可注入的 REST 和凭据存储验证云端协议，并验证真实的本机 OAuth 回调。原生面板检查需要 macOS GUI 会话，截图写入 `build/cloud-sync-verification/`。这些检查不表示真实云端账号已通过端到端验收，接入说明见 [Memory 云端同步](../docs/memory-cloud-sync.md)。

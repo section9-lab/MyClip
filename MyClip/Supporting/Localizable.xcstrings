@@ -20206,6 +20206,46 @@
         }
       }
     },
+    "整理已停止，未完成的截图已重新排队。": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Organisation wurde beendet. Unfertige Screenshots wurden erneut eingereiht."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organizing stopped. Unfinished screenshots were returned to the queue."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se detuvo la organización. Las capturas pendientes volvieron a la cola."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le classement a été arrêté. Les captures inachevées ont été remises en file."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理を停止しました。未完了のスクリーンショットはキューに戻されました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "정리를 중지했습니다. 완료되지 않은 스크린샷을 대기열에 다시 넣었습니다."
+          }
+        }
+      }
+    },
     "整理已取消": {
       "localizations": {
         "de": {

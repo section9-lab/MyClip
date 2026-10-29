@@ -284,19 +284,22 @@ struct AgentActivationTests {
         try await waitUntil { model.currentJob?.agent == .claude && (try? requests(.claude, method: "session/prompt").count) == 1 }
         let running = model.currentJob
         model.disableAgent()
-        check(model.preferences.enabledAgent == nil && model.currentJob?.id == running?.id, "Disabling stops new work without cancelling the current batch")
+        check(model.preferences.enabledAgent == nil && model.currentJob?.id == running?.id, "Disabling requests a stop while retaining ownership until cleanup")
         model.enable(.codex)
-        check(model.currentJob?.agent == .claude, "Switching preserves the Agent for the running batch")
+        check(model.currentJob?.agent == .claude, "The old batch retains ownership only while its stop is being settled")
         try await model.store.record(image: image,
             context: CaptureContext(appName: "Test", bundleID: "test", windowTitle: "Next batch", windowID: 2,
                 reason: .pointerIdle), agent: .claude, organize: true, extractedText: "test")
         await model.refresh()
-        check(model.library.queue.pendingCounts == [.codex: 1], "New waiting captures follow the selection while another batch finishes")
+        check(model.library.queue.pendingCounts[.codex, default: 0] >= 1 && model.library.queue.pendingCounts[.claude] == nil,
+              "Waiting captures follow the new selection during shutdown")
         try await waitUntil { model.currentJob == nil && !model.dispatching }
         let completed = try await model.store.snapshot().jobs.first { $0.id == running?.id }
-        check(completed?.state == .completed && completed?.agent == .claude, "The previous Agent completes its batch normally")
+        check(completed?.state == .cancelled && completed?.agent == .claude, "The previous Agent stops without holding the queue")
+        check(try await model.store.snapshot().queue.pendingCounts == [.codex: 2], "Interrupted screenshots join the new Agent's queue")
         let execution = try await model.store.executionRecords(jobID: completed!.id)
-        check(execution.count == 1 && execution.first?.stopReason == "end_turn", "Organization automatically saves a completed execution record")
+        check(execution.count == 1 && ["end_turn", "cancelled"].contains(execution.first?.stopReason ?? ""),
+              "A switch retains the old Agent's final execution record")
         let firstClaudePrompt = try requests(.claude, method: "session/prompt").first?["params"] as? [String: Any]
         check(execution.first?.sessionID == firstClaudePrompt?["sessionId"] as? String, "Execution history retains the exact Agent session")
         check(model.state(.claude).sessionID == nil, "Completed batches release their temporary session")
@@ -319,8 +322,8 @@ struct AgentActivationTests {
         model.retry(retry)
         try await Task.sleep(for: .milliseconds(50))
         check(try await model.store.snapshot().jobs.first { $0.id == retryID }?.state == .failed, "Rejecting an inactive retry preserves its state")
-        model.enable(.claude)
-        check(model.canRetry(retry), "Re-enabling the original Agent allows its retry")
+        await model.selectDefaultAgent(.claude)
+        check(model.canRetry(retry), "Reconnecting and enabling the original Agent allows its retry")
         model.retry(retry)
         try await waitUntil { (try? requests(.claude, method: "session/prompt").count) == 2 }
         try await waitUntil { model.currentJob == nil && !model.dispatching }

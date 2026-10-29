@@ -10,7 +10,7 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 if [[ ${#tests[@]} -eq 0 ]]; then
-    tests=(AgentActivationTests AgentModelTests AgentRecoveryTests TaskRecoveryTests CaptureLifecycleTests CaptureFilterModelTests ScreenshotDocumentTests
+    tests=(AgentActivationTests AgentModelTests AgentRecoveryTests AgentSwitchingTests TaskRecoveryTests CaptureLifecycleTests CaptureFilterModelTests ScreenshotDocumentTests
            MemoryDirectoryTests MemoryScrollTests TaskBoardScrollTests MenuBarBoardTests AgentModelPickerTests BackstageResponsivenessTests)
 fi
 if [[ ${#test_args[@]} -gt 0 && ${#tests[@]} -ne 1 ]]; then
@@ -21,7 +21,7 @@ needs_model=false
 needs_app=false
 for name in "${tests[@]}"; do
     case "$name" in
-        AgentActivationTests|AgentModelTests|AgentRecoveryTests|CaptureLifecycleTests|MenuBarBoardTests|TaskRecoveryTests) needs_model=true ;;
+        AgentActivationTests|AgentModelTests|AgentRecoveryTests|AgentSwitchingTests|CaptureLifecycleTests|MenuBarBoardTests|TaskRecoveryTests) needs_model=true ;;
         CaptureFilterModelTests|ScreenshotDocumentTests|MemoryDirectoryTests|MemoryScrollTests|TaskBoardScrollTests|AgentModelPickerTests|BackstageResponsivenessTests) needs_app=true ;;
         *) echo "Unknown app test: $name" >&2; exit 2 ;;
     esac
@@ -73,7 +73,7 @@ for name in "${tests[@]}"; do
                 MyClip/Features/Agent/AgentCharacterView.swift MyClip/Features/Agent/AgentStatusIcon.swift \
                 MyClip/UI/LibraryCompatibility.swift "Tests/MyClipAppTests/$name.swift" -o "$test_build/bin/$name"
             ;;
-        CaptureLifecycleTests|AgentModelTests|AgentRecoveryTests|TaskRecoveryTests)
+        CaptureLifecycleTests|AgentModelTests|AgentRecoveryTests|AgentSwitchingTests|TaskRecoveryTests)
             # These suites replace only capture with a test double; all model/storage/ACP code is real.
             swiftc "${compiler_args[@]}" -I "$package_build/Modules" "${core_objects[@]}" \
                 "${model_sources[@]}" "Tests/MyClipAppTests/$name.swift" -o "$test_build/bin/$name"

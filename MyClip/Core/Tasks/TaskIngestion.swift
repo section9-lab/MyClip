@@ -112,6 +112,15 @@ extension LibraryStore {
         try recordTaskIngestionFailure(id, response: stage.response, error: error, rejectedCount: max(1, stage.rejectedCount), retryable: retryable, at: date)
     }
 
+    /// Stopping an Agent is not a failed repair attempt. Preserve the outbox
+    /// response and let the next selected Agent claim it again.
+    public func releaseTaskIngestion(_ id: UUID, at date: Date = Date()) throws {
+        try database.run("""
+            UPDATE task_ingestions SET state='pending',attempts=max(0,attempts-1),retry_at=NULL,updated_at=?
+            WHERE id=? AND state='running'
+            """, [String(date.timeIntervalSince1970), id.uuidString])
+    }
+
     private func recordTaskIngestionFailure(_ id: UUID, response: String, error: String, rejectedCount: Int,
                                             changedCount: Int = 0, retryable: Bool = true, at date: Date) throws {
         let attempts = try taskIngestion(id).attempts

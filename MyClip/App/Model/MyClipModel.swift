@@ -195,8 +195,11 @@ final class MyClipModel: ObservableObject {
     private var searchTask: Task<Void, Never>?
     private var selectionBeforeSearch: (entry: UUID?, folder: String?)?
     var taskDiscovery: Task<Void, Never>?
+    var organizationTask: Task<Void, Never>?
+    var organizationAgent: ClipAgent?
     var discoveryAgent: ClipAgent?
     var cancelledJobs: Set<UUID> = []
+    var interruptedJobs: Set<UUID> = []
     var lastCleanup = Date.distantPast
 
     init(root: URL, preview: Bool, preferences suppliedPreferences: ClipPreferences? = nil) throws {
@@ -231,6 +234,7 @@ final class MyClipModel: ObservableObject {
             guard let self else { return }
             do {
                 try await store.recoverInterruptedJobs()
+                if let agent = preferences.enabledAgent { try await store.handoffQueuedOrganizationJobs(to: agent) }
                 await runColdStartIngestionIfNeeded()
                 if preview { try await seedPreview() }
                 await refresh()
@@ -289,6 +293,7 @@ final class MyClipModel: ObservableObject {
         textWorker?.cancel()
         searchTask?.cancel()
         taskDiscovery?.cancel()
+        organizationTask?.cancel()
         accountAuthorizationTasks.values.forEach { $0.cancel() }
         Task { [sessionCoordinator] in await sessionCoordinator.stopAll() }
     }
