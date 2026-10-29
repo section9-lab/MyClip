@@ -44,6 +44,8 @@ Choose models in **Backstage**. Every supported Agent loads its own searchable l
 
 Releases are self-signed and not notarized. If macOS blocks the first launch, see [installation help](docs/release-signing.md#installing-a-community-build).
 
+The next release adds **MyClip → Check for Updates…** and an automatic-check switch in Settings. The first version with the updater needs a manual installation; subsequent releases can be downloaded and installed inside the app. See [in-app updates](docs/app-updates.md).
+
 ## MCP memory access for Codex and Claude Code
 
 In **Settings → MCP memory access**, enable the service, select your clients, and run the one-click configuration. Restart the clients or open a new session after setup.

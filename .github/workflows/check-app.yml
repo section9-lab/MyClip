@@ -1,0 +1,54 @@
+name: Check native app
+
+on:
+  push:
+    branches: ['codex/**']
+    paths:
+      - 'MyClip/**'
+      - 'MyClip.xcodeproj/**'
+      - 'project.yml'
+      - 'Scripts/**'
+      - 'Tests/**'
+      - '.github/workflows/check-app.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'MyClip/**'
+      - 'MyClip.xcodeproj/**'
+      - 'project.yml'
+      - 'Scripts/**'
+      - 'Tests/**'
+      - '.github/workflows/check-app.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Native app (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-26
+          - arch: x86_64
+            runner: macos-26-intel
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check packaging and analytics
+        run: |
+          python3 -m unittest discover -s Tests/Packaging -v
+          bash Scripts/test_analytics.sh
+      - name: Build and test native app
+        run: bash Scripts/test.sh app
+      - name: Check signed update feeds with temporary test keys
+        env:
+          SPARKLE_BIN: build/app-tests/SourcePackages/artifacts/sparkle/Sparkle/bin
+        run: bash Scripts/test.sh updates

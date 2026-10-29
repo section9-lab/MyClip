@@ -20,6 +20,8 @@ Initialization refuses to run if any of these settings already exists, preventin
 
 The release workflow imports the identity into a temporary keychain and trusts it for code signing **only on the disposable build runner**. It deletes the private keychain and temporary signing files after packaging; the temporary trust configuration is discarded with the runner. Both architecture jobs must succeed before publication. Releases include both DMGs, the public `MyClip-signing-certificate.pem`, and `SHA256SUMS`; the private key stays in Actions secrets. Users do not need to install or trust the public certificate.
 
+In-app updates also require the separate `MYCLIP_SPARKLE_PRIVATE_KEY` Actions secret. Sparkle signs each DMG and architecture-specific appcast with Ed25519, using the public key embedded in the app. This does not replace the persistent macOS code-signing identity. See [in-app updates](app-updates.md) for setup and validation.
+
 ## Installing a community build
 
 Download the correct architecture's DMG from this repository's Release page and verify its SHA-256 checksum. Because the app is not notarized, macOS may require **System Settings → Privacy & Security → Open Anyway** after the first opening attempt. Do not disable Gatekeeper or system integrity protections. Developer ID signing and notarization would require Apple Developer Program membership and a separate release configuration.

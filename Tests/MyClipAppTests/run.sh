@@ -11,7 +11,7 @@ while [[ $# -gt 0 ]]; do
 done
 if [[ ${#tests[@]} -eq 0 ]]; then
     tests=(AgentActivationTests AgentModelTests AgentRecoveryTests AgentSwitchingTests TaskRecoveryTests CaptureLifecycleTests CaptureFilterModelTests ScreenshotDocumentTests
-           MemoryDirectoryTests MemoryScrollTests TaskBoardScrollTests MenuBarBoardTests AgentModelPickerTests BackstageResponsivenessTests)
+           MemoryDirectoryTests MemoryScrollTests TaskBoardScrollTests MenuBarBoardTests AgentModelPickerTests BackstageResponsivenessTests AppUpdaterTests)
 fi
 if [[ ${#test_args[@]} -gt 0 && ${#tests[@]} -ne 1 ]]; then
     echo "Arguments after -- require exactly one test name." >&2
@@ -22,7 +22,7 @@ needs_app=false
 for name in "${tests[@]}"; do
     case "$name" in
         AgentActivationTests|AgentModelTests|AgentRecoveryTests|AgentSwitchingTests|CaptureLifecycleTests|MenuBarBoardTests|TaskRecoveryTests) needs_model=true ;;
-        CaptureFilterModelTests|ScreenshotDocumentTests|MemoryDirectoryTests|MemoryScrollTests|TaskBoardScrollTests|AgentModelPickerTests|BackstageResponsivenessTests) needs_app=true ;;
+        CaptureFilterModelTests|ScreenshotDocumentTests|MemoryDirectoryTests|MemoryScrollTests|TaskBoardScrollTests|AgentModelPickerTests|BackstageResponsivenessTests|AppUpdaterTests) needs_app=true ;;
         *) echo "Unknown app test: $name" >&2; exit 2 ;;
     esac
 done
@@ -87,7 +87,9 @@ for name in "${tests[@]}"; do
             ;;
         *)
             # Reuse the built application for UI tests instead of maintaining another production source list.
-            swiftc "${compiler_args[@]}" -I "$products" "${app_objects[@]}" \
+            swiftc "${compiler_args[@]}" -I "$products" \
+                -F "$products/MyClip.app/Contents/Frameworks" \
+                -Xlinker -rpath -Xlinker "$products/MyClip.app/Contents/Frameworks" "${app_objects[@]}" \
                 "Tests/MyClipAppTests/$name.swift" -o "$test_build/bin/$name"
             ;;
     esac

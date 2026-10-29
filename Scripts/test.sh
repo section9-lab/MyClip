@@ -12,6 +12,7 @@ case "$suite" in
         bash Scripts/test.sh scripts
         bash Scripts/test.sh benchmark
         bash Scripts/test.sh app
+        bash Scripts/test.sh updates
         ;;
     core) swift test "$@" ;;
     cloud-sync) bash Tests/CloudSync/run.sh "$@" ;;
@@ -26,5 +27,9 @@ case "$suite" in
         PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s benchmark/tests -v
         ;;
     app) bash Tests/MyClipAppTests/run.sh "$@" ;;
-    *) echo "Usage: bash Scripts/test.sh [all|core|cloud-sync|scripts|benchmark|app [TestName...]]" >&2; exit 2 ;;
+    updates)
+        SPARKLE_BIN="${SPARKLE_BIN:-build/app-tests/SourcePackages/artifacts/sparkle/Sparkle/bin}" \
+            PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Tests/Updates -v
+        ;;
+    *) echo "Usage: bash Scripts/test.sh [all|core|cloud-sync|scripts|benchmark|app [TestName...]|updates]" >&2; exit 2 ;;
 esac

@@ -7,6 +7,7 @@ struct MyClipSettingsView: View {
     @ObservedObject var model: MyClipModel
     @State private var showMCPHelp = false
     @ObservedObject private var usageAnalytics = AppAnalytics.shared
+    @ObservedObject private var updater = AppUpdater.shared
 
     var body: some View {
         @ObservedObject var preferences = model.preferences
@@ -165,8 +166,19 @@ struct MyClipSettingsView: View {
                     get: { usageAnalytics.isEnabled }, set: { usageAnalytics.setEnabled($0) }
                 )).labelsHidden().toggleStyle(.switch).controlSize(.small)
             }
-            SettingsRow(String(localized: "版本")) {
-                Text(appVersion).foregroundStyle(.secondary).monospacedDigit()
+            SettingsRow(String(localized: "自动检查更新"), subtitle: String(localized: "每天检查新版本，下载和安装前由你确认。")) {
+                Toggle(String(localized: "自动检查更新"), isOn: Binding(
+                    get: { updater.automaticallyChecksForUpdates },
+                    set: { updater.setAutomaticallyChecksForUpdates($0) }
+                )).labelsHidden().toggleStyle(.switch).controlSize(.small)
+                    .disabled(model.preview || !updater.canCheckForUpdates)
+            }
+            SettingsRow(String(localized: "版本"), subtitle: lastUpdateCheck) {
+                HStack(spacing: 12) {
+                    Text(appVersion).foregroundStyle(.secondary).monospacedDigit()
+                    Button(String(localized: "检查更新…")) { updater.checkForUpdates(nil) }
+                        .disabled(model.preview || !updater.canCheckForUpdates)
+                }
             }
             HStack {
                 Button(String(localized: "重新打开设置向导"), systemImage: "slider.horizontal.3") {
@@ -206,6 +218,11 @@ struct MyClipSettingsView: View {
 
     private var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    }
+
+    private var lastUpdateCheck: String {
+        guard let date = updater.lastUpdateCheckDate else { return String(localized: "从 GitHub Releases 获取新版本") }
+        return String(localized: "上次检查：\(date.formatted(date: .abbreviated, time: .shortened))")
     }
 }
 

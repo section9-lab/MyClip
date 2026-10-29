@@ -76,7 +76,9 @@ jobs:
           bash Scripts/test.sh benchmark
 
       - name: Test native app with macOS 13 deployment target
-        run: bash Scripts/test.sh app
+        run: |
+          bash Scripts/test.sh app
+          bash Scripts/test.sh updates
 
       - name: Build architecture-specific DMG
         env:
@@ -87,6 +89,12 @@ jobs:
           bash Scripts/package_dmg.sh
           cp "$RUNNER_TEMP/myclip-signing.pem" dist/MyClip-signing-certificate.pem
 
+      - name: Generate and verify signed update feed
+        env:
+          MYCLIP_ARCH: ${{ matrix.arch }}
+          MYCLIP_SPARKLE_PRIVATE_KEY: ${{ secrets.MYCLIP_SPARKLE_PRIVATE_KEY }}
+        run: bash Scripts/generate_update_feed.sh
+
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
@@ -94,6 +102,7 @@ jobs:
           path: |
             dist/MyClip-*-${{ matrix.arch }}.dmg
             dist/MyClip-signing-certificate.pem
+            dist/appcast-${{ matrix.arch }}.xml
           if-no-files-found: error
           retention-days: 7
 
@@ -129,11 +138,19 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           test -f "dist/MyClip-$version-arm64.dmg"
           test -f "dist/MyClip-$version-x86_64.dmg"
-          (cd dist && sha256sum ./*.dmg ./MyClip-signing-certificate.pem > SHA256SUMS)
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/*.dmg dist/MyClip-signing-certificate.pem dist/SHA256SUMS --clobber
+          test -f dist/appcast-arm64.xml
+          test -f dist/appcast-x86_64.xml
+          (cd dist && sha256sum ./*.dmg ./*.xml ./MyClip-signing-certificate.pem > SHA256SUMS)
+          if gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft > "$RUNNER_TEMP/release-is-draft" 2>/dev/null; then
+            if [[ "$(cat "$RUNNER_TEMP/release-is-draft")" != true ]]; then
+              echo "::error::Published releases are immutable; use a new version instead of replacing signed assets."
+              exit 1
+            fi
+            gh release upload "$GITHUB_REF_NAME" dist/*.dmg dist/*.xml dist/MyClip-signing-certificate.pem dist/SHA256SUMS --clobber
+            gh release edit "$GITHUB_REF_NAME" --title "MyClip $version" --notes-file "docs/releases/$GITHUB_REF_NAME.md"
           else
-            gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/MyClip-signing-certificate.pem dist/SHA256SUMS \
+            gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/*.xml dist/MyClip-signing-certificate.pem dist/SHA256SUMS \
               --verify-tag --title "MyClip $version" \
-              --notes-file "docs/releases/$GITHUB_REF_NAME.md" --latest
+              --notes-file "docs/releases/$GITHUB_REF_NAME.md" --draft
           fi
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest

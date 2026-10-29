@@ -35,6 +35,7 @@ final class MyClipAppDelegate: NSObject, NSApplicationDelegate {
             menuBar = MyClipMenuBarController(model: model)
             model.start()
             showWindow()
+            if !preview { AppUpdater.shared.start() }
         } catch {
             let alert = NSAlert()
             alert.messageText = String(localized: "MyClip 无法打开资料库")
@@ -84,6 +85,8 @@ final class MyClipAppDelegate: NSObject, NSApplicationDelegate {
         let appMenu = NSMenu(title: "MyClip")
         let about = appMenu.addItem(withTitle: String(localized: "关于 MyClip"), action: #selector(showAbout), keyEquivalent: "")
         about.target = self
+        let updates = appMenu.addItem(withTitle: String(localized: "检查更新…"), action: #selector(AppUpdater.checkForUpdates(_:)), keyEquivalent: "")
+        updates.target = AppUpdater.shared
         appMenu.addItem(.separator())
         let settings = appMenu.addItem(withTitle: String(localized: "设置…"), action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
