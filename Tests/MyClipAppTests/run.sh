@@ -10,8 +10,8 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 if [[ ${#tests[@]} -eq 0 ]]; then
-    tests=(AgentActivationTests AgentModelTests AgentRecoveryTests AgentSwitchingTests TaskRecoveryTests CaptureLifecycleTests CaptureFilterModelTests ScreenshotDocumentTests
-           MemoryDirectoryTests MemoryScrollTests TaskBoardScrollTests MenuBarBoardTests AgentModelPickerTests BackstageResponsivenessTests AppUpdaterTests)
+    tests=(AppUpdaterTests AgentActivationTests AgentModelTests AgentRecoveryTests AgentSwitchingTests TaskRecoveryTests CaptureLifecycleTests CaptureFilterModelTests ScreenshotDocumentTests
+           MemoryDirectoryTests MemoryScrollTests TaskBoardScrollTests MenuBarBoardTests AgentModelPickerTests BackstageResponsivenessTests)
 fi
 if [[ ${#test_args[@]} -gt 0 && ${#tests[@]} -ne 1 ]]; then
     echo "Arguments after -- require exactly one test name." >&2
