@@ -27,6 +27,7 @@
 		610DABD292333BFB3252692E /* AgentCharacterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CD7B102E641D08BD7DCD335 /* AgentCharacterView.swift */; };
 		64B50CEF8586DF62220C71A8 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = FAAEE4036C8AB5F23D3B7DD9 /* Sparkle */; };
 		66D5E958D402320799B98DD6 /* MyClipRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3D0BC567D8289A2AC73A4C /* MyClipRootView.swift */; };
+		67ECC49D18564F0776C93B79 /* Sparkle in Embed Frameworks */ = {isa = PBXBuildFile; productRef = FAAEE4036C8AB5F23D3B7DD9 /* Sparkle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		69231AE121D380DE9610A0A6 /* WindowImageCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5F0C1BBDD52F2D72D0DC22 /* WindowImageCapture.swift */; };
 		772D3B1BCE0D1DECD9F6017A /* LibraryCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6073BF53BD6D93A05B390CAB /* LibraryCompatibility.swift */; };
 		79C82E477E668E2C8107B3B9 /* ExecutionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C538A894C0DA8D034D5ABFE /* ExecutionDetailView.swift */; };
@@ -61,6 +62,20 @@
 		F953339207F78E08ED8AB961 /* MyClipModel+WorkTasks.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2D0486E69563DCE662D41AC /* MyClipModel+WorkTasks.swift */; };
 		FD08315AB518ADF1981415A3 /* MyClipApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64AB631DA26E7316F978FC4E /* MyClipApp.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		228F7415EA4EF209651AE256 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				67ECC49D18564F0776C93B79 /* Sparkle in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0334B2B9D358A3A43ECD84DB /* LucideThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = LucideThirdPartyNotices.txt; sourceTree = "<group>"; };
@@ -338,6 +353,7 @@
 				F57F8470AAFF38D0695F53CF /* Sources */,
 				A47E82572115426CC3E4E555 /* Resources */,
 				7F6FBFCA547833AB07FE819E /* Frameworks */,
+				228F7415EA4EF209651AE256 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);

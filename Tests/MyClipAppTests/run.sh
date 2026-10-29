@@ -47,6 +47,8 @@ if $needs_app; then
     xcodebuild -quiet -project MyClip.xcodeproj -scheme MyClip -configuration Debug \
         -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "$test_build" CODE_SIGNING_ALLOWED=NO build
     products="$test_build/Build/Products/Debug"
+    sparkle_frameworks="$test_build/SourcePackages/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64"
+    test -f "$products/MyClip.app/Contents/Frameworks/Sparkle.framework/Sparkle"
     # Standalone test executables reuse the app's objects but have their own
     # Bundle.main. Include Swift package resources beside them, as the app does.
     for resource in "$products"/*.bundle "$products/MyClip.app/Contents/Resources/"*.bundle; do
@@ -88,7 +90,7 @@ for name in "${tests[@]}"; do
         *)
             # Reuse the built application for UI tests instead of maintaining another production source list.
             swiftc "${compiler_args[@]}" -I "$products" \
-                -F "$products/MyClip.app/Contents/Frameworks" \
+                -F "$sparkle_frameworks" \
                 -Xlinker -rpath -Xlinker "$products/MyClip.app/Contents/Frameworks" "${app_objects[@]}" \
                 "Tests/MyClipAppTests/$name.swift" -o "$test_build/bin/$name"
             ;;

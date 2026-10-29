@@ -44,6 +44,7 @@ targets:
     dependencies:
       - package: Sparkle
         product: Sparkle
+        embed: true
       - package: Mixpanel
         product: Mixpanel
       - package: MyClipCore
