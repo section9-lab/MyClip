@@ -18,6 +18,9 @@ schemes:
       targets:
         MyClip: all
 packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
   Mixpanel:
     url: https://github.com/mixpanel/mixpanel-swift
     revision: 3ad0fb82216978c124b04accac6c9f9eaf848187
@@ -39,6 +42,8 @@ targets:
           - Supporting/IconSources/**
           - Supporting/Kara.icns
     dependencies:
+      - package: Sparkle
+        product: Sparkle
       - package: Mixpanel
         product: Mixpanel
       - package: MyClipCore
