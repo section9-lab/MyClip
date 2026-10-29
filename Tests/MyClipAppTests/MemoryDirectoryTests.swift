@@ -100,10 +100,10 @@ struct MemoryDirectoryTests {
         await model.refresh()
         model.search = "old search"
         model.memoryFolder = "Wiki"
-        model.results.entries = [original] // A search result can predate the latest saved revision.
         model.openMemoryEntry(original.id)
         check(model.page == .memory && model.selectedEntry == original.id, "A saved-file result opens its Memory document")
         check(model.search.isEmpty && model.memoryFolder == nil, "Opening a saved file clears the previous search and folder")
+        model.results.entries = [original] // An older in-flight search can finish after the document opens.
         check(model.selectedMemoryEntry?.body.contains("Newly saved memory") == true, "The reader prefers the saved revision over a stale search result")
         print("Memory directory checks: \(failures) failure(s)")
         if failures > 0 { exit(1) }
