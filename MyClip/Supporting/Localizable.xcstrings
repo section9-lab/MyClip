@@ -38577,43 +38577,43 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Counts daily activity and app versions. Screenshots, clipboard contents, memories and conversations are never sent."
+            "value": "Counts daily activity, versions, language, system region and time zone. Never sends screenshots, clipboard contents, memories or conversations."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Erfasst tägliche Nutzung und App-Versionen. Screenshots, Zwischenablage, Erinnerungen und Gespräche werden nicht gesendet."
+            "value": "Erfasst tägliche Nutzung, Versionen, Sprache, Systemregion und Zeitzone. Sendet keine Screenshots, Zwischenablage, Erinnerungen oder Gespräche."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Compte l’activité quotidienne et les versions. Aucune capture, donnée du presse-papiers, mémoire ou conversation n’est envoyée."
+            "value": "Compte l’activité quotidienne, les versions, la langue, la région et le fuseau horaire du système. N’envoie aucune capture, donnée du presse-papiers, mémoire ou conversation."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Registra la actividad diaria y las versiones. No envía capturas, portapapeles, recuerdos ni conversaciones."
+            "value": "Registra actividad diaria, versiones, idioma, región y zona horaria del sistema. No envía capturas, portapapeles, recuerdos ni conversaciones."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "日ごとの利用状況とバージョンのみを集計します。スクリーンショット、クリップボード、メモリ、会話内容は送信しません。"
+            "value": "日ごとの利用状況、バージョン、言語、システムの地域とタイムゾーンを集計します。スクリーンショット、クリップボード、メモリ、会話内容は送信しません。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "일일 활동과 앱 버전만 집계합니다. 스크린샷, 클립보드, 메모리 및 대화 내용은 전송하지 않습니다."
+            "value": "일일 활동, 버전, 언어, 시스템 지역 및 시간대를 집계합니다. 스크린샷, 클립보드, 메모리 및 대화 내용은 전송하지 않습니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "仅统计日活与版本，不上传截图、剪贴板、记忆或对话内容。"
+            "value": "统计日活、版本、语言及系统地区和时区，不上传截图、剪贴板、记忆或对话内容。"
           }
         }
       }
