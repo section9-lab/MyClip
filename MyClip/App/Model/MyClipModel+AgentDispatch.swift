@@ -31,7 +31,7 @@ extension MyClipModel {
     }
 
     func discoverTasks() {
-        guard canStartOrganization, let agent = preferences.enabledAgent else { return }
+        guard canStartOrganization, organizationTask == nil, let agent = preferences.enabledAgent else { return }
         discoveringTasks = true
         discoveryAgent = agent
         taskDiscoveryFailed = false
@@ -190,7 +190,7 @@ extension MyClipModel {
     }
 
     func reauthorizeAccount(_ agent: ClipAgent) {
-        guard !preview, !state(agent).busy, !dispatching, !discoveringTasks,
+        guard !preview, !state(agent).busy, !dispatching, organizationTask == nil, !discoveringTasks,
               runtime.usesAccountBridge(agent, customPath: preferences.path(for: agent)) else { return }
         agents[agent]?.phase = .connecting
         agents[agent]?.detail = String(localized: "等待登录完成…")
@@ -228,7 +228,7 @@ extension MyClipModel {
     }
 
     func refreshAgentAccount(_ agent: ClipAgent) {
-        guard canConfigureAgentModel(agent), runtime.usesAccountBridge(agent, customPath: preferences.path(for: agent)) else { return }
+        guard canConfigureAgentModel(agent), organizationTask == nil, runtime.usesAccountBridge(agent, customPath: preferences.path(for: agent)) else { return }
         Task {
             do { let client = try await connectedClient(agent); try await client.refreshAccount() }
             catch { notice = error.localizedDescription }
@@ -261,7 +261,7 @@ extension MyClipModel {
 
     func retry(_ job: ClipJob) {
         Task {
-            guard canRetry(job) else { return }
+            guard canRetry(job), organizationTask == nil else { return }
             if state(job.agent).phase == .failed {
                 agents[job.agent]?.phase = .disconnected
                 agents[job.agent]?.detail = String(localized: "正在重新连接…")
@@ -406,7 +406,7 @@ extension MyClipModel {
 
     /// Opening a catalog prepares a blank session but never enables an Agent or sends a prompt.
     func loadAgentModels(_ agent: ClipAgent, refresh: Bool = false) async {
-        guard canConfigureAgentModel(agent), refresh || !state(agent).modelsLoaded else { return }
+        guard canConfigureAgentModel(agent), organizationTask == nil, refresh || !state(agent).modelsLoaded else { return }
         configuringAgentModels.insert(agent)
         defer { configuringAgentModels.remove(agent) }
         agents[agent]?.phase = .connecting
@@ -428,7 +428,7 @@ extension MyClipModel {
     /// Persist only a confirmed session choice. Each later batch reapplies it to its fresh session.
     @discardableResult
     func selectAgentModel(_ agent: ClipAgent, modelID: String?) async -> Bool {
-        guard canConfigureAgentModel(agent) else { return false }
+        guard canConfigureAgentModel(agent), organizationTask == nil else { return false }
         configuringAgentModels.insert(agent)
         defer { configuringAgentModels.remove(agent) }
         agents[agent]?.phase = .connecting
@@ -509,16 +509,16 @@ extension MyClipModel {
     }
 
     func processNext(immediately: Bool = false, jobID: UUID? = nil, agent: ClipAgent? = nil) async {
-        guard canStartOrganization, let enabled = preferences.enabledAgent else { return }
-        // Reserve dispatch before the first await so timer ticks and repeated clicks cannot race.
-        dispatching = true
+        guard canStartOrganization, organizationTask == nil, let enabled = preferences.enabledAgent else { return }
+        // Reserve dispatch with the task handle before the first await. An empty queue check is
+        // not visible work: toggling @Published dispatching here redraws Backstage on every tick.
         organizationAgent = enabled
         let task = Task { await runNext(immediately: immediately, jobID: jobID, agent: agent, enabled: enabled) }
         organizationTask = task
         await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
         organizationTask = nil
         organizationAgent = nil
-        dispatching = false
+        if dispatching { dispatching = false }
     }
 
     private func runNext(immediately: Bool, jobID: UUID?, agent: ClipAgent?, enabled: ClipAgent) async {
@@ -533,6 +533,7 @@ extension MyClipModel {
                     try await store.releaseTaskIngestion(stage.id)
                     return
                 }
+                dispatching = true
                 await repairTaskIngestion(stage, agent: enabled)
                 return
             }
@@ -548,6 +549,7 @@ extension MyClipModel {
             }
             guard target == preferences.enabledAgent, !state(target).busy, state(target).phase != .failed,
                   let job = try await store.claimNextJob(immediately: immediately, jobID: jobID) else { return }
+            dispatching = true
             currentJob = job
             if Task.isCancelled || target != preferences.enabledAgent { interruptedJobs.insert(job.id) }
             currentJobStartedAt = Date()
@@ -742,7 +744,7 @@ extension MyClipModel {
         try Task.checkCancellation()
         if let jobID, interruptedJobs.contains(jobID) { throw CancellationError() }
         guard images.isEmpty || state(agent).modelSelection.current?.supportsImages != false else {
-            throw LibraryError.invalidResult(String(localized: "当前模型不支持图片。请在 Backstage 选择支持图片的模型后重试。"))
+            throw LibraryError.invalidResult(String(localized: "当前模型不支持图片。请在自动整理的 Agent 与账号中选择支持图片的模型后重试。"))
         }
         return try await store.executePrompt(client, agent: agent, sessionID: session, text: text, images: images, jobID: jobID, maximumDuration: maximumDuration)
     }
@@ -803,7 +805,7 @@ extension MyClipModel {
 
     /// Runs before the worker's pause check, so a retryable pause cannot prevent its own recovery.
     func recoverOrganizationIfNeeded(at date: Date = Date()) async {
-        guard !preview, !dispatching, currentJob == nil, !discoveringTasks, configuringAgentModels.isEmpty,
+        guard !preview, !dispatching, organizationTask == nil, currentJob == nil, !discoveringTasks, configuringAgentModels.isEmpty,
               let agent = preferences.enabledAgent, !state(agent).busy else { return }
         if state(agent).phase == .failed {
             guard let retryAt = agentRetryAt[agent], date >= retryAt else { return }

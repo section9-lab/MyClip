@@ -1,6 +1,26 @@
 import Foundation
 
 extension LibraryStore {
+    /// Read only the history requested by the visible records page. Pagination is stable for equal timestamps.
+    public func organizationHistory(limit: Int = 50, offset: Int = 0, agent: ClipAgent? = nil,
+                                    states: [ClipJobState] = [], since: Date? = nil) throws -> [ClipJob] {
+        var conditions: [String] = []
+        var arguments: [String?] = []
+        if let agent { conditions.append("agent=?"); arguments.append(agent.rawValue) }
+        if !states.isEmpty {
+            conditions.append("state IN (\(states.map { _ in "?" }.joined(separator: ",")))")
+            arguments += states.map(\.rawValue)
+        }
+        if let since { conditions.append("created_at>=?"); arguments.append(String(since.timeIntervalSince1970)) }
+        let filter = conditions.isEmpty ? "" : "WHERE " + conditions.joined(separator: " AND ")
+        arguments += [String(min(max(limit, 1), 501)), String(max(offset, 0))]
+        return try database.run("SELECT * FROM jobs \(filter) ORDER BY created_at DESC,rowid DESC LIMIT ? OFFSET ?", arguments).map(job)
+    }
+
+    public func organizationJob(id: UUID) throws -> ClipJob? {
+        try database.run("SELECT * FROM jobs WHERE id=?", [id.uuidString]).first.map(job)
+    }
+
     public func organizationCaptures(jobID: UUID) throws -> [ClipCapture] {
         guard let row = try database.run("SELECT * FROM jobs WHERE id=?", [jobID.uuidString]).first else {
             throw LibraryError.invalidResult(String(localized: "任务不存在"))

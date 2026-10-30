@@ -89,10 +89,14 @@ for name in "${tests[@]}"; do
             ;;
         *)
             # Reuse the built application for UI tests instead of maintaining another production source list.
+            extra_args=()
+            if [[ "$name" == BackstageResponsivenessTests ]]; then
+                extra_args=(-D MYCLIP_APP_TESTS Tests/Performance/UsageDashboardChecks.swift)
+            fi
             swiftc "${compiler_args[@]}" -I "$products" \
                 -F "$sparkle_frameworks" \
                 -Xlinker -rpath -Xlinker "$products/MyClip.app/Contents/Frameworks" "${app_objects[@]}" \
-                "Tests/MyClipAppTests/$name.swift" -o "$test_build/bin/$name"
+                ${extra_args[@]+"${extra_args[@]}"} "Tests/MyClipAppTests/$name.swift" -o "$test_build/bin/$name"
             ;;
     esac
     "$test_build/bin/$name" ${test_args[@]+"${test_args[@]}"}

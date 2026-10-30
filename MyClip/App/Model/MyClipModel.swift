@@ -63,7 +63,7 @@ enum LibraryPage: String, CaseIterable, Identifiable {
         case .dashboard: "Kanban"
         case .memory: "Memory"
         case .captures: "Timeline"
-        case .agents: "Backstage"
+        case .agents: String(localized: "自动整理")
         case .settings: "Settings"
         }
     }
@@ -74,6 +74,18 @@ enum LibraryPage: String, CaseIterable, Identifiable {
         case .captures: "rectangle.on.rectangle"
         case .agents: "square.stack.3d.up"
         case .settings: "gearshape"
+        }
+    }
+}
+
+enum OrganizationSection: String, CaseIterable, Identifiable {
+    case status, history, usage
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .status: String(localized: "运行状态")
+        case .history: String(localized: "执行记录")
+        case .usage: String(localized: "用量")
         }
     }
 }
@@ -96,6 +108,9 @@ final class MyClipModel: ObservableObject {
     let preferences: ClipPreferences
     let preview: Bool
     @Published var page: LibraryPage? = .captures
+    @Published var organizationSection: OrganizationSection = .status
+    var organizationUIVisible = false
+    private(set) var organizationHistoryVersion: String?
     @Published var search = "" {
         didSet {
             guard search != oldValue else { return }
@@ -128,6 +143,8 @@ final class MyClipModel: ObservableObject {
     @Published private(set) var workTasksUpdatedAt: Date?
     @Published var statistics = LibraryStatistics()
     @Published var tokenUsage = TokenUsageStatistics()
+    @Published private(set) var tokenUsageLoaded = false
+    @Published private(set) var tokenUsageLoadError: String?
     @Published var workTaskEvents: [WorkTaskEvent] = []
     @Published var showingTaskReports = false
     @Published var discoveringTasks = false
@@ -203,6 +220,9 @@ final class MyClipModel: ObservableObject {
     private var lastTaskVersion: String?
     private var lastStatisticsVersion: String?
     private var lastTokenVersion: String?
+    private var lastTokenRefresh = Date.distantPast
+    private var refreshingTokenUsage = false
+    private var tokenUsageRefreshWaiters: [CheckedContinuation<Void, Never>] = []
     private var lastLibraryRefresh = Date.distantPast
     private var lastStatisticsRefresh = Date.distantPast
     private var lastAnalyticsDays: Int?
@@ -378,7 +398,13 @@ final class MyClipModel: ObservableObject {
             }
             if libraryChanged {
                 let snapshot = try await store.snapshot()
+                let historyChanged = organizationHistoryVersion != versions.library
+                organizationHistoryVersion = versions.library
                 if library != snapshot { library = snapshot }
+                else if historyChanged && page == .agents && organizationSection == .history && organizationUIVisible {
+                    // An older job can change without changing the latest-100 snapshot. Wake only visible history.
+                    objectWillChange.send()
+                }
                 cloudSync.observe(snapshot.entries)
                 let nextProposals = try await store.proposals()
                 if proposals != nextProposals { proposals = nextProposals }
@@ -393,10 +419,8 @@ final class MyClipModel: ObservableObject {
                 lastAnalyticsDays = analyticsDays
                 lastStatisticsRefresh = Date()
             }
-            if reconcile || lastTokenVersion != versions.tokens {
-                let next = try await store.tokenUsageStatistics()
-                if tokenUsage != next { tokenUsage = next }
-                lastTokenVersion = versions.tokens
+            if page == .agents && organizationSection == .usage && organizationUIVisible {
+                await refreshTokenUsageIfNeeded(version: versions.tokens)
             }
             let query = search
             let filter = captureFilter
@@ -410,6 +434,39 @@ final class MyClipModel: ObservableObject {
             }
         } catch {
             if notice != error.localizedDescription { notice = error.localizedDescription }
+        }
+    }
+
+    /// Usage is an on-demand utility page, not part of each background library refresh.
+    func refreshTokenUsageIfNeeded(version suppliedVersion: String? = nil) async {
+        // A quick leave/re-entry must not lose its refresh behind a cancelled previous request.
+        while refreshingTokenUsage {
+            await withCheckedContinuation { tokenUsageRefreshWaiters.append($0) }
+        }
+        guard !Task.isCancelled else { return }
+        refreshingTokenUsage = true
+        defer {
+            refreshingTokenUsage = false
+            let waiting = tokenUsageRefreshWaiters
+            tokenUsageRefreshWaiters.removeAll(keepingCapacity: true)
+            waiting.forEach { $0.resume() }
+        }
+        do {
+            let version: String
+            if let suppliedVersion { version = suppliedVersion }
+            else { version = try await store.refreshVersions().tokens }
+            guard !tokenUsageLoaded || tokenUsageLoadError != nil || lastTokenVersion != version
+                    || Date().timeIntervalSince(lastTokenRefresh) >= 60 else { return }
+            let next = try await store.tokenUsageStatistics()
+            try Task.checkCancellation()
+            if tokenUsage != next { tokenUsage = next }
+            if !tokenUsageLoaded { tokenUsageLoaded = true }
+            if tokenUsageLoadError != nil { tokenUsageLoadError = nil }
+            lastTokenVersion = version
+            lastTokenRefresh = Date()
+        } catch is CancellationError { return }
+        catch {
+            if tokenUsageLoadError != error.localizedDescription { tokenUsageLoadError = error.localizedDescription }
         }
     }
 

@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 @testable import MyClipCore
 
 @MainActor enum MyClipAppDelegate { static func relaunch() {} }
@@ -51,6 +52,26 @@ import AppKit
         preferences.enabledAgent = .opencode
         let model = try MyClipModel(root: root.appendingPathComponent("Library"), preview: false, preferences: preferences)
         defer { model.stop() }
+
+        // Exercise the complete no-work cycle, not just refreshIfNeeded: an unpublished
+        // reservation must prevent reentrancy without toggling the visible dispatcher state.
+        model.agents[.opencode]?.phase = .ready
+        try await model.store.recordConsolidation()
+        await model.refresh()
+        var idlePublications = 0
+        let idleObservation = model.objectWillChange.sink { idlePublications += 1 }
+        for _ in 0..<10 {
+            model.refreshPermissions()
+            await model.recoverOrganizationIfNeeded()
+            await model.processNext()
+            await model.refreshIfNeeded()
+        }
+        check(idlePublications == 0, "Complete idle dispatcher cycles publish no false busy state")
+        check(model.organizationTask == nil && !model.dispatching && model.sessionCoordinator.client(.opencode) == nil,
+              "Idle checks release reservations without starting an Agent")
+        idleObservation.cancel()
+        model.agents[.opencode]?.phase = .disconnected
+
         let graphics = CGContext(data: nil, width: 8, height: 8, bitsPerComponent: 8, bytesPerRow: 32,
                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         let image = try CapturedImage(image: graphics.makeImage()!)

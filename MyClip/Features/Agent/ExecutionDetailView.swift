@@ -9,11 +9,17 @@ struct ExecutionDetailView: View {
     let job: ClipJob
     @Environment(\.dismiss) private var dismiss
     @State private var records: [ExecutionRecord] = []
+    @State private var refreshedJob: ClipJob?
+    @State private var sourceCaptures: [ClipCapture] = []
     @State private var loadError: String?
     @State private var loaded = false
 
-    private var currentJob: ClipJob { model.library.jobs.first { $0.id == job.id } ?? job }
-    private var usage: TokenUsageSummary { model.tokenUsage.jobs[job.id] ?? TokenUsageSummary() }
+    private var currentJob: ClipJob { refreshedJob ?? model.library.jobs.first { $0.id == job.id } ?? job }
+    private var usage: TokenUsageSummary {
+        var summary = TokenUsageSummary()
+        for record in records { summary.add(record.usage) }
+        return summary
+    }
     private var tools: [ACPToolCall] { records.flatMap(\.tools) }
     private var isLive: Bool { currentJob.state == .running || currentJob.state == .queued }
 
@@ -58,26 +64,33 @@ struct ExecutionDetailView: View {
                             .padding(12).frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
                     }
-                    summaryTiles
+                    memorySection
+                    sourcesSection
                     if let plan = currentJob.dreamPlan { dreamSection(plan) }
                     if let loadError {
                         Label(loadError, systemImage: "exclamationmark.circle").foregroundStyle(.orange)
                     } else if !loaded {
                         ProgressView("正在读取执行记录…")
                     } else {
-                        toolsSection
-                        sequenceSection
-                        memorySection
+                        DisclosureGroup("执行过程") {
+                            VStack(alignment: .leading, spacing: 18) {
+                                summaryTiles
+                                toolsSection
+                                sequenceSection
+                            }.padding(.top, 12)
+                        }
                     }
-                    tokenSection
+                    DisclosureGroup("Token 明细") { tokenSection.padding(.top, 12) }
                     actions
                 }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .frame(minWidth: 480, idealWidth: 520, minHeight: 440, idealHeight: 640)
-        .task(id: currentJob.state.rawValue) {
+        .task(id: model.organizationHistoryVersion) {
             while !Task.isCancelled {
                 do {
+                    refreshedJob = try await model.store.organizationJob(id: job.id)
+                    sourceCaptures = try await model.store.organizationCaptures(jobID: job.id)
                     records = try await model.store.executionRecords(jobID: job.id)
                     loadError = nil
                 } catch { loadError = error.localizedDescription }
@@ -219,6 +232,29 @@ struct ExecutionDetailView: View {
                         Text(path).font(.caption).textSelection(.enabled)
                     }
                 }
+            }
+        }
+    }
+
+    private var sourcesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel(String(localized: "来源截图"))
+            if currentJob.sourceIDs.isEmpty {
+                Text(currentJob.kind == .dream ? String(localized: "本次只整理已有记忆，没有新截图。") : String(localized: "没有记录来源截图。"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(currentJob.sourceIDs, id: \.self) { id in
+                let capture = sourceCaptures.first { $0.id == id } ?? model.library.captures.first { $0.id == id }
+                Button {
+                    dismiss()
+                    model.search = ""
+                    model.captureFilter = CaptureFilter()
+                    model.selectedCapture = id
+                    model.open(.captures)
+                } label: {
+                    Label(capture.map { "\($0.appName) · \($0.date.formatted(date: .abbreviated, time: .shortened))" } ?? String(id.uuidString.prefix(8)),
+                          systemImage: "photo")
+                }.buttonStyle(.link).disabled(capture == nil)
             }
         }
     }

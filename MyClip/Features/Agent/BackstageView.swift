@@ -3,30 +3,65 @@ import SwiftUI
 import Combine
 import MyClipCore
 
-/// Who organizes captures, how the queue is doing, and what it costs.
+/// One utility entry with three independently mounted destinations: live status, history and usage.
 struct BackstageView: View {
     @ObservedObject var model: MyClipModel
     @State private var selectedJob: ClipJob?
     @State private var selectedModelAgent: ClipAgent?
-    @State private var jobFilter = JobFilter.all
     @State private var usageRange = UsageRange.month
-    @State private var usageExpanded = false
-    /// Fixed row height so the history shows exactly five batches; older ones scroll inside the card.
-    private let jobRowHeight: CGFloat = 58
-    private let visibleJobRows = 5
+    @State private var usageAsTable = false
+    @State private var showingAgentConfiguration = false
+    @State private var configurationModelAgent: ClipAgent?
+    @StateObject private var history = OrganizationHistoryState()
+    @State private var windowVisible = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                ForEach(model.permissions) { permission in PermissionRequestView(model: model, permission: permission) }
-                usageSection
-                agentsSection
-                jobsSection
-            }.padding(32).frame(maxWidth: 920).frame(maxWidth: .infinity)
+        VStack(spacing: 0) {
+            Picker("自动整理", selection: $model.organizationSection) {
+                ForEach(OrganizationSection.allCases) { section in
+                    Text(section == .status && !model.permissions.isEmpty ? "\(section.title) · \(model.permissions.count)" : section.title).tag(section)
+                }
+            }
+            .pickerStyle(.segmented).labelsHidden()
+            .frame(maxWidth: 400).padding(.horizontal, 24).padding(.vertical, 16)
+            .accessibilityIdentifier("organization.navigation")
+            Divider()
+            // Do not keep hidden charts, history lists or their tasks alive in a TabView/ZStack.
+            switch model.organizationSection {
+            case .status:
+                ScrollView {
+                    runtimeSection.padding(24).frame(maxWidth: 920).frame(maxWidth: .infinity, alignment: .top)
+                }.accessibilityIdentifier("organization.status")
+            case .history:
+                OrganizationHistoryView(model: model, state: history, visible: windowVisible) { selectedJob = $0 }
+            case .usage:
+                ScrollView {
+                    usageSection.padding(24).frame(maxWidth: 920).frame(maxWidth: .infinity, alignment: .top)
+                }
+                .accessibilityIdentifier("organization.usage")
+                .task(id: windowVisible) { if windowVisible { await model.refreshTokenUsageIfNeeded() } }
+            }
         }
-        .onAppear { model.refreshAgentAvailability() }
+        .background(BackstageWindowActivity(active: $windowVisible, requiresActive: false).frame(width: 0, height: 0))
+        .onAppear { model.organizationUIVisible = windowVisible }
+        .onChange(of: windowVisible) { model.organizationUIVisible = $0 }
+        .onDisappear { model.organizationUIVisible = false }
         .sheet(item: $selectedJob) { ExecutionDetailView(model: model, job: $0) }
         .sheet(item: $selectedModelAgent) { AgentModelPickerView(model: model, agent: $0) }
+        .sheet(isPresented: $showingAgentConfiguration) {
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Agent 与账号").font(.title3.weight(.semibold))
+                    Spacer()
+                    Button("完成") { showingAgentConfiguration = false }.keyboardShortcut(.cancelAction)
+                }.padding(20)
+                Divider()
+                ScrollView { agentsSection.padding(20) }
+            }
+            .frame(minWidth: 560, idealWidth: 680, minHeight: 400, idealHeight: 600)
+            .onAppear { model.refreshAgentAvailability() }
+            .sheet(item: $configurationModelAgent) { AgentModelPickerView(model: model, agent: $0) }
+        }
     }
 
     // MARK: - Agents
@@ -80,7 +115,7 @@ struct BackstageView: View {
             if model.authorizingAccounts.contains(agent) {
                 Button("取消授权") { model.cancelAccountAuthorization(agent) }.controlSize(.small)
             }
-            Button { selectedModelAgent = agent } label: {
+            Button { configurationModelAgent = agent } label: {
                 VStack(spacing: 2) {
                     Text("模型").foregroundStyle(.secondary)
                     Text(state.modelSelection.current?.name ?? model.preferences.selectedModel(for: agent) ?? String(localized: "选择模型…"))
@@ -187,101 +222,108 @@ struct BackstageView: View {
         }
     }
 
-    // MARK: - Jobs
+    // MARK: - Runtime status
 
-    private enum JobFilter: String, CaseIterable, Identifiable {
-        case all, open, done
-        var id: String { rawValue }
-        var title: String {
-            switch self {
-            case .all: String(localized: "全部")
-            case .open: String(localized: "未完成")
-            case .done: String(localized: "已完成")
-            }
+    private var runtimeTitle: String {
+        if let job = model.currentJob {
+            return job.kind == .dream ? String(localized: "正在整理已有记忆") : String(localized: "正在整理 \(job.sourceIDs.count) 张截图")
         }
-        func matches(_ job: ClipJob) -> Bool {
-            switch self {
-            case .all: true
-            case .open: job.state != .completed && job.state != .cancelled
-            case .done: job.state == .completed
-            }
-        }
+        if model.discoveringTasks { return String(localized: "正在识别任务") }
+        guard let agent = model.preferences.enabledAgent else { return String(localized: "尚未选择 Agent") }
+        if !model.permissions.isEmpty { return String(localized: "等待你的确认") }
+        if model.library.queue.pauseReason != nil || model.state(agent).phase == .failed { return String(localized: "整理需要处理") }
+        if model.processingPaused { return String(localized: "自动整理已暂停") }
+        if model.state(agent).phase == .connecting || model.state(agent).phase == .installing { return String(localized: "正在准备 Agent") }
+        return model.library.queue.pendingCount > 0 ? String(localized: "等待下一批整理") : String(localized: "空闲，等待新截图")
     }
 
-    private var visibleJobs: [ClipJob] { model.library.jobs.filter(jobFilter.matches) }
-    private var openJobCount: Int { model.library.jobs.filter(JobFilter.open.matches).count }
+    private var runtimeWarning: Bool {
+        model.library.queue.pauseReason != nil || !model.permissions.isEmpty
+            || model.preferences.enabledAgent.map { model.state($0).phase == .failed } == true
+    }
 
-    private var jobsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // One stable header, not two copies of a ticking view measured by ViewThatFits.
-            // Keep controls on their own row at every width to avoid repeated proposal negotiation.
-            jobHeading
-            jobControls
-            BackstageCard {
-                if let reason = model.library.queue.pauseReason {
-                    Label(reason, systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(.orange)
-                        .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 18).padding(.vertical, 12)
-                        .frame(maxWidth: .infinity, alignment: .leading).background(Color.orange.opacity(0.08))
-                }
-                if visibleJobs.isEmpty {
-                    Text(model.library.jobs.isEmpty
-                         ? (model.library.queue.pendingCount > 0 ? String(localized: "截图已保存，开始整理后会在这里看到进度。") : String(localized: "还没有整理记录。截图开始后会出现在这里。"))
-                         : String(localized: "没有符合筛选条件的记录。"))
-                        .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 28)
+    private var runtimeSection: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            ForEach(model.permissions) { permission in PermissionRequestView(model: model, permission: permission) }
+            HStack(spacing: 12) {
+                if let agent = model.preferences.enabledAgent {
+                    AgentBrandIcon(agent: agent, size: 32)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(agent.name).font(.headline)
+                        Button { selectedModelAgent = agent } label: {
+                            Text(model.state(agent).modelSelection.current?.name ?? model.preferences.selectedModel(for: agent) ?? String(localized: "Agent 默认模型"))
+                                .lineLimit(1).truncationMode(.middle)
+                        }.buttonStyle(.link).font(.callout).disabled(!model.canConfigureAgentModel(agent))
+                    }
                 } else {
-                    ScrollView {
-                        // At most 50 fixed-height rows: eager placement avoids lazy height estimation
-                        // feeding back into this nested viewport while progress and job states change.
-                        VStack(spacing: 0) {
-                            ForEach(visibleJobs.prefix(50)) { job in
-                                jobRow(job)
-                                Divider().padding(.leading, 60)
-                            }
+                    Label("选择一个 Agent 来整理截图与记忆。", systemImage: "person.crop.circle").foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 12)
+                Button("Agent 与账号…") { showingAgentConfiguration = true }
+                    .accessibilityIdentifier("organization.agent-configuration")
+            }
+            BackstageCard {
+                VStack(alignment: .leading, spacing: 16) {
+                    Label(runtimeTitle, systemImage: runtimeWarning ? "exclamationmark.circle" : model.currentJob == nil ? "circle.dotted" : "arrow.triangle.2.circlepath")
+                        .font(.title3.weight(.semibold)).foregroundStyle(runtimeWarning ? Color.orange : Color.primary)
+                    if let job = model.currentJob {
+                        BackstageClock(running: true) { model.organizationActivity(at: $0) }.font(.callout).foregroundStyle(.secondary)
+                        if model.processingPaused { Text("当前批次完成后暂停。").font(.caption).foregroundStyle(.secondary) }
+                        HStack {
+                            Button("查看本次详情") { selectedJob = job }
+                            Button("停止本次", role: .destructive) { model.cancel(job) }.disabled(model.preview)
                         }
-                    }.frame(height: CGFloat(min(visibleJobs.count, visibleJobRows)) * (jobRowHeight + 1))
-                }
-                HStack {
-                    Text(visibleJobs.isEmpty ? "" : String(localized: "\(visibleJobs.count) 条\(visibleJobs.count > 50 ? String(localized: " · 显示最近 50 条") : "")"))
-                    Spacer()
-                    Text("点击一条查看调用过的工具")
-                }.font(.caption).foregroundStyle(.tertiary).padding(.horizontal, 18).padding(.vertical, 8)
+                    } else if model.discoveringTasks {
+                        Text(model.taskDiscoveryMessage ?? String(localized: "正在识别工作任务")).font(.callout).foregroundStyle(.secondary)
+                    } else if let reason = model.library.queue.pauseReason {
+                        Text(reason).font(.callout).foregroundStyle(.orange).textSelection(.enabled)
+                    } else if let agent = model.preferences.enabledAgent, model.state(agent).phase == .failed {
+                        Text(model.state(agent).detail).font(.callout).foregroundStyle(.orange).textSelection(.enabled)
+                        if model.agentRetryAt[agent] != nil {
+                            Text("将按退避时间自动重试。").font(.caption).foregroundStyle(.secondary)
+                        } else { Button("重试连接") { model.connect(agent) }.disabled(model.preview) }
+                    } else if model.preferences.enabledAgent == nil {
+                        Button("选择 Agent…") { showingAgentConfiguration = true }.buttonStyle(.borderedProminent)
+                    } else if let agent = model.preferences.enabledAgent,
+                              model.state(agent).phase == .connecting || model.state(agent).phase == .installing {
+                        Text(model.state(agent).detail).font(.callout).foregroundStyle(.secondary)
+                    } else if model.library.queue.pendingCount > 0 || model.processingPaused {
+                        BackstageClock(running: !model.processingPaused && model.library.queue.readyAt != nil) { model.organizationStatus(at: $0) }
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
                 Divider()
-                DisclosureGroup {
-                    Grid(alignment: .topLeading, horizontalSpacing: 16, verticalSpacing: 6) {
-                        GridRow { Text("顺序").foregroundStyle(.tertiary); Text("按截图时间先后整理，自动整理之间至少间隔 5 分钟。") }
-                        GridRow { Text("每批上限").foregroundStyle(.tertiary); Text("最多 8 张截图。") }
-                        GridRow { Text("用图还是用文字").foregroundStyle(.tertiary); Text("回车、鼠标和手动截图都将原图交给 Agent；OCR 文字只用于本机搜索和原文查看。") }
-                        GridRow { Text("超时与重试").foregroundStyle(.tertiary); Text("连续 \(ACPClient.promptIdleSeconds / 60) 分钟没有新进度就停止等待，单批最长 \(ACPClient.promptMaximumSeconds / 60) 分钟。超时、断线等临时故障会自动重试，最多 \(RetryPolicy.maxAttempts) 次，间隔从 1 分钟逐步拉长到 1 小时；之后停下等你处理。") }
-                        GridRow { Text("做梦").foregroundStyle(.tertiary); Text("每天一次回头整理已有记忆：归位、合并、清理过期状态、补别名，并轮流巡检旧页面。凌晨 \(MemoryDream.dayStartHour) 点后、队列空闲且 \(Int(MemoryDream.idleInterval / 60)) 分钟没有新截图时自动开始，也可以点“整理记忆”手动开始。失败不会暂停队列，第二天会再做。") }
-                    }.font(.caption).foregroundStyle(.secondary).padding(.top, 8).fixedSize(horizontal: false, vertical: true)
-                } label: {
-                    Label(String(localized: "整理是怎么分批的"), systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
-                }.padding(.horizontal, 18).padding(.vertical, 10)
+                Text("待整理 \(model.library.queue.pendingCount) 张截图").font(.callout).foregroundStyle(.secondary)
+                    .padding(.horizontal, 20).padding(.vertical, 12).frame(maxWidth: .infinity, alignment: .leading)
             }
-        }
-    }
-
-    private var jobHeading: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("执行记录").font(.title3.weight(.semibold)).fixedSize()
-            BackstageClock(running: model.currentJob != nil || model.library.queue.readyAt != nil) { date in
-                model.organizationStatus(at: date)
-            }
-            .font(.callout)
-            .foregroundStyle(model.library.queue.pauseReason != nil ? Color.orange : .secondary)
-        }
-    }
-
-    private var jobControls: some View {
-        HStack(spacing: 10) {
-            queueActions
-            Picker("筛选", selection: $jobFilter) {
-                ForEach(JobFilter.allCases) { filter in
-                    Text(filter == .open && openJobCount > 0 ? "\(filter.title) \(openJobCount)" : filter.title).tag(filter)
+            if model.preferences.enabledAgent != nil { HStack(spacing: 10) { queueActions } }
+            if model.taskIngestionSummary.failedCount > 0 {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("部分任务线索仍待补处理。", systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(.orange)
+                    Button("重试任务识别") { model.retryTaskIngestionFailures() }.disabled(!model.canStartOrganization)
                 }
-            }.pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(width: 190)
-        }.fixedSize()
+            }
+            if model.currentJob == nil, let completed = model.library.jobs.first(where: { $0.state == .completed }) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("最近完成").font(.caption).foregroundStyle(.secondary)
+                        Text(organizationOutcome(completed)).font(.callout)
+                        Text(completed.createdAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.tertiary)
+                    }
+                    Spacer()
+                    Button("查看结果") { selectedJob = completed }
+                }
+            }
+            Button("查看全部执行记录") { model.organizationSection = .history }.buttonStyle(.link)
+            DisclosureGroup("整理规则") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("按截图时间先后整理，自动整理之间至少间隔 5 分钟。")
+                    Text("最多 8 张截图。")
+                    Text("回车、鼠标和手动截图都将原图交给 Agent；OCR 文字只用于本机搜索和原文查看。")
+                    Text(dreamHelp)
+                }.font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true).padding(.top, 8)
+            }
+        }
     }
 
     /// What the dream button does, since “dream” alone does not say it.
@@ -310,75 +352,6 @@ struct BackstageView: View {
             Button(String(localized: "暂停"), systemImage: "pause.fill") { model.processingPaused = true }
                 .buttonStyle(.bordered).controlSize(.small).disabled(model.preview || model.preferences.enabledAgent == nil)
                 .help("停止分配新批次，当前批次会先完成")
-        }
-    }
-
-    private func jobRow(_ job: ClipJob) -> some View {
-        let usage = model.tokenUsage.jobs[job.id]
-        return HStack(alignment: .center, spacing: 12) {
-            Button { selectedJob = job } label: {
-                HStack(alignment: .center, spacing: 12) {
-                    JobIcon(job: job, size: 28)
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 8) {
-                            Text(jobTitle(job)).font(.subheadline.weight(.medium))
-                            StatusChip(jobChipTitle(job), tone: jobTone(job))
-                        }
-                        jobDetail(job, usage: usage).font(.caption).lineLimit(1)
-                    }
-                    Spacer(minLength: 8)
-                    Text(job.createdAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
-                }.contentShape(Rectangle())
-            }.buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "查看\(jobTitle(job))的详情，\(jobLabel(job))"))
-            if job.state == .failed {
-                Button(String(localized: "重试"), systemImage: "arrow.clockwise") { model.retry(job) }.controlSize(.small).disabled(!model.canRetry(job))
-                    .help(model.canRetry(job) ? (job.kind == .dream ? String(localized: "重新做梦") : String(localized: "重新整理这批素材")) : String(localized: "请先选择并连接 \(job.agent.name)，重试会继续使用原 Agent"))
-            } else if job.state == .running || job.state == .queued {
-                Button("取消") { model.cancel(job) }.buttonStyle(.bordered).controlSize(.small)
-            }
-        }
-        .padding(.horizontal, 18).frame(height: jobRowHeight)
-    }
-
-    private func jobChipTitle(_ job: ClipJob) -> String {
-        if job.isAwaitingRetry, !model.processingPaused { return String(localized: "等待第 \(job.attempts + 1) 次尝试") }
-        return jobLabel(job)
-    }
-
-    private func jobTone(_ job: ClipJob) -> StatusChip.Tone {
-        switch job.state {
-        case .running: .accent
-        case .completed: .good
-        case .failed: .warning
-        case .queued: job.isAwaitingRetry ? .warning : .neutral
-        case .cancelled: .neutral
-        }
-    }
-
-    @ViewBuilder private func jobDetail(_ job: ClipJob, usage: TokenUsageSummary?) -> some View {
-        switch job.state {
-        case .running:
-            BackstageClock(running: true) { date in model.organizationActivity(at: date) }
-                .foregroundStyle(.secondary)
-        case .failed:
-            Text(job.error ?? String(localized: "未完成")).foregroundStyle(.orange)
-        case .queued:
-            if let error = job.error { Text(error).foregroundStyle(.orange) }
-            else if job.kind == .dream, let plan = job.dreamPlan { Text(dreamScope(plan)).foregroundStyle(.secondary) }
-            else { Text("排队中").foregroundStyle(.secondary) }
-        case .cancelled:
-            Text(job.kind == .dream ? String(localized: "已停止，明天会再做") : String(localized: "素材已回到队列")).foregroundStyle(.secondary)
-        case .completed:
-            HStack(spacing: 10) {
-                if let changes = job.memoryChanges {
-                    Text(changes.count == 0 ? String(localized: "已整理，Memory 无需更新") : String(localized: "已更新 \(changes.count) 个 Memory 文件"))
-                }
-                if job.kind == .dream, let plan = job.dreamPlan { Text(dreamScope(plan)) }
-                if job.attempts > 1 { Text("第 \(job.attempts) 次尝试成功") }
-                Text(usage?.totalTokens.map { "Token \($0.formatted())" } ?? String(localized: "Token 未记录")).monospacedDigit()
-            }.foregroundStyle(.secondary)
         }
     }
 
@@ -412,17 +385,227 @@ struct BackstageView: View {
                 Picker("范围", selection: $usageRange) {
                     ForEach(UsageRange.allCases) { Text($0.title).tag($0) }
                 }.pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(width: 170)
-                Button {
-                    usageExpanded.toggle()
-                } label: {
-                    Label(usageExpanded ? String(localized: "收起") : String(localized: "展开"),
-                          systemImage: usageExpanded ? "chevron.up" : "chevron.down")
-                }.buttonStyle(.bordered).controlSize(.small)
             }
-            BackstageCard { UsageDashboard(statistics: model.tokenUsage, days: usageRange.days, expanded: usageExpanded) }
+            if let error = model.tokenUsageLoadError {
+                Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.orange)
+                Button("重试") { Task { await model.refreshTokenUsageIfNeeded() } }
+            } else if !model.tokenUsageLoaded {
+                ProgressView("正在读取用量…").frame(maxWidth: .infinity).padding(32)
+            } else {
+                BackstageCard { UsageDashboard(statistics: model.tokenUsage, days: usageRange.days, asTable: $usageAsTable) }
+            }
         }
     }
 
+}
+
+/// History owns its filters, pagination and cancellation separately from the live runtime surface.
+@MainActor final class OrganizationHistoryState: ObservableObject {
+    enum Filter: String, CaseIterable, Identifiable {
+        case all, open, done, failed
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .all: String(localized: "全部状态")
+            case .open: String(localized: "未完成")
+            case .done: String(localized: "已完成")
+            case .failed: String(localized: "失败")
+            }
+        }
+        var states: [ClipJobState] {
+            switch self {
+            case .all: []
+            case .open: [.queued, .running, .failed]
+            case .done: [.completed]
+            case .failed: [.failed]
+            }
+        }
+    }
+    enum Period: String, CaseIterable, Identifiable {
+        case all, today, week, month
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .all: String(localized: "全部时间")
+            case .today: String(localized: "今天")
+            case .week: String(localized: "7 天")
+            case .month: String(localized: "30 天")
+            }
+        }
+        func since(now: Date = Date(), calendar: Calendar = .current) -> Date? {
+            if self == .all { return nil }
+            return calendar.date(byAdding: .day, value: self == .today ? 0 : self == .week ? -6 : -29,
+                                 to: calendar.startOfDay(for: now))
+        }
+    }
+    struct Key: Equatable { let agent: ClipAgent?; let filter: Filter; let period: Period }
+    struct Request: Equatable { let key: Key; let page: Int; let revision: Int; let recent: [ClipJob]; let version: String? }
+    @Published var agent: ClipAgent?
+    @Published var filter = Filter.all
+    @Published var period = Period.all
+    @Published private(set) var rows: [ClipJob] = []
+    @Published private(set) var hasMore = false
+    @Published private(set) var loading = false
+    @Published private(set) var error: String?
+    @Published private var page = 0
+    @Published private var revision = 0
+    private var loaded: Request?
+    private var loadingID: UUID?
+    private let pageSize = 50
+
+    func request(recent: [ClipJob], version: String? = nil) -> Request {
+        Request(key: Key(agent: agent, filter: filter, period: period), page: page, revision: revision, recent: recent, version: version)
+    }
+    func nextPage() {
+        guard !loading, hasMore, let loaded else { return }
+        page = loaded.page + 1
+    }
+    func reload() { revision &+= 1 }
+    func load(store: LibraryStore, recent: [ClipJob], version: String? = nil) async {
+        let request = request(recent: recent, version: version)
+        guard loaded != request || error != nil else { return }
+        let keyChanged = loaded?.key != request.key
+        let reset = keyChanged || loaded?.recent != recent || loaded?.revision != revision || loaded?.version != version
+        // A live job update refreshes all already loaded pages, preserving older rows and scroll context.
+        let targetPage = reset ? (keyChanged || loaded?.revision != revision ? 0 : loaded?.page ?? 0) : request.page
+        let id = UUID()
+        loadingID = id
+        loading = true
+        error = nil
+        if keyChanged { rows = [] }
+        defer { if loadingID == id { loading = false } }
+        do {
+            var refreshed: [ClipJob] = reset ? [] : rows
+            var known = Set(refreshed.map(\.id))
+            var more = false
+            var finalPage = 0
+            let since = request.key.period.since()
+            for index in (reset ? 0 : targetPage)...targetPage {
+                try Task.checkCancellation()
+                let found = try await store.organizationHistory(limit: pageSize + 1, offset: index * pageSize,
+                    agent: request.key.agent, states: request.key.filter.states, since: since)
+                try Task.checkCancellation()
+                guard loadingID == id, request.key == self.request(recent: recent, version: version).key else { return }
+                refreshed.append(contentsOf: found.prefix(pageSize).filter { known.insert($0.id).inserted })
+                more = found.count > pageSize
+                finalPage = index
+                if !more { break }
+            }
+            rows = refreshed
+            hasMore = more
+            loaded = Request(key: request.key, page: finalPage, revision: request.revision, recent: recent, version: version)
+            if page != finalPage { page = finalPage }
+        } catch is CancellationError { return }
+        catch { if loadingID == id { self.error = error.localizedDescription } }
+    }
+}
+
+struct OrganizationHistoryView: View {
+    @ObservedObject var model: MyClipModel
+    @ObservedObject var state: OrganizationHistoryState
+    var visible = true
+    let select: (ClipJob) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Picker("Agent", selection: $state.agent) {
+                    Text("全部 Agent").tag(Optional<ClipAgent>.none)
+                    ForEach(ClipAgent.allCases) { Text($0.name).tag(Optional($0)) }
+                }
+                Picker("状态", selection: $state.filter) {
+                    ForEach(OrganizationHistoryState.Filter.allCases) { Text($0.title).tag($0) }
+                }
+                Picker("时间", selection: $state.period) {
+                    ForEach(OrganizationHistoryState.Period.allCases) { Text($0.title).tag($0) }
+                }
+                Spacer(minLength: 0)
+                Button { state.reload() } label: { Image(systemName: "arrow.clockwise") }
+                    .help("刷新").accessibilityLabel("刷新执行记录").disabled(state.loading)
+            }.pickerStyle(.menu).labelsHidden().padding(20)
+            Divider()
+            if let error = state.error {
+                HStack {
+                    Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.orange).lineLimit(2)
+                    Spacer()
+                    Button("重试") { state.reload() }
+                }.font(.callout).padding(16)
+            }
+            if state.rows.isEmpty {
+                if state.loading { ProgressView("正在读取执行记录…").frame(maxWidth: .infinity, maxHeight: .infinity) }
+                else {
+                    LibraryUnavailableView(String(localized: "没有符合筛选条件的记录。"), systemImage: "clock",
+                                           description: Text("调整筛选条件，或等待第一次整理完成。"))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else {
+                // One native list, not a fixed-height scrolling list nested inside a scrolling page.
+                List {
+                    ForEach(state.rows) { job in row(job).id(job.id) }
+                    if state.hasMore {
+                        HStack {
+                            Spacer()
+                            Button("加载更多") { state.nextPage() }.disabled(state.loading)
+                            Spacer()
+                        }.padding(.vertical, 8)
+                    }
+                }.listStyle(.inset).scrollContentBackground(.hidden)
+            }
+            HStack {
+                Text("\(state.rows.count) 条已加载").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                if state.loading && !state.rows.isEmpty { ProgressView().controlSize(.small) }
+            }.padding(.horizontal, 20).padding(.vertical, 10)
+        }
+        .accessibilityIdentifier("organization.history")
+        .task(id: visible ? state.request(recent: model.library.jobs, version: model.organizationHistoryVersion) : nil) {
+            if visible { await state.load(store: model.store, recent: model.library.jobs, version: model.organizationHistoryVersion) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in state.reload() }
+    }
+
+    private func row(_ job: ClipJob) -> some View {
+        HStack(spacing: 12) {
+            Button { select(job) } label: {
+                HStack(spacing: 12) {
+                    JobIcon(job: job, size: 30)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(job.kind == .dream ? String(localized: "整理已有记忆") : String(localized: "整理 \(job.sourceIDs.count) 张截图"))
+                                .font(.callout.weight(.medium))
+                            StatusChip(jobLabel(job), tone: job.state == .failed ? .warning : job.state == .completed ? .good : .neutral)
+                        }
+                        Text(organizationOutcome(job)).font(.caption).foregroundStyle(job.state == .failed ? Color.orange : .secondary).lineLimit(1)
+                        HStack(spacing: 6) {
+                            Text(job.agent.name)
+                            Text("·")
+                            Text(job.createdAt, format: .dateTime.month().day().hour().minute())
+                        }.font(.caption).foregroundStyle(.tertiary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                }.contentShape(Rectangle())
+            }.buttonStyle(.plain).help(organizationOutcome(job))
+            if job.state == .failed {
+                Button("重试") { model.retry(job) }.controlSize(.small).disabled(!model.canRetry(job))
+                    .help(model.canRetry(job) ? String(localized: "重新整理这批素材") : String(localized: "请先选择并连接 \(job.agent.name)，重试会继续使用原 Agent"))
+            } else if job.state == .running || job.state == .queued {
+                Button("取消") { model.cancel(job) }.controlSize(.small).disabled(model.preview)
+            }
+        }.padding(.vertical, 8)
+    }
+}
+
+func organizationOutcome(_ job: ClipJob) -> String {
+    switch job.state {
+    case .completed:
+        guard let changes = job.memoryChanges else { return String(localized: "已完成；未记录实际文件变更。") }
+        return changes.count == 0 ? String(localized: "已整理，Memory 无需更新") : String(localized: "已更新 \(changes.count) 个 Memory 文件")
+    case .failed: return job.error ?? String(localized: "未完成")
+    case .cancelled: return job.kind == .dream ? String(localized: "已停止，明天会再做") : String(localized: "素材已回到队列")
+    case .running: return String(localized: "正在处理，可打开详情查看进度。")
+    case .queued: return job.error ?? String(localized: "排队中")
+    }
 }
 
 /// Every Agent uses its own live ACP catalog; no model IDs are bundled into the app.
@@ -557,14 +740,18 @@ private struct BackstageClock: View {
 
 private struct BackstageWindowActivity: NSViewRepresentable {
     @Binding var active: Bool
-    func makeNSView(context: Context) -> Probe { Probe(active: $active) }
-    func updateNSView(_ view: Probe, context: Context) { view.active = $active }
+    var requiresActive = true
+    func makeNSView(context: Context) -> Probe { Probe(active: $active, requiresActive: requiresActive) }
+    func updateNSView(_ view: Probe, context: Context) { view.active = $active; view.requiresActive = requiresActive }
     static func dismantleNSView(_ view: Probe, coordinator: ()) { view.observation?.cancel() }
 
     final class Probe: NSView {
         var active: Binding<Bool>
+        var requiresActive: Bool
         var observation: AnyCancellable?
-        init(active: Binding<Bool>) { self.active = active; super.init(frame: .zero) }
+        init(active: Binding<Bool>, requiresActive: Bool) {
+            self.active = active; self.requiresActive = requiresActive; super.init(frame: .zero)
+        }
         required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -578,7 +765,7 @@ private struct BackstageWindowActivity: NSViewRepresentable {
         }
         private func publish() {
             let visible = window.map { $0.isVisible && !$0.isMiniaturized && $0.occlusionState.contains(.visible) } ?? false
-            let value = visible && NSApp.isActive && !NSApp.isHidden
+            let value = visible && (!requiresActive || NSApp.isActive) && !NSApp.isHidden
             if active.wrappedValue != value { active.wrappedValue = value }
         }
     }
@@ -660,11 +847,10 @@ func jobLabel(_ state: ClipJobState) -> String {
 
 // MARK: - Usage dashboard
 
-private struct UsageDashboard: View {
+struct UsageDashboard: View {
     let statistics: TokenUsageStatistics
     let days: Int?
-    let expanded: Bool
-    @State private var asTable = false
+    @Binding var asTable: Bool
 
     private var calendar: Calendar { .current }
     private var summary: TokenUsageSummary { statistics.summary(days: days) }
@@ -685,31 +871,29 @@ private struct UsageDashboard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             tiles
-            if expanded {
+            Divider()
+            HStack {
+                Text("只统计 Agent 回传的部分").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Picker("Token 用量", selection: $asTable) {
+                    Text("图表").tag(false)
+                    Text("表格").tag(true)
+                }.pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(width: 110)
+            }.padding(.horizontal, 14).padding(.vertical, 10)
+            if summary.calls == 0 {
+                Text(days == nil ? String(localized: "还没有回传过用量。任务结束后会在这里汇总。") : String(localized: "这段时间没有整理任务。"))
+                    .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 24)
+            } else if asTable {
+                table
+            } else {
+                chart.padding(.horizontal, 14).padding(.bottom, 12)
                 Divider()
-                HStack {
-                    Text("只统计 Agent 回传的部分").font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Picker("Token 用量", selection: $asTable) {
-                        Text("图表").tag(false)
-                        Text("表格").tag(true)
-                    }.pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(width: 110)
-                }.padding(.horizontal, 14).padding(.vertical, 10)
-                if summary.calls == 0 {
-                    Text(days == nil ? String(localized: "还没有回传过用量。任务结束后会在这里汇总。") : String(localized: "这段时间没有整理任务。"))
-                        .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 24)
-                } else if asTable {
-                    table
-                } else {
-                    chart.padding(.horizontal, 14).padding(.bottom, 12)
-                    Divider()
-                    composition.padding(.horizontal, 14).padding(.vertical, 12)
-                }
-                Divider()
-                Text("含截图整理、任务识别和重试。旧任务和没有回传用量的请求不计入；缓存明细为已回传部分。")
-                    .font(.caption).foregroundStyle(.tertiary).padding(.horizontal, 14).padding(.vertical, 10)
-                    .fixedSize(horizontal: false, vertical: true)
+                composition.padding(.horizontal, 14).padding(.vertical, 12)
             }
+            Divider()
+            Text("含截图整理、任务识别和重试。旧任务和没有回传用量的请求不计入；缓存明细为已回传部分。")
+                .font(.caption).foregroundStyle(.tertiary).padding(.horizontal, 14).padding(.vertical, 10)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -733,7 +917,7 @@ private struct UsageDashboard: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label).font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.85)
             Text(value).font(.system(size: 20, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.8)
-            if expanded { Text(detail).font(.caption).foregroundStyle(.tertiary).lineLimit(1) }
+            Text(detail).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
         }.padding(.horizontal, 14).padding(.vertical, 12).frame(maxWidth: .infinity, alignment: .leading)
             .help(detail).accessibilityElement(children: .combine).accessibilityHint(detail)
     }
@@ -753,6 +937,12 @@ private struct UsageDashboard: View {
         }
     }
 
+    private var axisDates: [Date] {
+        let dates = Set(bars.map { weekly ? calendar.dateInterval(of: .weekOfYear, for: $0.day)?.start ?? $0.day : $0.day }).sorted()
+        let step = max(1, Int(ceil(Double(dates.count) / 7)))
+        return dates.enumerated().compactMap { index, date in index % step == 0 || index == dates.count - 1 ? date : nil }
+    }
+
     private var chart: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(weekly ? String(localized: "每周用量，按 Agent") : String(localized: "每天用量，按 Agent")).font(.caption).foregroundStyle(.secondary)
@@ -769,11 +959,13 @@ private struct UsageDashboard: View {
             Chart(bars) { bar in
                 BarMark(x: .value(String(localized: "日期"), bar.day, unit: weekly ? .weekOfYear : .day),
                         y: .value("Token", bar.tokens))
-                    .foregroundStyle(by: .value("Agent", bar.agent.name))
+                    .foregroundStyle(by: .value("Agent", bar.agent.rawValue))
                     .cornerRadius(3)
             }
-            .chartForegroundStyleScale([ClipAgent.claude.name: UsageDashboard.color(for: .claude), ClipAgent.codex.name: UsageDashboard.color(for: .codex),
-                                        ClipAgent.opencode.name: UsageDashboard.color(for: .opencode), ClipAgent.cursor.name: UsageDashboard.color(for: .cursor)])
+            // Keep the categorical domain complete and stable. A partial four-agent palette
+            // causes Charts to trap when WorkBuddy or Qwen Work contributes a bar.
+            .chartForegroundStyleScale(domain: ClipAgent.allCases.map(\.rawValue),
+                                       range: ClipAgent.allCases.map { UsageDashboard.color(for: $0) })
             .chartLegend(.hidden)
             .chartYAxis {
                 AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
@@ -782,12 +974,13 @@ private struct UsageDashboard: View {
                 }
             }
             .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: weekly ? 6 : 7)) { _ in
-                    AxisValueLabel(format: .dateTime.month(.defaultDigits).day(), centered: true).font(.caption2)
+                AxisMarks(values: axisDates) { _ in
+                    AxisValueLabel(format: .dateTime.month(.defaultDigits).day()).font(.caption2)
                 }
             }
             .frame(height: 130)
             .accessibilityLabel("按\(weekly ? String(localized: "周") : String(localized: "天"))的 Token 用量柱状图")
+            .accessibilityIdentifier("backstage.usage.chart")
         }
     }
 
@@ -854,7 +1047,7 @@ private struct UsageDashboard: View {
                     }.font(.caption).monospacedDigit()
                 }
             }.padding(.horizontal, 18).padding(.vertical, 12)
-        }.frame(maxHeight: 240)
+        }.frame(maxHeight: 240).accessibilityIdentifier("backstage.usage.table")
     }
 
     static func color(for agent: ClipAgent) -> Color {

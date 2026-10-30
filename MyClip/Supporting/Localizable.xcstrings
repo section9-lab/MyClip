@@ -1,6 +1,99 @@
 {
   "sourceLanguage": "zh-Hans",
   "strings": {
+    "Agent 默认模型": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Agent default model" } } } },
+    "今天": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Today" } } } },
+    "停止本次": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Stop this run" } } } },
+    "全部 Agent": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "All Agents" } } } },
+    "全部时间": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "All time" } } } },
+    "全部状态": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "All statuses" } } } },
+    "刷新执行记录": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Refresh history" } } } },
+    "加载更多": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Load more" } } } },
+    "失败": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Failed" } } } },
+    "将按退避时间自动重试。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Will retry automatically after the backoff interval." } } } },
+    "尚未选择 Agent": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "No Agent selected" } } } },
+    "已完成；未记录实际文件变更。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Completed; actual file changes were not recorded." } } } },
+    "当前批次完成后暂停。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Pausing after the current batch finishes." } } } },
+    "整理已有记忆": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Organize existing memory" } } } },
+    "整理规则": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Organization rules" } } } },
+    "整理需要处理": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Organization needs attention" } } } },
+    "时间": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Time" } } } },
+    "最近完成": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Recently completed" } } } },
+    "查看全部执行记录": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "View all history" } } } },
+    "查看本次详情": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "View run details" } } } },
+    "查看结果": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "View results" } } } },
+    "正在处理，可打开详情查看进度。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Processing. Open details to see progress." } } } },
+    "正在整理已有记忆": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Organizing existing memory" } } } },
+    "正在识别任务": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Identifying tasks" } } } },
+    "状态": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Status" } } } },
+    "空闲，等待新截图": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Idle, waiting for new captures" } } } },
+    "等待下一批整理": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Waiting for the next batch" } } } },
+    "等待你的确认": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Waiting for your approval" } } } },
+    "自动整理已暂停": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Auto-organization paused" } } } },
+    "调整筛选条件，或等待第一次整理完成。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Adjust the filters, or wait for the first run to finish." } } } },
+    "选择 Agent…": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Choose Agent…" } } } },
+    "选择一个 Agent 来整理截图与记忆。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Choose an Agent to organize captures and memory." } } } },
+    "部分任务线索仍待补处理。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Some task leads still need processing." } } } },
+    "重试任务识别": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Retry task identification" } } } },
+    "执行过程": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Execution process" } } } },
+    "本次只整理已有记忆，没有新截图。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "This run organized existing memory without new captures." } } } },
+    "来源截图": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Source captures" } } } },
+    "没有记录来源截图。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "No source captures recorded." } } } },
+    "正在读取用量…": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Loading usage…" } } } },
+    "正在整理 %lld 张截图": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Organizing %lld captures" } } } },
+    "整理 %lld 张截图": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Organize %lld captures" } } } },
+    "待整理 %lld 张截图": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "%lld captures pending" } } } },
+    "%lld 条已加载": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "%lld records loaded" } } } },
+    "自动整理": {
+      "localizations": {
+        "de": { "stringUnit": { "state": "translated", "value": "Automatisch organisieren" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Auto-organize" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Organización automática" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Organisation automatique" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "自動整理" } },
+        "ko": { "stringUnit": { "state": "translated", "value": "자동 정리" } }
+      }
+    },
+    "运行状态": {
+      "localizations": {
+        "de": { "stringUnit": { "state": "translated", "value": "Status" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Status" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Estado" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "État" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "実行状況" } },
+        "ko": { "stringUnit": { "state": "translated", "value": "실행 상태" } }
+      }
+    },
+    "用量": {
+      "localizations": {
+        "de": { "stringUnit": { "state": "translated", "value": "Nutzung" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Usage" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Uso" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Utilisation" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "使用量" } },
+        "ko": { "stringUnit": { "state": "translated", "value": "사용량" } }
+      }
+    },
+    "Agent 与账号": {
+      "localizations": {
+        "de": { "stringUnit": { "state": "translated", "value": "Agents und Konten" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Agents & Accounts" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Agents y cuentas" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Agents et comptes" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "Agent とアカウント" } },
+        "ko": { "stringUnit": { "state": "translated", "value": "Agent 및 계정" } }
+      }
+    },
+    "Agent 与账号…": {
+      "localizations": {
+        "de": { "stringUnit": { "state": "translated", "value": "Agents und Konten…" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Agents & Accounts…" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Agents y cuentas…" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Agents et comptes…" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "Agent とアカウント…" } },
+        "ko": { "stringUnit": { "state": "translated", "value": "Agent 및 계정…" } }
+      }
+    },
     "\n重试会用同一个 Agent 重新建立连接并处理这批素材。": {
       "localizations": {
         "de": {
@@ -17086,42 +17179,42 @@
         }
       }
     },
-    "当前模型不支持图片。请在 Backstage 选择支持图片的模型后重试。": {
+    "当前模型不支持图片。请在自动整理的 Agent 与账号中选择支持图片的模型后重试。": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Das aktuelle Modell unterstützt keine Bilder. In Backstage ein bildfähiges Modell wählen und erneut versuchen."
+            "value": "Das aktuelle Modell unterstützt keine Bilder. Unter „Automatisch organisieren“ in „Agents und Konten“ ein bildfähiges Modell wählen und erneut versuchen."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The current model does not support images. Choose an image-capable model in Backstage and retry."
+            "value": "The current model does not support images. Choose an image-capable model in Auto-organize → Agents & Accounts and retry."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El modelo actual no admite imágenes. Elige un modelo compatible en Backstage y vuelve a intentarlo."
+            "value": "El modelo actual no admite imágenes. Elige un modelo compatible en Organización automática → Agents y cuentas y vuelve a intentarlo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le modèle actuel ne prend pas en charge les images. Choisissez un modèle compatible dans Backstage et réessayez."
+            "value": "Le modèle actuel ne prend pas en charge les images. Choisissez un modèle compatible dans Organisation automatique → Agents et comptes, puis réessayez."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "現在のモデルは画像に対応していません。Backstage で画像対応モデルを選び、再試行してください。"
+            "value": "現在のモデルは画像に対応していません。自動整理の「Agent とアカウント」で画像対応モデルを選び、再試行してください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "현재 모델은 이미지를 지원하지 않습니다. Backstage에서 이미지 지원 모델을 선택한 후 다시 시도하세요."
+            "value": "현재 모델은 이미지를 지원하지 않습니다. 자동 정리의 'Agent 및 계정'에서 이미지 지원 모델을 선택한 후 다시 시도하세요."
           }
         }
       }

@@ -11,12 +11,17 @@ while IFS= read -r object; do objects+=("$object"); done < <(
 )
 mkdir -p build/performance
 backstage_source="${MYCLIP_PERFORMANCE_BACKSTAGE_SOURCE:-MyClip/Features/Agent/BackstageView.swift}"
+usage_checks=(Tests/Performance/UsageDashboardChecks.swift)
+if [[ -n "${MYCLIP_PERFORMANCE_BACKSTAGE_SOURCE:-}" ]]; then
+    usage_checks=(-D MYCLIP_PERFORMANCE_BASELINE)
+fi
 swiftc -parse-as-library -swift-version 6 -target "$(uname -m)-apple-macosx13.0" \
     -I "$package_build/Modules" "${objects[@]}" \
     MyClip/App/PermissionCoordinator.swift MyClip/App/Model/*.swift \
     MyClip/Features/Agent/AgentRuntime.swift MyClip/Features/Agent/AgentSessionCoordinator.swift \
     MyClip/Features/Agent/AgentCharacterView.swift MyClip/Features/Agent/AgentStatusIcon.swift \
-    MyClip/Features/Agent/PermissionRequestView.swift "$backstage_source" \
-    MyClip/UI/LibraryCompatibility.swift Tests/Performance/PerformanceChecks.swift \
+    MyClip/Features/Agent/PermissionRequestView.swift MyClip/Features/Agent/ExecutionDetailView.swift "$backstage_source" \
+    MyClip/UI/LibraryCompatibility.swift "${usage_checks[@]}" \
+    Tests/Performance/PerformanceChecks.swift \
     -o build/performance/PerformanceChecks
 build/performance/PerformanceChecks

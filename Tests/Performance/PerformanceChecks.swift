@@ -5,7 +5,7 @@ import Darwin
 @testable import MyClipCore
 
 // The performance harness uses real model/storage/UI code, but never requests capture permissions or
-// connects a live agent. The execution-details sheet is outside the measured Backstage surface.
+// connects a live agent. Detail rendering is checked separately from the idle CPU surface.
 @MainActor enum MyClipAppDelegate { static func relaunch() {} }
 @MainActor final class FocusedCaptureService {
     var hasScreenPermission = false
@@ -19,12 +19,6 @@ import Darwin
     func start() -> Bool { false }
     func stop() {}
 }
-struct ExecutionDetailView: View {
-    let model: MyClipModel
-    let job: ClipJob
-    var body: some View { Text(job.id.uuidString) }
-}
-
 private struct PerformanceFailure: Error { let message: String }
 private extension LibraryStore {
     func performanceReadCount() -> Int { memoryReadCache.reads }
@@ -41,9 +35,66 @@ private extension LibraryStore {
         return Double(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec)
             + Double(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1_000_000
     }
+    private func checkIdleDispatcher(root: URL) async throws {
+        let suite = "MyClip.Performance.IdleDispatch.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        let preferences = ClipPreferences(preview: false, defaults: defaults)
+        preferences.enabledAgent = .workbuddy
+        let idle = try MyClipModel(root: root, preview: false, preferences: preferences)
+        defer { idle.stop(); defaults.removePersistentDomain(forName: suite) }
+        idle.agents[.workbuddy]?.phase = .ready
+        // Do not queue an automatic dream in this deterministic empty-library test.
+        try await idle.store.recordConsolidation()
+        await idle.refresh()
+        try await Task.sleep(for: .seconds(1))
+        await idle.refreshIfNeeded()
+        var publications = 0
+        let observation = idle.objectWillChange.sink { publications += 1 }
+        for _ in 0..<10 {
+            idle.refreshPermissions()
+            await idle.recoverOrganizationIfNeeded()
+            await idle.processNext()
+            await idle.refreshIfNeeded()
+        }
+        check(publications == 0, "Ten complete empty dispatcher cycles publish no UI changes (\(publications) publications)")
+        check(idle.organizationTask == nil && !idle.dispatching && idle.currentJob == nil && idle.canStartOrganization,
+              "An empty check releases its internal reservation without entering visible busy state")
+        check(idle.sessionCoordinator.client(.workbuddy) == nil, "An empty queue never starts an Agent runtime")
+        // UI eligibility must not depend on an unpublished, millisecond-long check reservation;
+        // otherwise an unrelated redraw can leave a button disabled after the check ends.
+        idle.organizationTask = Task {}
+        check(idle.canStartOrganization && idle.canConfigureAgentModel(.workbuddy),
+              "A silent internal reservation does not leave visible controls disabled")
+        await idle.processNext()
+        idle.discoverTasks()
+        let selected = await idle.selectAgentModel(.workbuddy, modelID: nil)
+        check(!selected && !idle.discoveringTasks && idle.sessionCoordinator.client(.workbuddy) == nil,
+              "Action guards still reject overlapping work while an internal check owns dispatch")
+        check(publications == 0, "Overlapping idle requests publish no false busy state")
+        idle.organizationTask = nil
+        observation.cancel()
+
+        let graphics = CGContext(data: nil, width: 8, height: 8, bitsPerComponent: 8, bytesPerRow: 32,
+                                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let image = try CapturedImage(image: graphics.makeImage()!)
+        try await idle.store.record(image: image,
+            context: CaptureContext(appName: "Fixture", bundleID: "test.idle-dispatch", windowTitle: "Waiting batch",
+                                    windowID: 1, reason: .manual), agent: .workbuddy, organize: true, extractedText: "fixture")
+        await idle.refresh()
+        publications = 0
+        let waitingObservation = idle.objectWillChange.sink { publications += 1 }
+        for _ in 0..<10 { await idle.processNext() }
+        check(publications == 0, "A pending batch before its deadline does not toggle visible busy state")
+        let snapshot = try await idle.store.snapshot()
+        check(snapshot.queue.pendingCount == 1 && snapshot.jobs.isEmpty,
+              "Quiet polling preserves pending captures and their original scheduling deadline")
+        waitingObservation.cancel()
+    }
+
     func run() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("MyClip-Performance-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
+        try await checkIdleDispatcher(root: root.appendingPathComponent("IdleDispatcher"))
         let model = try MyClipModel(root: root, preview: true)
         defer { model.stop() }
         await model.refresh()
@@ -170,6 +221,7 @@ private extension LibraryStore {
         NSApp.activate(ignoringOtherApps: true)
         defer { window.close() }
         try await Task.sleep(for: .seconds(1))
+        #if MYCLIP_PERFORMANCE_BASELINE
         func scrollViews(_ view: NSView) -> [NSScrollView] {
             ((view as? NSScrollView).map { [$0] } ?? []) + view.subviews.flatMap(scrollViews)
         }
@@ -181,6 +233,14 @@ private extension LibraryStore {
         try await Task.sleep(for: .milliseconds(250))
         check(abs((rows?.documentView?.bounds.height ?? 0) - 50 * 59) <= 1, "Narrow Backstage does not trigger history height feedback")
         window.setContentSize(NSSize(width: 1120, height: 760))
+        try await Task.sleep(for: .milliseconds(250))
+        #else
+        try await runOrganizationNavigationChecks(window: window, model: model, check: check)
+        try await runUsageDashboardChecks(window: window, check: check)
+        try await Task.sleep(for: .milliseconds(250))
+        #endif
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
         try await Task.sleep(for: .milliseconds(250))
         check(NSApp.isActive && window.isVisible, "Visible-window benchmark runs in an active AppKit host")
         let visibleStart = cpuTime()

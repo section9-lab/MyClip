@@ -3,7 +3,7 @@ import MyClipCore
 
 extension MyClipModel {
     func retryTaskIngestionFailures() {
-        guard canStartOrganization else { return }
+        guard canStartOrganization, organizationTask == nil else { return }
         Task {
             do {
                 try await store.retryFailedTaskIngestions()
