@@ -34,7 +34,7 @@ public struct WorkTaskDraft: Codable, Sendable {
     }
 }
 
-public struct WorkTaskEvidence: Identifiable, Sendable {
+public struct WorkTaskEvidence: Identifiable, Sendable, Equatable {
     public let id: UUID
     public let body: String
     public let sourceIDs: [UUID]
@@ -42,7 +42,7 @@ public struct WorkTaskEvidence: Identifiable, Sendable {
     public let date: Date
 }
 
-public struct WorkTask: Identifiable, Sendable {
+public struct WorkTask: Identifiable, Sendable, Equatable {
     public let id: UUID
     public let title: String
     public let project: String
@@ -57,7 +57,7 @@ public struct WorkTask: Identifiable, Sendable {
     public var projectTitle: String { project.isEmpty ? String(localized: "未归类") : project }
 }
 
-public struct WorkTaskEvent: Identifiable, Sendable {
+public struct WorkTaskEvent: Identifiable, Sendable, Equatable {
     public let id: UUID
     public let taskID: UUID
     public let from: WorkTaskStatus?

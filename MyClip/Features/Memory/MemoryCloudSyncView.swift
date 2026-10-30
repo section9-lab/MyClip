@@ -79,10 +79,8 @@ struct MemoryCloudSyncView: View {
                         .disabled(operation != nil)
                     Text("Memory 变化后自动更新；MyClip 运行时生效。")
                         .font(.caption).foregroundStyle(.secondary)
-                    HStack(spacing: 20) {
-                        Toggle("每日记录（Daily）", isOn: option(provider, keyPath: \.includeDaily))
-                        Toggle("待确认（Inbox）", isOn: option(provider, keyPath: \.includeInbox))
-                    }.font(.callout).disabled(operation != nil)
+                    Toggle("每日记录（Daily）", isOn: option(provider, keyPath: \.includeDaily))
+                        .font(.callout).disabled(operation != nil)
                     Text("默认同步个人信息、当前关注和主题记忆。").font(.caption).foregroundStyle(.secondary)
                     HStack(alignment: .center) {
                         status(provider, target: target)

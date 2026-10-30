@@ -25,10 +25,29 @@ final class MemoryPromptTests: XCTestCase {
 
     func testOrganizingPromptNamesNewFoldersAliasesAndDailySplit() {
         let prompt = MemoryPrompt.filePrompt(captures: [])
-        for phrase in ["Wiki/People 只放与用户有实际往来的人", "- Wiki/Reading：外部文章", "aliases: [名称一, 名称二]", "Daily/YYYY/MM/YYYY-MM-DD/主题.md", "外部观点和浏览记录不进 Inbox"] {
+        for phrase in ["Wiki/People 只放与用户有实际往来的人", "- Wiki/Reading：外部文章", "aliases: [名称一, 名称二]", "Daily/YYYY/MM/YYYY-MM-DD/主题.md", "不自动变成需要用户处理的事项"] {
             XCTAssertTrue(prompt.contains(phrase), phrase)
         }
         XCTAssertTrue(MemoryPrompt.coldStartPrompt(files: []).contains("人物放 Wiki/People"))
+    }
+
+    func testMemoryPromptsDoNotCreateAPendingInboxOrProfileCandidates() {
+        let plan = ConsolidationPlan(changed: ["Wiki/Projects/MyClip.md"], neighbours: [], weekly: nil)
+        let prompts = [MemoryPrompt.filePrompt(captures: []),
+                       MemoryPrompt.organizeBatchPrompt(captures: [], tasks: []),
+                       MemoryPrompt.consolidationPrompt(plan: plan, handoff: nil),
+                       MemoryPrompt.patrolPrompt(pages: ["Wiki/Topics/ACP.md"]),
+                       MemoryPrompt.weeklyPrompt(path: "Daily/weekly.md", dailies: []),
+                       MemoryPrompt.coldStartPrompt(files: [])]
+        for prompt in prompts {
+            XCTAssertFalse(prompt.contains("Inbox"))
+            XCTAssertFalse(prompt.contains("Profile候选"))
+            XCTAssertTrue(prompt.contains("看板独立管理待办、待确认事项和任务状态"))
+            XCTAssertTrue(prompt.contains("不收集推测的个人偏好或身份候选"))
+        }
+        var lint = MemoryLintReport()
+        lint.candidateEntities = ["ACP"]
+        XCTAssertFalse(lint.lines.joined().contains("Inbox"))
     }
 
     func testOrganizingPromptIsGroupedByWhatTheAgentDecides() {

@@ -63,7 +63,7 @@ extension LibraryStore {
 
     private static func kind(of path: String) -> NodeKind {
         if MemoryLayout.rootFiles.contains(path) || path.contains("/Weekly/") || path.hasPrefix(archivePrefix) { return .hub }
-        return path.hasPrefix("Daily/") || path.hasPrefix("Inbox/") ? .episode : .entity
+        return path.hasPrefix("Daily/") ? .episode : .entity
     }
 
     /// Searches memories and follows Wikilinks from the strongest matches.

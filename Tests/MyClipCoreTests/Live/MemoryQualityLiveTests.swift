@@ -4,7 +4,7 @@ import AppKit
 
 @MainActor
 final class MemoryQualityLiveTests: XCTestCase {
-    func testRealScreenshotsRespectTimeEvidenceAndResolvedInbox() async throws {
+    func testRealScreenshotsRespectTimeEvidence() async throws {
         guard let bin = ProcessInfo.processInfo.environment["MYCLIP_LIVE_ACP_BIN"],
               let manifest = ProcessInfo.processInfo.environment["MYCLIP_MEMORY_QUALITY_FIXTURES"] else {
             throw XCTSkip("Opt in with a signed-in ACP agent and a manifest of reviewed screenshots.")
@@ -28,11 +28,9 @@ final class MemoryQualityLiveTests: XCTestCase {
             revision: focus.revision, agent: .claude, sourceIDs: [], path: "Now.md", observedAt: Date())
         try focusText.write(to: focus.fileURL, atomically: true, encoding: .utf8)
         try "# MyClip\n\n任务看板升级尚无完成汇报记录。".write(to: directory.appendingPathComponent("Wiki/Projects/MyClip.md"), atomically: true, encoding: .utf8)
-        let pendingQuestion = "待确认事项：MyClip 0.6.0 是否已有安装并启动的完成汇报。"
-        try ("# MyClip 升级汇报\n\n" + pendingQuestion).write(to: directory.appendingPathComponent("Inbox/MyClip升级汇报.md"), atomically: true, encoding: .utf8)
         let index = try await store.readMemory(path: "Memory.md")
         try await store.updateEntry(id: index.id, title: index.title,
-            body: "# Memory\n\n[[Now]]\n[[Wiki/Projects/MyClip]]\n[[Inbox/MyClip升级汇报]]", expectedRevision: index.revision)
+            body: "# Memory\n\n[[Now]]\n[[Wiki/Projects/MyClip]]", expectedRevision: index.revision)
         for (number, input) in inputs.enumerated() {
             let image = try XCTUnwrap(NSImage(contentsOfFile: input.imagePath))
             var rect = CGRect(origin: .zero, size: image.size)
@@ -77,10 +75,10 @@ final class MemoryQualityLiveTests: XCTestCase {
             XCTAssertTrue(project.body.contains("0.6.0"))
             XCTAssertEqual(project.sourceIDs, [inputs[0].id], "The unrelated browser page is not project evidence")
             XCTAssertTrue(snapshot.entries.filter { $0.relativePath.hasPrefix("Wiki/Topics/") }.isEmpty, "A passing browser view does not require a permanent topic")
-            XCTAssertFalse(snapshot.entries.contains { $0.relativePath.hasPrefix("Inbox/") && $0.body.contains(pendingQuestion) })
+            XCTAssertFalse(snapshot.memoryFolders.contains("Inbox"), "Organization must not create a pending-memory directory")
             for entry in snapshot.entries {
                 let links = try await store.relations(entry.id)
-                XCTAssertTrue(links.unresolved.isEmpty, "Keep links intact when resolving Inbox: \(entry.relativePath)")
+                XCTAssertTrue(links.unresolved.isEmpty, "Keep memory links intact: \(entry.relativePath)")
             }
             let paths = Set(snapshot.entries.map(\.relativePath))
             let calendarDate = DateFormatter()

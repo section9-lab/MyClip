@@ -233,13 +233,13 @@ final class DirectMemoryEditingTests: XCTestCase {
             } else {
                 let historical = "# 历史\n\n当时验收受阻。来源：截图 `\(older.id)`。"
                 try historical.write(to: focus, atomically: true, encoding: .utf8)
-                try historical.write(to: root.appendingPathComponent("Memory/Inbox/历史.md"), atomically: true, encoding: .utf8)
+                try historical.write(to: root.appendingPathComponent("Memory/Daily/历史.md"), atomically: true, encoding: .utf8)
                 _ = try await store.snapshot() // A UI or MCP read can import an in-progress edit.
             }
             _ = try await store.finishMemoryEditing(jobID: job.id, previousRevisions: before)
         }
         let latest = try await store.readMemory(path: "Now.md")
-        let history = try await store.readMemory(path: "Inbox/历史.md")
+        let history = try await store.readMemory(path: "Daily/历史.md")
         XCTAssertEqual(latest.body, current)
         XCTAssertEqual(latest.sourceIDs, [newer.id])
         XCTAssertTrue(history.body.contains("当时验收受阻"))

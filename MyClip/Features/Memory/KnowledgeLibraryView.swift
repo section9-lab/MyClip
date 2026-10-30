@@ -28,7 +28,6 @@ private enum MemoryPresentation {
         case "Now.md": "scope"
         case "Wiki": "books.vertical"
         case "Daily": "calendar"
-        case "Inbox": "tray"
         default: "folder"
         }
     }

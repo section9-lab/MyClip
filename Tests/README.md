@@ -8,6 +8,7 @@
 | `bash Scripts/test.sh cloud-sync` | Google Drive / Notion 同步协议、恢复、自动调度、OAuth 回调及原生云端面板，不需要账号或 XCTest |
 | `bash Scripts/test.sh scripts` | `Adapters/` 下的 Node 适配器测试与 `Packaging/` 下的 Python 打包测试 |
 | `bash Scripts/test.sh benchmark` | 构建真实 MCP，运行 `benchmark/tests/`，不调用付费模型 |
+| `bash Scripts/test.sh performance` | 真实 Core、应用模型与 Backstage 的省电回归及 CPU 微基准；不需要 XCTest 或完整 Xcode，需要 macOS GUI 会话 |
 | `bash Scripts/test.sh app` | 原生应用测试，包含 Agent 激活、模型选择与失败恢复、采集生命周期、过滤、文档、目录、看板与菜单栏、滚动和 Backstage 响应性 |
 
 单独执行某组核心测试或某个应用测试：
@@ -23,6 +24,8 @@ bash Scripts/test.sh app TaskBoardScrollTests -- /tmp/myclip-task-board.png
 bash Scripts/test.sh app MenuBarBoardTests -- build/menu-bar-validation
 bash Scripts/test.sh app BackstageResponsivenessTests
 ```
+
+`Performance/` 验证空闲刷新不发布状态、不读 Markdown、不写数据库；按域失效；独立 SQLite 连接与外部文件增删改名；校验缓存与敏感信息检查；低电量/温度策略；流式进度去重仍更新活跃时间；50 条执行记录的固定高度、窄窗口以及显示/隐藏 CPU。采集边界和未打开的执行详情 sheet 使用测试替身，其余使用真实 Core、模型和 Backstage。数字是短时合成 CPU 基准，不代表整机功耗或续航；对照方法见 [性能与能耗](../docs/performance-and-energy.md)。
 
 `MyClipCoreTests/Support/` 放共享 Swift 夹具，`Fixtures/` 放测试 ACP 进程。`Live/` 中的真实 Agent 测试继续通过原有环境变量显式启用，默认跳过；需要登录和模型服务，不能用其跳过结果证明真实 Agent 已通过验收。
 

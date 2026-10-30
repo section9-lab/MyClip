@@ -26,7 +26,7 @@ public enum LibraryError: Error, LocalizedError, Sendable {
     }
 }
 
-public struct LibrarySnapshot: Sendable {
+public struct LibrarySnapshot: Sendable, Equatable {
     public var captures: [ClipCapture] = []
     public var captureCount = 0
     public var captureAppNames: [String] = []

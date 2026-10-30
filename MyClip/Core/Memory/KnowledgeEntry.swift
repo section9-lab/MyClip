@@ -5,7 +5,7 @@ public enum KnowledgeKind: String, Codable, CaseIterable, Sendable {
     case memory
 }
 
-public struct KnowledgeDraft: Codable, Sendable {
+public struct KnowledgeDraft: Codable, Sendable, Equatable {
     public var entryID: UUID?
     public var expectedRevision: Int?
     public var kind: KnowledgeKind
@@ -25,7 +25,7 @@ public struct KnowledgeDraft: Codable, Sendable {
     }
 }
 
-public struct KnowledgeEntry: Identifiable, Sendable {
+public struct KnowledgeEntry: Identifiable, Sendable, Equatable {
     public let id: UUID
     public let kind: KnowledgeKind
     public let title: String

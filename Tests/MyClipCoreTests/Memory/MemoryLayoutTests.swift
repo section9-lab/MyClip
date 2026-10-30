@@ -46,12 +46,73 @@ final class MemoryLayoutTests: XCTestCase {
     func testNewLibraryCreatesThreeRootDocumentsAndFolders() async throws {
         let store = try LibraryStore(root: root)
         let snapshot = try await store.snapshot()
-        for name in ["Memory.md", "Profile.md", "Now.md", "Wiki/Projects", "Wiki/Topics", "Wiki/People", "Wiki/Reading", "Wiki/Workflows", "Daily", "Inbox"] {
+        for name in ["Memory.md", "Profile.md", "Now.md", "Wiki/Projects", "Wiki/Topics", "Wiki/People", "Wiki/Reading", "Wiki/Workflows", "Daily"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("Memory/" + name).path), name)
         }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("Memory/Inbox").path))
+        XCTAssertFalse(snapshot.memoryFolders.contains("Inbox"))
+        XCTAssertFalse(try XCTUnwrap(snapshot.entries.first { $0.relativePath == "Memory.md" }).body.contains("Inbox"))
         XCTAssertEqual(Set(snapshot.entries.map { $0.fileURL.lastPathComponent }), ["Memory.md", "Profile.md", "Now.md"])
         let again = try await store.snapshot()
         XCTAssertEqual(Set(snapshot.entries.map(\.id)), Set(again.entries.map(\.id)))
+    }
+
+    func testRetiredInboxRemovesOnlyEmptyFoldersAndKeepsLegacyNotes() async throws {
+        let store = try LibraryStore(root: root)
+        let note = try await seed(store)
+        let directory = root.appendingPathComponent("Memory/Inbox")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        _ = try await store.snapshot()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try FileManager.default.moveItem(at: note.fileURL, to: directory.appendingPathComponent("历史.md"))
+        let legacy = try await store.readMemory(path: "Inbox/历史.md")
+        XCTAssertEqual(legacy.id, note.id)
+        XCTAssertEqual(legacy.body, note.body)
+        XCTAssertEqual(legacy.sourceIDs, note.sourceIDs)
+        let reopened = try LibraryStore(root: root)
+        let found = try await reopened.searchMemories(query: "焦点")
+        XCTAssertTrue(found.contains { $0.id == note.id })
+        let linked = try await reopened.resolveMemoryLink("Inbox/历史")
+        XCTAssertEqual(linked.id, note.id)
+        let service = MemoryMCP(store: reopened)
+        _ = await service.respond(#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#)
+        let reply = await service.respond(#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"memory_get","arguments":{"path":"Inbox/历史.md"}}}"#)
+        let decoded = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(XCTUnwrap(reply).utf8)) as? [String: Any])
+        XCTAssertEqual((decoded["result"] as? [String: Any])?["isError"] as? Bool, false)
+        try await reopened.updateEntry(id: legacy.id, title: legacy.title, body: "历史修订", expectedRevision: legacy.revision)
+        let edited = try await reopened.readMemory(path: "Inbox/历史.md")
+        XCTAssertEqual(edited.body, "历史修订")
+        do {
+            try await reopened.moveMemory(edited.id, to: "Inbox/new.md", expectedRevision: edited.revision)
+            XCTFail("Moving must not create new Inbox notes")
+        } catch LibraryError.invalidResult { }
+        try await reopened.moveMemory(edited.id, to: "Daily/历史.md", expectedRevision: edited.revision)
+        _ = try await reopened.snapshot()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+    }
+
+    func testLegacyOverviewUpgradePreservesAuthoredContentAndProfile() async throws {
+        let store = try LibraryStore(root: root)
+        let index = try await store.readMemory(path: "Memory.md")
+        let profile = try await store.readMemory(path: "Profile.md")
+        _ = try await store.saveEntry(id: index.id, kind: .memory, title: index.title, body: MemoryLayout.legacyIndexBody,
+                                     revision: 1, agent: index.agent, sourceIDs: [], relativePath: "Memory.md")
+        try await store.publishMemoryFiles()
+        let upgraded = try await store.readMemory(path: "Memory.md")
+        XCTAssertEqual(upgraded.id, index.id)
+        XCTAssertEqual(upgraded.body, MemoryLayout.initialBody(for: "Memory.md"))
+        XCTAssertEqual(upgraded.revision, 2)
+        let unchanged = try await store.readMemory(path: "Profile.md")
+        XCTAssertEqual(unchanged.body, profile.body)
+        XCTAssertEqual(unchanged.revision, profile.revision)
+        let authored = MemoryLayout.legacyIndexBody + "\n用户自己的记录。"
+        try authored.write(to: upgraded.fileURL, atomically: true, encoding: .utf8)
+        let preserved = try await store.readMemory(path: "Memory.md")
+        XCTAssertEqual(preserved.body, authored)
+        let again = try await store.readMemory(path: "Memory.md")
+        XCTAssertEqual(again.revision, preserved.revision)
     }
 
     func testExistingLibraryGainsNewFoldersOnceAndKeepsRemovalsAfterward() async throws {
@@ -134,7 +195,7 @@ final class MemoryLayoutTests: XCTestCase {
         try await store.enqueue(sourceIDs: note.sourceIDs, agent: .codex)
         let update = try await store.claimNextJob(immediately: true)
         do {
-            try await store.commit(jobID: XCTUnwrap(update).id, drafts: [KnowledgeDraft(entryID: note.id, expectedRevision: note.revision, kind: .memory, title: note.title, body: "新内容", sourceIDs: note.sourceIDs, path: "Inbox/偷偷移动.md")])
+            try await store.commit(jobID: XCTUnwrap(update).id, drafts: [KnowledgeDraft(entryID: note.id, expectedRevision: note.revision, kind: .memory, title: note.title, body: "新内容", sourceIDs: note.sourceIDs, path: "Wiki/Topics/偷偷移动.md")])
             XCTFail("An Agent update must keep the existing path")
         } catch LibraryError.invalidResult { }
     }
@@ -144,7 +205,7 @@ final class MemoryLayoutTests: XCTestCase {
         let note = try await seed(store)
         try await store.enqueue(sourceIDs: note.sourceIDs, agent: .codex)
         let job = try await store.claimNextJob(immediately: true)
-        for path in ["../escape.md", "/tmp/escape.md", "Wiki/../escape.md", "Wiki//empty.md", "Wiki/test.txt", "Profile.md"] {
+        for path in ["../escape.md", "/tmp/escape.md", "Wiki/../escape.md", "Wiki//empty.md", "Wiki/test.txt", "Profile.md", "Inbox/new.md"] {
             do {
                 try await store.commit(jobID: XCTUnwrap(job).id, drafts: [KnowledgeDraft(kind: .memory, title: "拒绝", body: "不应保存", sourceIDs: note.sourceIDs, path: path)])
                 XCTFail("Reject \(path)")
@@ -191,13 +252,13 @@ final class MemoryLayoutTests: XCTestCase {
     func testDuplicateIDsAndSymlinksFailWithoutChangingIndex() async throws {
         let store = try LibraryStore(root: root)
         let note = try await seed(store)
-        let copied = root.appendingPathComponent("Memory/Inbox/copy.md")
+        let copied = root.appendingPathComponent("Memory/Wiki/Topics/copy.md")
         try FileManager.default.copyItem(at: note.fileURL, to: copied)
         do { _ = try await store.snapshot(); XCTFail("Duplicate IDs must be rejected") }
         catch LibraryError.invalidResult { }
         try FileManager.default.removeItem(at: copied)
         try FileManager.default.createSymbolicLink(at: copied, withDestinationURL: note.fileURL)
-        do { _ = try await store.readMemory(path: "Inbox/copy.md"); XCTFail("Symlinks must not be followed") }
+        do { _ = try await store.readMemory(path: "Wiki/Topics/copy.md"); XCTFail("Symlinks must not be followed") }
         catch LibraryError.invalidResult { }
         try FileManager.default.removeItem(at: copied)
         let current = try await store.readMemory(note.id)
@@ -220,10 +281,10 @@ final class MemoryLayoutTests: XCTestCase {
         let updatedIndex = try await store.readMemory(index.id)
         XCTAssertEqual(updatedIndex.body, "[[Wiki/Projects/新名称.md|截图]]")
         try await store.updateEntry(id: moved.id, title: moved.title, body: "人工修订", expectedRevision: moved.revision)
-        do { try await store.moveMemory(moved.id, to: "Inbox/stale.md", expectedRevision: moved.revision); XCTFail("Stale move") }
+        do { try await store.moveMemory(moved.id, to: "Wiki/Topics/stale.md", expectedRevision: moved.revision); XCTFail("Stale move") }
         catch LibraryError.conflict { }
         let profile = try await store.readMemory(path: "Profile.md")
-        do { try await store.moveMemory(profile.id, to: "Inbox/Profile.md", expectedRevision: profile.revision); XCTFail("Root file must stay at root") }
+        do { try await store.moveMemory(profile.id, to: "Wiki/Topics/Profile.md", expectedRevision: profile.revision); XCTFail("Root file must stay at root") }
         catch LibraryError.invalidResult { }
     }
 
@@ -234,12 +295,12 @@ final class MemoryLayoutTests: XCTestCase {
         let job = try await store.claimNextJob(immediately: true)
         do {
             try await store.commit(jobID: XCTUnwrap(job).id, drafts: [
-                KnowledgeDraft(kind: .memory, title: "有效", body: "正文", sourceIDs: note.sourceIDs, path: "Inbox/未提交.md"),
+                KnowledgeDraft(kind: .memory, title: "有效", body: "正文", sourceIDs: note.sourceIDs, path: "Wiki/Topics/未提交.md"),
                 KnowledgeDraft(kind: .memory, title: "无效", body: "正文", sourceIDs: note.sourceIDs, path: "../逃逸.md")
             ])
             XCTFail("Invalid batch must fail")
         } catch LibraryError.invalidResult { }
-        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("Memory/Inbox/未提交.md").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("Memory/Wiki/Topics/未提交.md").path))
         let found = try await store.searchMemories(query: "有效")
         XCTAssertTrue(found.isEmpty)
     }
@@ -258,7 +319,7 @@ final class MemoryLayoutTests: XCTestCase {
     }
 
     func testInitializationCannotCreateFoldersThroughSymlinks() async throws {
-        for path in ["Memory", "Memory/Wiki"] {
+        for path in ["Memory", "Memory/Wiki", "Memory/Inbox"] {
             let library = root.appendingPathComponent(UUID().uuidString)
             let outside = root.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
@@ -279,18 +340,18 @@ final class MemoryLayoutTests: XCTestCase {
         let boundary = try XCTUnwrap(text.range(of: "\n---\n"))
         let header = String(text[..<boundary.upperBound])
         try (header + "\n  \n").write(to: previous.fileURL, atomically: true, encoding: .utf8)
-        try "".write(to: root.appendingPathComponent("Memory/Inbox/空白.md"), atomically: true, encoding: .utf8)
+        try "".write(to: root.appendingPathComponent("Memory/Wiki/Topics/空白.md"), atomically: true, encoding: .utf8)
 
         let snapshot = try await store.snapshot(query: "焦点")
-        XCTAssertEqual(snapshot.invalidMemoryFiles, ["Inbox/空白.md（Memory 正文为空。）", "\(previous.relativePath)（Memory 正文为空。）"])
+        XCTAssertEqual(snapshot.invalidMemoryFiles, ["Wiki/Topics/空白.md（Memory 正文为空。）", "\(previous.relativePath)（Memory 正文为空。）"])
         let kept = try await store.readMemory(path: previous.relativePath)
         XCTAssertEqual(kept.body, previous.body, "The last good revision stays searchable")
         XCTAssertEqual(snapshot.entries.map(\.id), [previous.id])
         let lint = try await store.memoryLint()
-        XCTAssertTrue(lint.invalidFiles.contains("Inbox/空白.md（Memory 正文为空。）"), lint.invalidFiles.description)
+        XCTAssertTrue(lint.invalidFiles.contains("Wiki/Topics/空白.md（Memory 正文为空。）"), lint.invalidFiles.description)
 
         try (header + "修好的正文。\n").write(to: previous.fileURL, atomically: true, encoding: .utf8)
-        try FileManager.default.removeItem(at: root.appendingPathComponent("Memory/Inbox/空白.md"))
+        try FileManager.default.removeItem(at: root.appendingPathComponent("Memory/Wiki/Topics/空白.md"))
         let repaired = try await store.snapshot()
         XCTAssertEqual(repaired.invalidMemoryFiles, [])
         let fixed = try await store.readMemory(path: previous.relativePath)

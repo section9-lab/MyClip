@@ -81,7 +81,7 @@ public enum MemoryLint {
         return count
     }
     static let minimumEntityFiles = 3
-    static let stopWords: Set<String> = ["github", "readme", "api", "mcp", "json", "macos", "ios", "codex", "chatgpt", "claude", "ocr", "uuid", "url", "http", "https", "png", "markdown", "wiki", "daily", "inbox", "memory", "profile", "now", "projects", "topics", "workflows", "archives", "imessage", "wechat", "utc", "iso", "cli", "sdk", "gif", "pdf", "html", "css", "swift", "python", "bash", "true", "false", "null", "todo", "doing", "done", "agent", "agents", "id", "ids", "md", "arm", "intel", "action", "actions", "key", "keys", "openrouter",
+    static let stopWords: Set<String> = ["github", "readme", "api", "mcp", "json", "macos", "ios", "codex", "chatgpt", "claude", "ocr", "uuid", "url", "http", "https", "png", "markdown", "wiki", "daily", "memory", "profile", "now", "projects", "topics", "workflows", "archives", "imessage", "wechat", "utc", "iso", "cli", "sdk", "gif", "pdf", "html", "css", "swift", "python", "bash", "true", "false", "null", "todo", "doing", "done", "agent", "agents", "id", "ids", "md", "arm", "intel", "action", "actions", "key", "keys", "openrouter",
                                                   // Halves of product names (“Claude Code”, “Chat Bridge”) and generic interface words.
                                                   "code", "app", "apple", "chat", "bridge", "logo", "mac", "demo", "ui"]
 
@@ -91,13 +91,21 @@ public enum MemoryLint {
         return latin || cjk
     }
 
-    static func mentions(_ body: String, name: String) -> Bool {
-        if name.unicodeScalars.allSatisfy({ $0.isASCII }) {
-            let pattern = "(?i)(?<![A-Za-z0-9_])" + NSRegularExpression.escapedPattern(for: name) + "(?![A-Za-z0-9_])"
-            return body.range(of: pattern, options: .regularExpression) != nil
+    struct NameMatcher {
+        let name: String
+        let expression: NSRegularExpression?
+        init(_ name: String) {
+            self.name = name
+            expression = name.unicodeScalars.allSatisfy(\.isASCII)
+                ? try? NSRegularExpression(pattern: "(?i)(?<![A-Za-z0-9_])" + NSRegularExpression.escapedPattern(for: name) + "(?![A-Za-z0-9_])") : nil
         }
-        return body.range(of: name, options: .caseInsensitive) != nil
+        func matches(_ body: String) -> Bool {
+            if let expression { return expression.firstMatch(in: body, range: NSRange(body.startIndex..., in: body)) != nil }
+            return body.range(of: name, options: .caseInsensitive) != nil
+        }
     }
+
+    static func mentions(_ body: String, name: String) -> Bool { NameMatcher(name).matches(body) }
 
     static func identifiers(in body: String) -> Set<String> {
         var text = body
@@ -118,12 +126,35 @@ public enum MemoryLint {
     }
 }
 
+/// Content-only checks are reused by revision; time-dependent and graph checks are still evaluated
+/// against the current vault. No sensitive-data or source validation is deferred for power saving.
+struct MemoryLintPage {
+    let entry: KnowledgeEntry
+    let identifiers: Set<String>
+    let sensitive: [String]
+    let longLines: Int
+    let citations: [UUID]
+    init(_ entry: KnowledgeEntry) {
+        self.entry = entry
+        identifiers = MemoryLint.identifiers(in: entry.body)
+        sensitive = MemoryLint.sensitiveKinds(in: entry.body)
+        longLines = MemoryLint.longLineCount(entry.body)
+        citations = MemoryPassage.explicitSources(in: entry.body)
+    }
+}
+
 extension LibraryStore {
     /// Runs the vault checks. Archives are ignored; root files are checked for size only.
     public func memoryLint(now: Date = Date()) throws -> MemoryLintReport {
         var report = MemoryLintReport()
         let entries = try database.run("SELECT * FROM entries").map(entry).filter { !$0.relativePath.hasPrefix(Self.archivePrefix) }
         let byID = Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0) })
+        lintPageCache = lintPageCache.filter { byID[$0.key] != nil }
+        let changed = entries.filter { lintPageCache[$0.id]?.entry != $0 }
+        let changedIDs = Set(changed.map { $0.id.uuidString })
+        lintMentionCache = lintMentionCache.filter { !changedIDs.contains(String($0.key.prefix(36))) }
+        for item in changed { lintPageCache[item.id] = MemoryLintPage(item) }
+        if lintMentionCache.count > 50_000 { lintMentionCache.removeAll(keepingCapacity: true) }
 
         var broken: [String: [String]] = [:]
         for row in try database.run("SELECT source,target,fragment FROM memory_links WHERE target_id IS NULL") {
@@ -152,9 +183,17 @@ extension LibraryStore {
             // Declared aliases are names too: a page mentioning "代理客户端协议" without linking the ACP page is reported.
             let names = ([page.title] + page.aliases).filter(MemoryLint.isNameLike)
             guard !names.isEmpty else { continue }
+            // Compile each name once, rather than compiling a regex for every pair of pages.
+            let matchers = names.map(MemoryLint.NameMatcher.init)
             let paths = entries.filter { other in
                 other.id != page.id && !other.isRootDocument && !(linked[other.id]?.contains(page.id) ?? false)
-                    && names.contains { MemoryLint.mentions(other.body, name: $0) }
+                    && matchers.contains { matcher in
+                        let key = other.id.uuidString + ":" + matcher.name.lowercased()
+                        if let cached = lintMentionCache[key], cached.revision == other.revision { return cached.found }
+                        let found = matcher.matches(other.body)
+                        lintMentionCache[key] = (other.revision, found)
+                        return found
+                    }
             }.map(\.relativePath).sorted()
             if !paths.isEmpty { unlinked.append((page.title, paths)) }
         }
@@ -163,7 +202,7 @@ extension LibraryStore {
 
         var counts: [String: Set<UUID>] = [:], spelling: [String: String] = [:]
         for item in entries where !item.isRootDocument {
-            for word in MemoryLint.identifiers(in: item.body) where !known.contains(word.lowercased()) {
+            for word in lintPageCache[item.id]!.identifiers where !known.contains(word.lowercased()) {
                 counts[word.lowercased(), default: []].insert(item.id)
                 spelling[word.lowercased()] = spelling[word.lowercased()] ?? word
             }
@@ -182,19 +221,19 @@ extension LibraryStore {
         }
         report.oversized.sort()
         report.mustSplit.sort()
-        report.misfiled = entries.filter { ($0.relativePath.hasPrefix("Wiki/Topics/") || $0.relativePath.hasPrefix("Inbox/")) && MemoryLint.isReadingTitle($0.title) }
+        report.misfiled = entries.filter { $0.relativePath.hasPrefix("Wiki/Topics/") && MemoryLint.isReadingTitle($0.title) }
             .map(\.relativePath).sorted().prefix(MemoryLint.reportLimit).map { $0 }
         report.expired = entries.flatMap { item in MemoryLint.expiredPassages(item.body, path: item.relativePath, sourceIDs: item.sourceIDs, now: now).map { "\(item.relativePath)「\($0)」" } }
             .prefix(MemoryLint.reportLimit).map { $0 }
         report.sensitive = entries.compactMap { item in
-            let kinds = MemoryLint.sensitiveKinds(in: item.body)
+            let kinds = lintPageCache[item.id]!.sensitive
             return kinds.isEmpty ? nil : "\(item.relativePath)（\(kinds.joined(separator: "、"))）"
         }.sorted().prefix(MemoryLint.reportLimit).map { $0 }
         // A library without capture records (imported or test vaults) has nothing to check citations against.
         if try !database.run("SELECT 1 FROM captures LIMIT 1").isEmpty {
             let recorded = Set(try database.run("SELECT id FROM captures").compactMap { $0["id"].flatMap(UUID.init(uuidString:)) })
             report.unknownCitations = entries.compactMap { item in
-                let unknown = MemoryPassage.explicitSources(in: item.body).filter { !recorded.contains($0) }
+                let unknown = lintPageCache[item.id]!.citations.filter { !recorded.contains($0) }
                 return unknown.isEmpty ? nil : "\(item.relativePath)（" + unknown.map { "`\($0.uuidString)`" }.joined(separator: "、") + "）"
             }.sorted().prefix(MemoryLint.reportLimit).map { $0 }
         }
@@ -210,10 +249,10 @@ extension LibraryStore {
             return count >= MemoryLint.hubPages ? (item.relativePath, count) : nil
         }.sorted { $0.1 > $1.1 }.prefix(MemoryLint.reportLimit).map { "\($0.0)（\($0.1) 个页面链接）" }
         report.longLines = entries.filter { !$0.isRootDocument }.compactMap { item -> (String, Int)? in
-            let count = MemoryLint.longLineCount(item.body)
+            let count = lintPageCache[item.id]!.longLines
             return count > 0 ? (item.relativePath, count) : nil
         }.sorted { $0.1 == $1.1 ? $0.0 < $1.0 : $0.1 > $1.1 }.prefix(MemoryLint.reportLimit).map { "\($0.0)（\($0.1) 行）" }
-        report.invalidFiles = try MemoryLayout.scan(in: root.appendingPathComponent("Memory")).invalid.map(\.description)
+        report.invalidFiles = try MemoryLayout.scan(in: root.appendingPathComponent("Memory"), cache: &memoryReadCache).invalid.map(\.description)
         return report
     }
 }

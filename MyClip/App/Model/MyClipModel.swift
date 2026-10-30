@@ -191,8 +191,23 @@ final class MyClipModel: ObservableObject {
     let sessionCoordinator = AgentSessionCoordinator()
     private var preferencesObservation: AnyCancellable?
     private var textWorker: Task<Void, Never>?
+    private var textRecognitionFailures: Set<String> = []
+    private var workspaceObservation: AnyCancellable?
+    private var backgroundSuspended = false
     var worker: Task<Void, Never>?
     private var searchTask: Task<Void, Never>?
+    private var refreshOperation: Task<Void, Never>?
+    private var refreshAgain = false
+    private var forceReconcileRequested = false
+    private var lastLibraryVersion: String?
+    private var lastTaskVersion: String?
+    private var lastStatisticsVersion: String?
+    private var lastTokenVersion: String?
+    private var lastLibraryRefresh = Date.distantPast
+    private var lastStatisticsRefresh = Date.distantPast
+    private var lastAnalyticsDays: Int?
+    private var lastQuery: String?
+    private var lastFilter: CaptureFilter?
     private var selectionBeforeSearch: (entry: UUID?, folder: String?)?
     var taskDiscovery: Task<Void, Never>?
     var organizationTask: Task<Void, Never>?
@@ -215,11 +230,15 @@ final class MyClipModel: ObservableObject {
                 let repeated = self.library.captures.first?.imageID == image.fingerprint
                 try await self.store.record(image: image, context: context, agent: self.preferences.enabledAgent ?? .codex, organize: self.preferences.autoOrganize,
                                             filterStrategies: self.preferences.captureSettings.filterStrategies)
-                await self.refresh()
+                await self.refreshIfNeeded()
+                self.startTextRecognition()
                 self.captureStatus = repeated ? String(localized: "已记录本次出现，相同画面共用原图") : String(localized: "已保存 \(context.appName) · \(context.date.formatted(date: .omitted, time: .standard))")
             } catch { self.captureStatus = String(localized: "保存失败：\(error.localizedDescription)"); self.notice = error.localizedDescription }
         }
-        captureService.onStatus = { [weak self] status in self?.captureStatus = status }
+        captureService.onStatus = { [weak self] status in
+            guard let self, self.captureStatus != status else { return }
+            self.captureStatus = status
+        }
         sessionCoordinator.onEvent = { [weak self] event, agent in self?.handle(event, agent: agent) }
         preferencesObservation = preferences.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
         if preview { captureStatus = String(localized: "界面预览 · 采集已停用") }
@@ -228,7 +247,17 @@ final class MyClipModel: ObservableObject {
 
     func start() {
         guard worker == nil else { return }
+        textRecognitionFailures.removeAll()
+        backgroundSuspended = false
         cloudSync.start()
+        let center = NSWorkspace.shared.notificationCenter
+        let sleepNames = [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification, NSWorkspace.sessionDidResignActiveNotification]
+        let wakeNames = [NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification, NSWorkspace.sessionDidBecomeActiveNotification]
+        workspaceObservation = Publishers.MergeMany((sleepNames + wakeNames).map { center.publisher(for: $0) })
+            .sink { [weak self] notification in
+                let sleeping = sleepNames.contains(notification.name)
+                Task { @MainActor in self?.backgroundSuspended = sleeping }
+            }
         if !preview, let agent = preferences.enabledAgent { connect(agent) }
         worker = Task { [weak self] in
             guard let self else { return }
@@ -249,12 +278,13 @@ final class MyClipModel: ObservableObject {
                 #endif
             } catch { notice = error.localizedDescription }
             while !Task.isCancelled {
-                refreshPermissions()
-                if !preview {
+                if !backgroundSuspended { refreshPermissions() }
+                if !preview && !backgroundSuspended {
                     await cleanupIfNeeded()
                     await recoverOrganizationIfNeeded()
                     if !processingPaused { await processNext() }
-                    await refresh()
+                    await refreshIfNeeded()
+                    startTextRecognition()
                 }
                 do { try await Task.sleep(for: .seconds(3)) } catch { break }
             }
@@ -263,21 +293,26 @@ final class MyClipModel: ObservableObject {
     }
 
     private func startTextRecognition() {
-        textWorker?.cancel()
-        textWorker = Task { [weak self] in
-            var failed: Set<String> = []
+        guard textWorker == nil else { return }
+        textWorker = Task(priority: .utility) { [weak self] in
+            defer { self?.textWorker = nil }
             while !Task.isCancelled {
                 guard let self else { return }
+                if backgroundSuspended { return }
                 do {
-                    if let image = try await store.nextImageForTextIndex(excluding: failed) {
+                    if let image = try await store.nextImageForTextIndex(excluding: textRecognitionFailures) {
+                        // Thermal pressure delays only background OCR; explicit document reads still work.
+                        if !BackgroundWorkBudget.allowsOCR {
+                            try await Task.sleep(for: .seconds(15))
+                            continue
+                        }
                         do {
                             _ = try await store.recognizeImageText(id: image.id)
-                            await refresh()
+                            await refreshIfNeeded()
+                            if ProcessInfo.processInfo.isLowPowerModeEnabled { try await Task.sleep(for: .milliseconds(500)) }
                         } catch is CancellationError { return }
-                        catch { failed.insert(image.id) }
-                    } else {
-                        try await Task.sleep(for: .seconds(3))
-                    }
+                        catch { textRecognitionFailures.insert(image.id) }
+                    } else { return }
                 } catch is CancellationError { return }
                 catch { return }
             }
@@ -286,12 +321,15 @@ final class MyClipModel: ObservableObject {
 
     func stop() {
         cloudSync.stop()
+        workspaceObservation?.cancel()
+        workspaceObservation = nil
         worker?.cancel()
         worker = nil
         captureService.stop()
         capturing = false
         textWorker?.cancel()
         searchTask?.cancel()
+        refreshOperation?.cancel()
         taskDiscovery?.cancel()
         organizationTask?.cancel()
         accountAuthorizationTasks.values.forEach { $0.cancel() }
@@ -305,36 +343,95 @@ final class MyClipModel: ObservableObject {
 
     func state(_ agent: ClipAgent) -> ClipAgentState { agents[agent] ?? .init() }
 
-    func refresh() async {
-        await refreshWorkTasks()
-        do {
-            if let agent = preferences.enabledAgent { try await store.reassignPendingCaptures(to: agent) }
-            library = try await store.snapshot()
-            cloudSync.observe(library.entries)
-            proposals = try await store.proposals()
-            statistics = try await store.statistics(since: analyticsDays == 0 ? .distantPast : Calendar.current.date(byAdding: .day, value: -analyticsDays, to: Date())!)
-            tokenUsage = try await store.tokenUsageStatistics()
-            let query = search
-            let filter = captureFilter
-            let found = query.isEmpty && !filter.isActive ? library : try await store.snapshot(query: query, captureFilter: filter)
-            if search == query && captureFilter == filter { results = found }
-        } catch { notice = error.localizedDescription }
+    /// Explicit reads reconcile disk immediately. Worker ticks use cheap domain versions instead.
+    func refresh() async { await requestRefresh(forceReconcile: true) }
+    func refreshIfNeeded() async { await requestRefresh(forceReconcile: false) }
+
+    private func requestRefresh(forceReconcile: Bool) async {
+        refreshAgain = true
+        forceReconcileRequested = forceReconcileRequested || forceReconcile
+        if let refreshOperation { await refreshOperation.value; return }
+        let operation = Task { [weak self] in
+            guard let self else { return }
+            while refreshAgain && !Task.isCancelled {
+                refreshAgain = false
+                let force = forceReconcileRequested
+                forceReconcileRequested = false
+                await performRefresh(forceReconcile: force)
+            }
+            // Clear ownership before completing, so a caller cannot join an already-finished refresh.
+            refreshOperation = nil
+        }
+        refreshOperation = operation
+        await operation.value
     }
 
-    private func refreshWorkTasks() async {
+    private func performRefresh(forceReconcile: Bool) async {
+        do {
+            if let agent = preferences.enabledAgent { try await store.reassignPendingCaptures(to: agent) }
+            let versions = try await store.refreshVersions()
+            let reconcile = Date().timeIntervalSince(lastLibraryRefresh) >= 60
+            let libraryChanged = forceReconcile || reconcile || lastLibraryVersion != versions.library
+            // The independent board must remain readable even when a Memory file fails validation.
+            if reconcile || lastTaskVersion != versions.tasks || !workTasksLoaded || workTasksLoadError != nil {
+                if await refreshWorkTasks() { lastTaskVersion = versions.tasks }
+            }
+            if libraryChanged {
+                let snapshot = try await store.snapshot()
+                if library != snapshot { library = snapshot }
+                cloudSync.observe(snapshot.entries)
+                let nextProposals = try await store.proposals()
+                if proposals != nextProposals { proposals = nextProposals }
+                lastLibraryVersion = versions.library
+                lastLibraryRefresh = Date()
+            }
+            if reconcile || lastStatisticsVersion != versions.statistics || lastAnalyticsDays != analyticsDays
+                || Date().timeIntervalSince(lastStatisticsRefresh) >= 60 {
+                let next = try await store.statistics(since: analyticsDays == 0 ? .distantPast : Calendar.current.date(byAdding: .day, value: -analyticsDays, to: Date())!)
+                if statistics != next { statistics = next }
+                lastStatisticsVersion = versions.statistics
+                lastAnalyticsDays = analyticsDays
+                lastStatisticsRefresh = Date()
+            }
+            if reconcile || lastTokenVersion != versions.tokens {
+                let next = try await store.tokenUsageStatistics()
+                if tokenUsage != next { tokenUsage = next }
+                lastTokenVersion = versions.tokens
+            }
+            let query = search
+            let filter = captureFilter
+            if libraryChanged || lastQuery != query || lastFilter != filter {
+                let found = query.isEmpty && !filter.isActive ? library : try await store.snapshot(query: query, captureFilter: filter)
+                if search == query && captureFilter == filter {
+                    if results != found { results = found }
+                    lastQuery = query
+                    lastFilter = filter
+                }
+            }
+        } catch {
+            if notice != error.localizedDescription { notice = error.localizedDescription }
+        }
+    }
+
+    @discardableResult
+    private func refreshWorkTasks() async -> Bool {
         do {
             let tasks = try await store.workTasks()
             let events = try await store.workTaskEvents()
-            taskIngestionSummary = try await store.taskIngestionSummary()
-            workTasks = tasks
-            workTaskEvents = events
-            workTasksLoaded = true
-            workTasksLoadError = nil
-            workTasksUpdatedAt = Date()
+            let summary = try await store.taskIngestionSummary()
+            let changed = workTasks != tasks || workTaskEvents != events || taskIngestionSummary != summary
+            if workTasks != tasks { workTasks = tasks }
+            if workTaskEvents != events { workTaskEvents = events }
+            if taskIngestionSummary != summary { taskIngestionSummary = summary }
+            if !workTasksLoaded { workTasksLoaded = true }
+            if workTasksLoadError != nil { workTasksLoadError = nil }
+            if changed || workTasksUpdatedAt == nil { workTasksUpdatedAt = Date() }
+            return true
         } catch {
             // Keep the last readable board while the normal refresh loop retries.
-            workTasksLoadError = error.localizedDescription
-            notice = error.localizedDescription
+            if workTasksLoadError != error.localizedDescription { workTasksLoadError = error.localizedDescription }
+            if notice != error.localizedDescription { notice = error.localizedDescription }
+            return false
         }
     }
 

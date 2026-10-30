@@ -213,7 +213,7 @@ final class MemoryConsolidationTests: XCTestCase {
     }
 
     func testMisfiledPagesLeadTheScopeWithinTheLimit() async throws {
-        for index in 0..<6 { try write("Inbox/某产品\(index)帖文.md", title: "某产品\(index)帖文", body: "外部帖子 \(index)。") }
+        for index in 0..<6 { try write("Wiki/Topics/某产品\(index)帖文.md", title: "某产品\(index)帖文", body: "外部帖子 \(index)。") }
         for index in 0..<20 { try write("Wiki/Topics/T\(index).md", title: "T\(index)", body: "主题 \(index)。") }
         let store = try LibraryStore(root: root)
         _ = try await store.snapshot()

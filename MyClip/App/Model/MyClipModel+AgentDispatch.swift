@@ -539,7 +539,7 @@ extension MyClipModel {
             try await store.handoffQueuedOrganizationJobs(to: enabled)
             try Task.checkCancellation()
             // Once a day, when nothing is waiting and the user has been away, the queue gets a dream.
-            if jobID == nil { try await store.enqueueDreamIfDue(agent: enabled) }
+            if jobID == nil, BackgroundWorkBudget.allowsMaintenance { try await store.enqueueDreamIfDue(agent: enabled) }
             let queue = try await store.organizationQueue()
             guard let target = agent ?? queue.nextAgent, target == preferences.enabledAgent,
                   !state(target).busy, state(target).phase != .failed else { return }
@@ -757,8 +757,12 @@ extension MyClipModel {
 
     private func updateActivity(_ text: String, session: String, agent: ClipAgent) {
         guard state(agent).sessionID == session else { return }
-        if currentJob?.agent == agent { activityText = text }
-        else if discoveryAgent == agent { taskDiscoveryMessage = text }
+        if currentJob?.agent == agent {
+            // Streaming deltas often carry the same status. Keep the liveness timestamp accurate
+            // without invalidating the entire SwiftUI tree for every token.
+            lastActivityAt = Date()
+            if activityText != text { activityText = text }
+        } else if discoveryAgent == agent, taskDiscoveryMessage != text { taskDiscoveryMessage = text }
     }
 
     func handle(_ event: ACPEvent, agent: ClipAgent) {

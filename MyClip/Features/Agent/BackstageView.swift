@@ -1,5 +1,6 @@
 import Charts
 import SwiftUI
+import Combine
 import MyClipCore
 
 /// Who organizes captures, how the queue is doing, and what it costs.
@@ -145,7 +146,7 @@ struct BackstageView: View {
 
     @ViewBuilder private func phaseChip(_ state: ClipAgentState, enabled: Bool, availability: LocalAgentAvailability) -> some View {
         switch state.phase {
-        case .working: StatusChip(String(localized: "整理中"), tone: .accent, pulsing: true)
+        case .working: StatusChip(String(localized: "整理中"), tone: .accent)
         case .connecting: StatusChip(String(localized: "连接中"), tone: .neutral)
         case .installing: StatusChip(String(localized: "安装组件"), tone: .neutral)
         case .permission: StatusChip(String(localized: "等待确认"), tone: .warning)
@@ -212,10 +213,10 @@ struct BackstageView: View {
 
     private var jobsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ViewThatFits(in: .horizontal) {
-                HStack { jobHeading; Spacer(minLength: 16); jobControls }
-                VStack(alignment: .leading, spacing: 10) { jobHeading; jobControls }
-            }
+            // One stable header, not two copies of a ticking view measured by ViewThatFits.
+            // Keep controls on their own row at every width to avoid repeated proposal negotiation.
+            jobHeading
+            jobControls
             BackstageCard {
                 if let reason = model.library.queue.pauseReason {
                     Label(reason, systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(.orange)
@@ -264,10 +265,11 @@ struct BackstageView: View {
     private var jobHeading: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text("执行记录").font(.title3.weight(.semibold)).fixedSize()
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text(model.organizationStatus(at: context.date)).font(.callout).lineLimit(1)
-                    .foregroundStyle(model.library.queue.pauseReason != nil ? Color.orange : .secondary)
+            BackstageClock(running: model.currentJob != nil || model.library.queue.readyAt != nil) { date in
+                model.organizationStatus(at: date)
             }
+            .font(.callout)
+            .foregroundStyle(model.library.queue.pauseReason != nil ? Color.orange : .secondary)
         }
     }
 
@@ -320,12 +322,12 @@ struct BackstageView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 8) {
                             Text(jobTitle(job)).font(.subheadline.weight(.medium))
-                            StatusChip(jobChipTitle(job), tone: jobTone(job), pulsing: job.state == .running)
+                            StatusChip(jobChipTitle(job), tone: jobTone(job))
                         }
                         jobDetail(job, usage: usage).font(.caption).lineLimit(1)
                     }
                     Spacer(minLength: 8)
-                    Text(job.createdAt, format: .relative(presentation: .named)).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                    Text(job.createdAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
                     Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
@@ -358,9 +360,8 @@ struct BackstageView: View {
     @ViewBuilder private func jobDetail(_ job: ClipJob, usage: TokenUsageSummary?) -> some View {
         switch job.state {
         case .running:
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text(model.organizationActivity(at: context.date)).foregroundStyle(.secondary)
-            }
+            BackstageClock(running: true) { date in model.organizationActivity(at: date) }
+                .foregroundStyle(.secondary)
         case .failed:
             Text(job.error ?? String(localized: "未完成")).foregroundStyle(.orange)
         case .queued:
@@ -539,6 +540,50 @@ struct AgentModelPickerView: View {
     }
 }
 
+/// Only the small status text owns a clock. This app uses AppKit NSHostingView rather than a SwiftUI
+/// Scene, so scenePhase alone cannot describe whether its particular window is visible and active.
+private struct BackstageClock: View {
+    let running: Bool
+    let text: (Date) -> String
+    @State private var visible = false
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1, paused: !running || !visible)) { context in
+            Text(text(context.date)).lineLimit(1).monospacedDigit()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(BackstageWindowActivity(active: $visible).frame(width: 0, height: 0))
+    }
+}
+
+private struct BackstageWindowActivity: NSViewRepresentable {
+    @Binding var active: Bool
+    func makeNSView(context: Context) -> Probe { Probe(active: $active) }
+    func updateNSView(_ view: Probe, context: Context) { view.active = $active }
+    static func dismantleNSView(_ view: Probe, coordinator: ()) { view.observation?.cancel() }
+
+    final class Probe: NSView {
+        var active: Binding<Bool>
+        var observation: AnyCancellable?
+        init(active: Binding<Bool>) { self.active = active; super.init(frame: .zero) }
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            let names = [NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
+                         NSWindow.didDeminiaturizeNotification, NSWindow.willCloseNotification,
+                         NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification,
+                         NSApplication.didHideNotification, NSApplication.didUnhideNotification]
+            observation = Publishers.MergeMany(names.map { NotificationCenter.default.publisher(for: $0) })
+                .sink { [weak self] _ in Task { @MainActor in self?.publish() } }
+            Task { @MainActor [weak self] in self?.publish() }
+        }
+        private func publish() {
+            let visible = window.map { $0.isVisible && !$0.isMiniaturized && $0.occlusionState.contains(.visible) } ?? false
+            let value = visible && NSApp.isActive && !NSApp.isHidden
+            if active.wrappedValue != value { active.wrappedValue = value }
+        }
+    }
+}
+
 /// White-on-grey grouped surface with a hairline; sections stack their rows inside.
 struct BackstageCard<Content: View>: View {
     @ViewBuilder var content: () -> Content
@@ -554,13 +599,9 @@ struct StatusChip: View {
     enum Tone { case neutral, accent, good, warning }
     let text: String
     let tone: Tone
-    var pulsing = false
-    @State private var dim = false
-
-    init(_ text: String, tone: Tone, pulsing: Bool = false) {
+    init(_ text: String, tone: Tone) {
         self.text = text
         self.tone = tone
-        self.pulsing = pulsing
     }
 
     private var color: Color {
@@ -574,16 +615,12 @@ struct StatusChip: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Circle().fill(color).frame(width: 6, height: 6).opacity(pulsing && dim ? 0.25 : 1)
+            Circle().fill(color).frame(width: 6, height: 6)
             Text(text).lineLimit(1)
         }
         .font(.caption.weight(.medium)).foregroundStyle(color)
         .padding(.horizontal, 8).padding(.vertical, 2)
         .background(color.opacity(0.12), in: Capsule())
-        .onAppear {
-            guard pulsing else { return }
-            withAnimation(.easeInOut(duration: 0.8).repeatForever()) { dim = true }
-        }
     }
 }
 

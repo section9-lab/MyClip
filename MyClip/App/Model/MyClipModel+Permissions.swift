@@ -3,16 +3,22 @@ import MyClipCore
 
 extension MyClipModel {
     func refreshPermissions() {
-        screenPermission = captureService.hasScreenPermission
-        accessibilityPermission = captureService.hasAccessibilityPermission
+        let screen = captureService.hasScreenPermission
+        let accessibility = captureService.hasAccessibilityPermission
+        if screenPermission != screen { screenPermission = screen }
+        if accessibilityPermission != accessibility { accessibilityPermission = accessibility }
         // The preview runs as a differently signed build, so a folder read there would prompt again.
-        if !preview { folderPermission = PermissionCoordinator.hasFolderAccess() }
+        if !preview {
+            let folder = PermissionCoordinator.hasFolderAccess()
+            if folderPermission != folder { folderPermission = folder }
+        }
         guard !preview, worker != nil else { return }
-        capturing = captureService.isRunning
+        if capturing != captureService.isRunning { capturing = captureService.isRunning }
         if !screenPermission || !accessibilityPermission {
             if capturing { captureService.stop() }
-            capturing = false
-            captureStatus = String(localized: "等待屏幕录制和辅助功能权限，授权后将自动开始采集")
+            if capturing { capturing = false }
+            let status = String(localized: "等待屏幕录制和辅助功能权限，授权后将自动开始采集")
+            if captureStatus != status { captureStatus = status }
         } else if !capturing {
             applyCaptureSettings()
             capturing = captureService.start()

@@ -93,17 +93,17 @@ final class MemoryLintTests: XCTestCase {
         XCTAssertTrue(report.lines.isEmpty)
     }
 
-    func testLintMovesReadingRecordsOutOfTopicsAndInbox() async throws {
+    func testLintMovesReadingRecordsOutOfTopics() async throws {
         try writeMemory(path: "Wiki/Topics/Hoy for macOS产品页浏览.md", title: "Hoy for macOS产品页浏览", body: "看了产品页。")
         try writeMemory(path: "Wiki/Topics/赵家驹UTMB访谈（四）.md", title: "赵家驹UTMB访谈（四）", body: "访谈内容。")
-        try writeMemory(path: "Inbox/X上的AI Agent交易收益说法.md", title: "X上的AI Agent交易收益说法", body: "未核实。")
+        try writeMemory(path: "Wiki/Topics/X上的AI Agent交易收益说法.md", title: "X上的AI Agent交易收益说法", body: "未核实。")
         try writeMemory(path: "Wiki/Topics/Cursor.md", title: "Cursor", body: "编辑器。")
         try writeMemory(path: "Wiki/Reading/某篇报道.md", title: "某篇报道", body: "已在正确位置。")
-        try writeMemory(path: "Inbox/MyClip权限与采集状态.md", title: "MyClip权限与采集状态", body: "需要确认。")
+        try writeMemory(path: "Wiki/Projects/MyClip权限与采集状态.md", title: "MyClip权限与采集状态", body: "需要确认。")
         let store = try LibraryStore(root: root)
         _ = try await store.snapshot()
         let report = try await store.memoryLint()
-        XCTAssertEqual(report.misfiled, ["Inbox/X上的AI Agent交易收益说法.md", "Wiki/Topics/Hoy for macOS产品页浏览.md", "Wiki/Topics/赵家驹UTMB访谈（四）.md"])
+        XCTAssertEqual(report.misfiled, ["Wiki/Topics/Hoy for macOS产品页浏览.md", "Wiki/Topics/X上的AI Agent交易收益说法.md", "Wiki/Topics/赵家驹UTMB访谈（四）.md"])
         XCTAssertTrue(report.lines.contains { $0.contains("移到 Wiki/Reading") })
         XCTAssertTrue(report.mandatoryLines.isEmpty, "Misfiled pages are a hint, not a blocking instruction")
     }
@@ -131,13 +131,13 @@ final class MemoryLintTests: XCTestCase {
     }
 
     func testLintNamesSensitiveValuesWithoutRepeatingThem() async throws {
-        try writeMemory(path: "Inbox/登录.md", title: "登录", body: "收到验证码 482913，已登录。")
+        try writeMemory(path: "Daily/登录.md", title: "登录", body: "收到验证码 482913，已登录。")
         try writeMemory(path: "Wiki/Topics/OpenRouter.md", title: "OpenRouter", body: "配置了 sk-or-v1-abcdefghijklmnopqrstuvwxyz0123。")
         try writeMemory(path: "Wiki/Topics/安全.md", title: "安全", body: "验证码已发送。来源：截图 `1234abcd-0000-4000-8000-000000000000`。版本 2026。")
         let store = try LibraryStore(root: root)
         _ = try await store.snapshot()
         let report = try await store.memoryLint()
-        XCTAssertEqual(report.sensitive, ["Inbox/登录.md（验证码）", "Wiki/Topics/OpenRouter.md（密钥）"])
+        XCTAssertEqual(report.sensitive, ["Daily/登录.md（验证码）", "Wiki/Topics/OpenRouter.md（密钥）"])
         let instructions = report.lines.joined(separator: "\n")
         XCTAssertTrue(report.lines.first?.hasPrefix("疑似保存了验证码或密钥") == true)
         XCTAssertFalse(instructions.contains("482913"))

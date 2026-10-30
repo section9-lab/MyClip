@@ -8,6 +8,9 @@ extension LibraryStore {
         guard !memory.isRootDocument else { throw LibraryError.invalidResult(String(localized: "根文件需要保留在 Memory 根目录。")) }
         let destination = try MemoryLayout.url(path, in: root.appendingPathComponent("Memory"))
         if path == memory.relativePath { return }
+        guard ["Wiki/", "Daily/"].contains(where: path.hasPrefix) else {
+            throw LibraryError.invalidResult(String(localized: "新记忆应放在 Wiki 或 Daily 中。"))
+        }
         guard !FileManager.default.fileExists(atPath: destination.path),
               try database.run("SELECT id FROM memory_files WHERE path=?", [path]).isEmpty else { throw LibraryError.conflict }
         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -56,6 +59,12 @@ extension LibraryStore {
     @discardableResult
     public func synchronizeMemoryFiles() throws -> [MemoryLayout.InvalidFile] {
         try prepareMemoryLayout()
+        // Metadata catches normal edits/atomic replacements. Periodically bypass it as a safety net
+        // for tools that deliberately preserve both size and timestamps.
+        if Date().timeIntervalSince(lastMemoryCacheReset) >= 60 {
+            memoryReadCache.reset()
+            lastMemoryCacheReset = Date()
+        }
         var invalid: [MemoryLayout.InvalidFile] = []
         try database.transaction {
             if try !database.run("SELECT value FROM vault_meta WHERE key='search_rebuild'").isEmpty {
@@ -67,13 +76,18 @@ extension LibraryStore {
                 try database.run("DELETE FROM vault_meta WHERE key='source_repair'")
             }
             try flushMemoryFiles()
+            try upgradeLegacyIndexTemplate()
             try importPlainMarkdownFiles()
-            let scan = try MemoryLayout.scan(in: root.appendingPathComponent("Memory"))
+            let scan = try MemoryLayout.scan(in: root.appendingPathComponent("Memory"), cache: &memoryReadCache)
             let files = scan.documents
             invalid = scan.invalid
             let known = try database.run("SELECT * FROM memory_files")
             let paths = Dictionary(uniqueKeysWithValues: known.compactMap { row -> (String, String)? in
                 guard let id = row["id"], let path = row["path"] else { return nil }; return (id, path)
+            })
+            let publishedHashes = Dictionary(uniqueKeysWithValues: known.compactMap { row -> (String, String)? in
+                guard let id = row["id"], let hash = row["published_hash"], row["pending"] == "0" else { return nil }
+                return (id, hash)
             })
             var redirects: [String: String] = [:]
             // Free old paths before assigning new ones, including two files swapping names.
@@ -85,7 +99,9 @@ extension LibraryStore {
                     try database.run("UPDATE memory_files SET path=? WHERE id=?", [".moving-\(document.id.uuidString)", document.id.uuidString])
                 }
             }
-            for (path, _, text, document) in files {
+            for (path, url, text, document) in files {
+                let hash = try memoryReadCache.hash(at: url)
+                if paths[document.id.uuidString] == path, publishedHashes[document.id.uuidString] == hash { continue }
                 let row = try database.run("SELECT * FROM entries WHERE id=?", [document.id.uuidString]).first
                 if let row {
                     let stored = try String(contentsOf: root.appendingPathComponent(row["path"]!), encoding: .utf8)
@@ -112,7 +128,7 @@ extension LibraryStore {
                         contextSourceIDs: document.hasContextField ? document.contextSourceIDs : last?.contextSourceIDs ?? [], observedAt: document.observedAt)
                     try database.run("INSERT OR IGNORE INTO protected_entries VALUES(?)", [document.id.uuidString])
                 }
-                try database.run("UPDATE memory_files SET path=?,published_hash=? WHERE id=?", [path, Self.memoryHash(text), document.id.uuidString])
+                try database.run("UPDATE memory_files SET path=?,published_hash=? WHERE id=?", [path, hash, document.id.uuidString])
             }
             let found = Set(files.map { $0.3.id.uuidString })
             let invalidPaths = Set(invalid.map(\.path))
@@ -133,9 +149,23 @@ extension LibraryStore {
         return invalid
     }
 
+    /// Refresh only the exact seeded overview. Authored overviews and all legacy notes stay untouched.
+    private func upgradeLegacyIndexTemplate() throws {
+        guard let row = try database.run("SELECT e.* FROM entries e JOIN memory_files f ON f.id=e.id WHERE f.path='Memory.md' AND e.revision=1").first else { return }
+        let previous = try entry(row)
+        let stored = try String(contentsOf: root.appendingPathComponent(row["path"]!), encoding: .utf8)
+        guard previous.body == MemoryLayout.legacyIndexBody,
+              let text = try? String(contentsOf: previous.fileURL, encoding: .utf8),
+              text == MemoryDocument.published(stored, path: "Memory.md") else { return }
+        _ = try saveEntry(id: previous.id, kind: .memory, title: previous.title, body: MemoryLayout.initialBody(for: "Memory.md")!,
+                          revision: previous.revision + 1, agent: previous.agent, sourceIDs: previous.sourceIDs,
+                          updatedAt: previous.updatedAt)
+        try flushMemoryFiles()
+    }
+
     private func importPlainMarkdownFiles() throws {
         for (path, url) in try MemoryLayout.markdownFiles(in: root.appendingPathComponent("Memory")) {
-            let text = try String(contentsOf: url, encoding: .utf8)
+            let text = try memoryReadCache.text(at: url)
             if text.hasPrefix("---\n"), let boundary = text.range(of: "\n---\n"),
                text[..<boundary.lowerBound].split(separator: "\n").contains(where: { $0.hasPrefix("id:") }) { continue }
             let row = try database.run("SELECT e.path FROM entries e JOIN memory_files f ON f.id=e.id WHERE f.path=?", [path]).first
@@ -308,7 +338,7 @@ public struct MemoryDocument {
         if path == "Profile.md" { return "profile" }
         if path == "Now.md" { return "focus" }
         let folders: [(String, String)] = [("Wiki/Projects/", "project"), ("Wiki/Topics/", "topic"), ("Wiki/People/", "person"),
-            ("Wiki/Reading/", "reading"), ("Wiki/Workflows/", "workflow"), ("Wiki/Archives/", "archive"), ("Daily/", "daily"), ("Inbox/", "inbox")]
+            ("Wiki/Reading/", "reading"), ("Wiki/Workflows/", "workflow"), ("Wiki/Archives/", "archive"), ("Daily/", "daily")]
         return folders.first { path.hasPrefix($0.0) }?.1 ?? "memory"
     }
 

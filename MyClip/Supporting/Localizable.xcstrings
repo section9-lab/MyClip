@@ -201,6 +201,46 @@
         }
       }
     },
+    "# Memory\n\n## 关于我\n- [[Profile|个人信息与偏好]]\n- [[Now|当前关注事项]]\n\n## 重要记忆\n主题积累在 Wiki/，每日记录保存在 Daily/。\n": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "# Memory\n\n## Über mich\n- [[Profile|Persönliche Informationen und Vorlieben]]\n- [[Now|Aktuelle Themen]]\n\n## Wichtige Memory-Seiten\nThemen sammeln sich in Wiki/, tägliche Aufzeichnungen liegen in Daily/.\n"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "# Memory\n\n## About Me\n- [[Profile|Personal information and preferences]]\n- [[Now|Current focus]]\n\n## Key Memory\nTopics accumulate in Wiki/, and daily records are kept in Daily/.\n"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "# Memory\n\n## Sobre mí\n- [[Profile|Información personal y preferencias]]\n- [[Now|Enfoque actual]]\n\n## Páginas de Memory importantes\nLos temas se acumulan en Wiki/ y los registros diarios se guardan en Daily/.\n"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "# Memory\n\n## À propos de moi\n- [[Profile|Informations personnelles et préférences]]\n- [[Now|Priorités actuelles]]\n\n## Pages Memory importantes\nLes sujets s'accumulent dans Wiki/, les notes quotidiennes sont enregistrées dans Daily/.\n"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "# Memory\n\n## 私について\n- [[Profile|個人情報と好み]]\n- [[Now|現在の関心事項]]\n\n## 重要な Memory\nテーマ別の蓄積は Wiki/ に、日々の記録は Daily/ に保存されます。\n"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "# Memory\n\n## 나에 관하여\n- [[Profile|개인 정보와 선호]]\n- [[Now|현재 관심 사항]]\n\n## 중요한 Memory\n주제는 Wiki/에 누적되고, 일일 기록은 Daily/에 저장됩니다.\n"
+          }
+        }
+      }
+    },
     "# Now\n\n## 当前项目\n尚未整理。\n\n## 当前问题\n\n## 下一步\n": {
       "localizations": {
         "de": {
@@ -17286,46 +17326,6 @@
         }
       }
     },
-    "待确认（Inbox）": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unbestätigt (Inbox)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unconfirmed (Inbox)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sin confirmar (Inbox)"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "À confirmer (Inbox)"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未確認（Inbox）"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "미확인(Inbox)"
-          }
-        }
-      }
-    },
     "待确认：调整为%@": {
       "localizations": {
         "de": {
@@ -21126,42 +21126,42 @@
         }
       }
     },
-    "新记忆应放在 Wiki、Daily 或 Inbox 中。": {
+    "新记忆应放在 Wiki 或 Daily 中。": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Neue Memory-Seiten gehören nach Wiki, Daily oder Inbox."
+            "value": "Neue Memory-Seiten gehören nach Wiki oder Daily."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New Memory pages should be placed in Wiki, Daily, or Inbox."
+            "value": "New Memory pages should be placed in Wiki or Daily."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las páginas de Memory nuevas deben ir en Wiki, Daily o Inbox."
+            "value": "Las páginas de Memory nuevas deben ir en Wiki o Daily."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les nouvelles pages Memory doivent être placées dans Wiki, Daily ou Inbox."
+            "value": "Les nouvelles pages Memory doivent être placées dans Wiki ou Daily."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "新しい Memory は Wiki、Daily、または Inbox に置く必要があります。"
+            "value": "新しい Memory は Wiki または Daily に置く必要があります。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "새 Memory는 Wiki, Daily 또는 Inbox에 저장해야 합니다."
+            "value": "새 Memory는 Wiki 또는 Daily에 저장해야 합니다."
           }
         }
       }

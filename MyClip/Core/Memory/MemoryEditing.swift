@@ -178,9 +178,8 @@ extension LibraryStore {
         guard let id = row["id"].flatMap(UUID.init(uuidString:)), KnowledgeKind(rawValue: row["kind"] ?? "") != nil,
               let agent = ClipAgent(rawValue: row["agent"] ?? ""), let path = row["path"] else { throw LibraryError.database(String(localized: "知识记录格式错误")) }
         let url = root.appendingPathComponent(path)
-        let text = try String(contentsOf: url, encoding: .utf8)
-        let body = text.range(of: "\n---\n").map { String(text[$0.upperBound...]) } ?? text
-        let document = try MemoryDocument(text)
+        let document = try memoryReadCache.document(at: url)
+        let body = document.body
         return KnowledgeEntry(id: id, kind: .memory, title: row["title"] ?? "", body: body,
                               revision: Int(row["revision"] ?? "1") ?? 1,
                               updatedAt: Date(timeIntervalSince1970: Double(row["updated_at"] ?? "0") ?? 0),

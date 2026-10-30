@@ -124,7 +124,7 @@ final class MemoryTests: XCTestCase {
         let url = root.appendingPathComponent("Memory/Wiki/Archives/旧版.md")
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let legacy = try MemoryDocument.encode(id: id, title: "旧版", body: "事实。来源：截图 `\(cited)`。", revision: 3, agent: .codex, sourceIDs: [cited],
-                                               path: "Inbox/旧版.md", contextSourceIDs: context)
+                                               path: "Wiki/Archives/旧版.md", contextSourceIDs: context)
         try legacy.write(to: url, atomically: true, encoding: .utf8)
         _ = try await LibraryStore(root: root).snapshot()
         // Simulate a library written before v12: the published file still carries the full frontmatter.

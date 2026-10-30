@@ -8,7 +8,7 @@ public struct WeeklySummary: Sendable, Equatable, Codable {
 
 /// What one dream may touch, fixed when the dream is queued.
 public struct ConsolidationPlan: Sendable, Equatable, Codable {
-    /// Reading records filed as entities or Inbox items; nothing else moves them, since they rarely change again.
+    /// Reading records filed as entities; nothing else moves them, since they rarely change again.
     public var misfiled: [String] = []
     /// Pages changed since the last completed dream, and their one-hop neighbours.
     public var changed: [String]
@@ -141,7 +141,7 @@ extension LibraryStore {
             guard let id = row["entry_id"], let time = row["reviewed_at"].flatMap(Double.init) else { return nil }
             return (id, time)
         })
-        let patrol = entries.filter { ($0.relativePath.hasPrefix("Wiki/") || $0.relativePath.hasPrefix("Inbox/")) && !taken.contains($0.relativePath) }
+        let patrol = entries.filter { $0.relativePath.hasPrefix("Wiki/") && !taken.contains($0.relativePath) }
             .sorted { (reviewed[$0.id.uuidString] ?? 0, $0.relativePath) < (reviewed[$1.id.uuidString] ?? 0, $1.relativePath) }
             .prefix(MemoryDream.patrolLimit).map(\.relativePath)
         let plan = ConsolidationPlan(misfiled: misfiled, changed: changedPaths, neighbours: neighbours.sorted(), weekly: weekly, patrol: Array(patrol))

@@ -23,7 +23,7 @@ public struct JobMemoryChanges: Codable, Sendable, Equatable {
     public var count: Int { written.count + deletedIDs.count }
 }
 
-public struct ClipJob: Identifiable, Sendable {
+public struct ClipJob: Identifiable, Sendable, Equatable {
     public let id: UUID
     public let agent: ClipAgent
     public let state: ClipJobState

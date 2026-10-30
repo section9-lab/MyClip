@@ -77,7 +77,7 @@
   }
   function directory(state) {
     const file = doc => `<button class="file-row ${doc.path===state.file&&!state.query?'selected':''}" data-file="${doc.path}">${icon('doc')}<span>${doc.path.split('/').pop()}</span></button>`;
-    return `<aside class="memory-dir" aria-label="Memory 文件目录">${['Daily','Inbox','Wiki'].map(name=>`<details class="folder-tree" ${state.file.startsWith(name+'/')?'open':''}><summary class="folder-label">${icon('chevron','chevron')}${icon('folder')}${name}</summary><div class="folder-files">${state.documents.filter(doc=>doc.path.startsWith(name+'/')).map(file).join('')||'<div class="empty-folder">文件夹为空</div>'}</div></details>`).join('')}${state.documents.filter(doc=>!doc.path.includes('/')).map(file).join('')}</aside>`;
+    return `<aside class="memory-dir" aria-label="Memory 文件目录">${['Daily','Wiki'].map(name=>`<details class="folder-tree" ${state.file.startsWith(name+'/')?'open':''}><summary class="folder-label">${icon('chevron','chevron')}${icon('folder')}${name}</summary><div class="folder-files">${state.documents.filter(doc=>doc.path.startsWith(name+'/')).map(file).join('')||'<div class="empty-folder">文件夹为空</div>'}</div></details>`).join('')}${state.documents.filter(doc=>!doc.path.includes('/')).map(file).join('')}</aside>`;
   }
   function memory(state) {
     const doc=state.documents.find(item=>item.path===state.file)||state.documents[0];
@@ -187,7 +187,7 @@
       case 'agent-menu':
         title='整理 Agent';cls='popover-dialog';body=`<div class="dialog-body popover-list">${button('重新连接','reconnect-agent')}${button('停用','disable-agent','danger')}</div>`;break;
       case 'library-info':
-        title='本地资料库';cls='popover-dialog';body='<div class="dialog-body"><p>~/Library/Application Support/MyClip/</p><div class="evidence-box">Memory/<p>Memory.md　Now.md　Profile.md</p><p>Daily/　Inbox/　Wiki/</p></div></div>';break;
+        title='本地资料库';cls='popover-dialog';body='<div class="dialog-body"><p>~/Library/Application Support/MyClip/</p><div class="evidence-box">Memory/<p>Memory.md　Now.md　Profile.md</p><p>Daily/　Wiki/</p></div></div>';break;
     }
     if(!title)return '';
     return `<div class="modal-layer"><section class="app-dialog ${cls}" role="dialog" aria-modal="true" aria-label="${title}"><header class="dialog-header"><strong>${title}</strong>${headerExtra}${iconButton('关闭弹窗','close','close-modal')}</header>${body}${footer?`<footer class="dialog-footer">${footer}</footer>`:''}</section></div>`;

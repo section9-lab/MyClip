@@ -22,6 +22,7 @@ final class FocusedCaptureService {
     private var pendingCaptures: [(CaptureReason, Focus, Int)] = []
     private var lastPointer = NSEvent.mouseLocation
     private var keyboardFocus: Focus?
+    private var lastPermissionCheck: TimeInterval = 0
 
     var hasScreenPermission: Bool { CGPreflightScreenCaptureAccess() }
     var hasAccessibilityPermission: Bool { AXIsProcessTrusted() }
@@ -54,6 +55,7 @@ final class FocusedCaptureService {
         guard hasScreenPermission, hasAccessibilityPermission else { return false }
         stop()
         enabled = true
+        lastPermissionCheck = 0
         suspended = false
         screenLocked = false
         lastPointer = NSEvent.mouseLocation
@@ -77,6 +79,7 @@ final class FocusedCaptureService {
         let poller = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.poll() }
         }
+        poller.tolerance = 0.05
         timer = poller
         RunLoop.main.add(poller, forMode: .common)
         let center = NSWorkspace.shared.notificationCenter
@@ -125,6 +128,7 @@ final class FocusedCaptureService {
 
     private func setScreenLocked(_ value: Bool) {
         screenLocked = value
+        updatePollingState()
         generation += 1
         pendingCaptures.removeAll()
         trigger.reset()
@@ -135,12 +139,18 @@ final class FocusedCaptureService {
 
     private func suspend(_ value: Bool) {
         suspended = value
+        updatePollingState()
         generation += 1
         pendingCaptures.removeAll()
         trigger.reset()
         keyboardFocus = nil
         lastPointer = NSEvent.mouseLocation
         onStatus?(value ? String(localized: "屏幕休眠，等待恢复") : String(localized: "等待应用中的活动"))
+    }
+
+    private func updatePollingState() {
+        timer?.fireDate = suspended || screenLocked ? .distantFuture : Date().addingTimeInterval(0.15)
+        lastPermissionCheck = 0
     }
 
     private func activity(type: NSEvent.EventType, at time: TimeInterval, clickCount: Int, scrollDeltaY: Double) {
@@ -187,12 +197,15 @@ final class FocusedCaptureService {
 
     private func poll() {
         guard enabled, !suspended, !screenLocked else { return }
-        guard hasScreenPermission, hasAccessibilityPermission else {
-            stop()
-            onStatus?(String(localized: "采集权限已关闭，请在设置中恢复"))
-            return
-        }
         let time = ProcessInfo.processInfo.systemUptime
+        if time - lastPermissionCheck >= 3 {
+            lastPermissionCheck = time
+            guard hasScreenPermission, hasAccessibilityPermission else {
+                stop()
+                onStatus?(String(localized: "采集权限已关闭，请在设置中恢复"))
+                return
+            }
+        }
         updatePointer(at: time)
         if let reason = trigger.poll(at: time) { capture(reason: reason) }
     }

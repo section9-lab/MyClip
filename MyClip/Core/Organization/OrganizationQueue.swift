@@ -1,6 +1,6 @@
 import Foundation
 
-public struct OrganizationQueue: Sendable {
+public struct OrganizationQueue: Sendable, Equatable {
     public static let batchSize = 8
     public static let interval: TimeInterval = 300
     public var pendingCounts: [ClipAgent: Int] = [:]

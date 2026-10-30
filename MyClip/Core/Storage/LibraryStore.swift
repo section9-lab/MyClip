@@ -4,6 +4,13 @@ public actor LibraryStore {
     public nonisolated let root: URL
     let database: SQLiteConnection
     var textRecognitionTasks: [String: Task<String, Error>] = [:]
+    let memoryMonitor: LibraryFileMonitor
+    let imageMonitor: LibraryFileMonitor
+    var memoryReadCache = MemoryReadCache()
+    var lastMemoryCacheReset = Date.distantPast
+    var imageStorageCache: (bytes: Int64, generation: UInt64, checkedAt: Date)?
+    var lintPageCache: [UUID: MemoryLintPage] = [:]
+    var lintMentionCache: [String: (revision: Int, found: Bool)] = [:]
 
     public init(root: URL) throws {
         self.root = root
@@ -19,6 +26,8 @@ public actor LibraryStore {
                 }
             }
         }
+        memoryMonitor = LibraryFileMonitor(directory: root.appendingPathComponent("Memory"))
+        imageMonitor = LibraryFileMonitor(directory: images)
         database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
         try Self.prepareDatabase(database)
         for row in try database.run("SELECT image_id,body FROM image_text JOIN images ON images.id=image_text.image_id WHERE available=1") {

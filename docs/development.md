@@ -26,6 +26,12 @@
 
 `project.yml` 是 Xcode 项目的来源。新增、移动应用源文件后运行 `xcodegen generate`，将生成的 `MyClip.xcodeproj` 一起保留。Core 的 Swift 文件由 SwiftPM 自动发现。
 
+## Memory 与看板的边界
+
+Memory 仅保存有来源依据的上下文：`Daily/` 记录经过，`Wiki/` 积累项目与专题知识，`Profile.md` 只接受用户明确表达或确认的信息。待办、待确认事项和任务状态由独立看板逻辑管理，不通过记忆目录维护另一套清单，也不自动收集个人偏好候选。
+
+不再初始化 `Inbox/`，新建和移动记忆的目标仅允许 `Wiki/` 或 `Daily/`。旧资料库的非空 Inbox 保留原路径，继续支持读取、检索、编辑和已有链接；不会自动变成已确认知识或看板任务。空 Inbox 安全清理，未经编辑的旧版概览模板会更新，用户撰写的概览不覆盖。旧 Inbox 内容不再参与云同步。
+
 ## 提示词
 
 提示词使用 Swift 多行字符串，可以直接插入语言、时间、任务、来源和限制值，无需额外的模板加载器。
@@ -41,6 +47,10 @@
 调用方只传入数据。任务 JSON 的解析留在 `Core/Tasks/TaskResponse.swift`；文件读取、检索、执行 Agent 和写回数据库不放进 Prompt。
 
 修改共享写入规则时只改 `MemoryRules`，避免各个流程的规则产生分歧。纯提示词测试在 `Tests/MyClipCoreTests/Prompt/`；需要真实存储或队列的联动测试留在对应领域。评测专用提示词在 `benchmark/prompts/`，不进入应用。
+
+## 性能与后台工作
+
+应用保留轻量队列/恢复检查，但界面刷新使用 SQLite 按表版本、跨连接 `data_version` 和目录事件按域失效；无变化时不发布 ObservableObject 状态。显式读取立即核对 Memory，后台最长约一分钟做兜底核对。文件解析、哈希、容量和 Memory 校验缓存的失效规则、能耗策略与基准见 [性能与能耗](performance-and-energy.md)。
 
 ## 构建与验证
 

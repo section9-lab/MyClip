@@ -19,7 +19,7 @@ public struct TokenUsage: Sendable, Equatable {
     }
 }
 
-public struct TokenUsageSummary: Sendable {
+public struct TokenUsageSummary: Sendable, Equatable {
     public var calls = 0
     public var reportedCalls = 0
     public var totalTokens: Int?
@@ -63,7 +63,7 @@ public extension TokenUsageSummary {
 }
 
 /// One local calendar day of recorded usage, split by Agent.
-public struct TokenUsageDay: Sendable, Identifiable {
+public struct TokenUsageDay: Sendable, Identifiable, Equatable {
     public let day: Date
     public var agents: [ClipAgent: TokenUsageSummary] = [:]
     public var total = TokenUsageSummary()
@@ -71,7 +71,7 @@ public struct TokenUsageDay: Sendable, Identifiable {
     public init(day: Date) { self.day = day }
 }
 
-public struct TokenUsageStatistics: Sendable {
+public struct TokenUsageStatistics: Sendable, Equatable {
     public static let historyDays = 90
     public var total = TokenUsageSummary()
     public var agents: [ClipAgent: TokenUsageSummary] = [:]

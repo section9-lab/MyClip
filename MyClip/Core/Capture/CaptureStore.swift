@@ -18,6 +18,7 @@ extension LibraryStore {
 
     public func record(image: CapturedImage, context: CaptureContext, agent: ClipAgent, organize: Bool, extractedText: String? = nil,
                        filterStrategies: Set<CaptureFilterStrategy> = CaptureFilterStrategy.defaults) throws {
+        defer { imageStorageCache = nil }
         let decision = try database.transaction { () -> RecordingDecision in
             var decision = try recordingDecision(for: image, context: context, filterStrategies: filterStrategies)
             if decision.reusedImage {
@@ -104,6 +105,7 @@ extension LibraryStore {
         if let text = try database.run("SELECT body FROM image_text WHERE image_id=?", [id]).first?["body"] {
             if !FileManager.default.fileExists(atPath: documentURL.path) {
                 try text.write(to: documentURL, atomically: true, encoding: .utf8)
+                imageStorageCache = nil
             }
             return text
         }
@@ -128,6 +130,7 @@ extension LibraryStore {
     }
 
     public func indexImageText(id: String, text: String) throws {
+        defer { imageStorageCache = nil }
         try database.transaction {
             guard try !database.run("SELECT id FROM images WHERE id=? AND available=1", [id]).isEmpty else { return }
             try database.run("INSERT INTO image_text VALUES(?,?) ON CONFLICT(image_id) DO UPDATE SET body=excluded.body", [id, text])
@@ -143,6 +146,7 @@ extension LibraryStore {
 
     /// Rebuilds every derived search table from entry files: passages, full text, link edges and anchor text.
     public func expireImages(before date: Date) throws {
+        defer { imageStorageCache = nil }
         let rows = try database.run("""
             SELECT i.id FROM images i JOIN captures c ON c.image_id=i.id WHERE i.available=1
             GROUP BY i.id HAVING max(c.captured_at) < CAST(? AS REAL) AND i.id NOT IN (

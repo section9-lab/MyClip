@@ -15,7 +15,7 @@ public struct TaskIngestion: Sendable, Identifiable {
     public let error: String?
 }
 
-public struct TaskIngestionSummary: Sendable {
+public struct TaskIngestionSummary: Sendable, Equatable {
     public var pendingCount = 0
     public var failedCount = 0
     public var lastError: String?

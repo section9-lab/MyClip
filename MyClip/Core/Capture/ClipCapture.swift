@@ -20,7 +20,7 @@ public struct CaptureContext: Sendable {
     }
 }
 
-public struct ClipCapture: Identifiable, Sendable {
+public struct ClipCapture: Identifiable, Sendable, Equatable {
     public let id: UUID
     public let appName: String
     public let bundleID: String

@@ -1,6 +1,6 @@
 import Foundation
 
-public struct LibraryStatistics: Sendable {
+public struct LibraryStatistics: Sendable, Equatable {
     public var captures = 0
     public var uniqueImages = 0
     public var memories = 0
@@ -12,7 +12,7 @@ public struct LibraryStatistics: Sendable {
     public var storageBytes: Int64 = 0
     public var days: [Count] = []
     public var applications: [Count] = []
-    public struct Count: Identifiable, Sendable {
+    public struct Count: Identifiable, Sendable, Equatable {
         public let name: String
         public let count: Int
         public var id: String { name }
@@ -37,14 +37,25 @@ extension LibraryStore {
         result.averageSeconds = try database.run("SELECT avg(t.finished_at-t.started_at) seconds FROM job_times t JOIN jobs j ON j.id=t.id WHERE j.state='completed' AND j.created_at>=?", [date]).first?["seconds"].flatMap(Double.init)
         result.days = try database.run("SELECT strftime('%Y-%m-%d', captured_at, 'unixepoch', 'localtime') name, count(*) n FROM captures WHERE captured_at>=? GROUP BY name ORDER BY name", [date]).map { .init(name: $0["name"] ?? "", count: Int($0["n"] ?? "0") ?? 0) }
         result.applications = try database.run("SELECT app_name name,count(*) n FROM captures WHERE captured_at>=? GROUP BY app_name ORDER BY n DESC LIMIT 12", [date]).map { .init(name: $0["name"] ?? "", count: Int($0["n"] ?? "0") ?? 0) }
-        for item in (try? FileManager.default.contentsOfDirectory(at: root.appendingPathComponent("Images"), includingPropertiesForKeys: [.fileSizeKey])) ?? [] {
-            result.storageBytes += Int64((try? item.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
-        }
+        result.storageBytes = imageStorageBytes()
         return result
+    }
+
+    /// File events invalidate this snapshot; local writes invalidate synchronously before the next read.
+    /// A periodic reconciliation handles other tools and missed filesystem notifications.
+    func imageStorageBytes() -> Int64 {
+        let generation = imageMonitor.generation
+        if let cache = imageStorageCache, cache.generation == generation, Date().timeIntervalSince(cache.checkedAt) < 60 { return cache.bytes }
+        var bytes: Int64 = 0
+        for item in (try? FileManager.default.contentsOfDirectory(at: root.appendingPathComponent("Images"), includingPropertiesForKeys: [.fileSizeKey])) ?? [] {
+            bytes += Int64((try? item.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        }
+        imageStorageCache = (bytes, generation, Date())
+        return bytes
     }
 }
 
-public struct MemoryProposal: Identifiable, Sendable {
+public struct MemoryProposal: Identifiable, Sendable, Equatable {
     public let id: UUID
     public let drafts: [KnowledgeDraft]
 }

@@ -65,11 +65,11 @@ extension MemoryLintReport {
         if !unknownCitations.isEmpty { result.append("引用了没有记录的截图 ID（多为抄错），核对后改成本批或已有记忆里真实的 ID，找不到依据就删掉该引用：" + unknownCitations.joined(separator: "；")) }
         if !brokenLinks.isEmpty { result.append("断链（目标不存在，需修正或建页）：" + brokenLinks.joined(separator: "；")) }
         if !unlinkedMentions.isEmpty { result.append("提到已有页面但未加链接：" + unlinkedMentions.joined(separator: "；")) }
-        if !candidateEntities.isEmpty { result.append("多处提到但没有页面的名词，考虑建 Wiki 页或 Inbox 条目：" + candidateEntities.joined(separator: "、")) }
+        if !candidateEntities.isEmpty { result.append("多处提到但没有页面的名词，有充分依据时考虑建 Wiki 页：" + candidateEntities.joined(separator: "、")) }
         if !oversized.isEmpty { result.append("过长文件（先整理再追加：把对话经过移入对应 Daily 并互链，页面按固定结构只留当前结论）：" + oversized.joined(separator: "；")) }
         if !hubs.isEmpty { result.append("被大量页面链接的枢纽页：按工作线拆成子页 Wiki/Projects/名称/主题.md，原页只留概览、当前状态和子页导航，再把各处链接改到最具体的子页或 #小节：" + hubs.joined(separator: "；")) }
         if !longLines.isEmpty { result.append("超过 \(GraphConstants.excerptLimit) 字的行会在检索片段里被截断，拆成每行一件事（不含链接和来源约 120 字以内），链接与来源跟着各自的事实：" + longLines.joined(separator: "；")) }
-        if !misfiled.isEmpty { result.append("外部内容或浏览记录放在了实体或待确认目录，移到 Wiki/Reading 并链接其中提到的实体页：" + misfiled.joined(separator: "；")) }
+        if !misfiled.isEmpty { result.append("外部内容或浏览记录放在了实体目录，移到 Wiki/Reading 并链接其中提到的实体页：" + misfiled.joined(separator: "；")) }
         return result
     }
 }

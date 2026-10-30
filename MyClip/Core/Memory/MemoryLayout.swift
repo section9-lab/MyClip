@@ -2,18 +2,23 @@ import Foundation
 
 public enum MemoryLayout {
     public static let rootFiles = ["Memory.md", "Profile.md", "Now.md"]
-    public static let folders = ["Wiki", "Wiki/Projects", "Wiki/Topics", "Wiki/People", "Wiki/Reading", "Wiki/Workflows", "Daily", "Inbox"]
+    public static let folders = ["Wiki", "Wiki/Projects", "Wiki/Topics", "Wiki/People", "Wiki/Reading", "Wiki/Workflows", "Daily"]
     /// Folders added after a library was laid out; created once, so a folder the user removes stays removed.
     static let laterFolders = [2: ["Wiki/People", "Wiki/Reading"]]
     static let layoutVersion = 2
 
     public static func initialBody(for path: String) -> String? {
         let templates: [String: String] = [
-            "Memory.md": String(localized: "# Memory\n\n## 关于我\n- [[Profile|个人信息与偏好]]\n- [[Now|当前关注事项]]\n\n## 重要记忆\n主题积累在 Wiki/，每日记录保存在 Daily/。\n\n## 待确认\n待确认内容保存在 Inbox/。\n"),
+            "Memory.md": String(localized: "# Memory\n\n## 关于我\n- [[Profile|个人信息与偏好]]\n- [[Now|当前关注事项]]\n\n## 重要记忆\n主题积累在 Wiki/，每日记录保存在 Daily/。\n"),
             "Profile.md": String(localized: "# Profile\n\n## 已确认的信息\n尚未填写。只保存你明确表达或确认的信息。\n\n## 沟通偏好\n\n## 工作方式\n\n## 长期目标\n\n## 最近确认\n"),
             "Now.md": String(localized: "# Now\n\n## 当前项目\n尚未整理。\n\n## 当前问题\n\n## 下一步\n")
         ]
         return templates[path]
+    }
+
+    /// Only used to upgrade an untouched overview from before the Inbox was retired.
+    static var legacyIndexBody: String {
+        String(localized: "# Memory\n\n## 关于我\n- [[Profile|个人信息与偏好]]\n- [[Now|当前关注事项]]\n\n## 重要记忆\n主题积累在 Wiki/，每日记录保存在 Daily/。\n\n## 待确认\n待确认内容保存在 Inbox/。\n")
     }
 
     static func defaultPath(id: UUID, title: String) -> String {
@@ -79,13 +84,21 @@ public enum MemoryLayout {
     /// One unreadable, empty or oversized file is reported rather than failing the whole vault.
     /// Two files claiming one ID still fail: the index could not tell which one is the memory.
     static func scan(in directory: URL) throws -> (documents: [(String, URL, String, MemoryDocument)], invalid: [InvalidFile]) {
+        var cache = MemoryReadCache()
+        return try scan(in: directory, cache: &cache)
+    }
+
+    static func scan(in directory: URL, cache: inout MemoryReadCache) throws -> (documents: [(String, URL, String, MemoryDocument)], invalid: [InvalidFile]) {
         var result: [(String, URL, String, MemoryDocument)] = []
         var invalid: [InvalidFile] = []
         var ids: [UUID: String] = [:]
         for (path, url) in try markdownFiles(in: directory) {
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else { invalid.append(InvalidFile(path: path, reason: String(localized: "不是 UTF-8 文本。"))); continue }
+            guard let text = try? cache.text(at: url) else { invalid.append(InvalidFile(path: path, reason: String(localized: "不是 UTF-8 文本。"))); continue }
             let document: MemoryDocument
-            do { document = try MemoryDocument.accepted(text) } catch LibraryError.invalidResult(let reason) {
+            do {
+                document = try cache.document(at: url)
+                try MemoryDocument.validate(title: document.title, body: document.body)
+            } catch LibraryError.invalidResult(let reason) {
                 // A plain note without MyClip metadata is described by its body problem, not by the missing header.
                 var explanation = reason
                 if !text.hasPrefix("---\n") {
@@ -108,8 +121,8 @@ extension LibraryStore {
         if let current {
             guard path == current.relativePath else { throw LibraryError.invalidResult(String(localized: "更新已有记忆时不能改变文件路径。")) }
         } else {
-            guard ["Wiki/", "Daily/", "Inbox/"].contains(where: path.hasPrefix) else {
-                throw LibraryError.invalidResult(String(localized: "新记忆应放在 Wiki、Daily 或 Inbox 中。"))
+            guard ["Wiki/", "Daily/"].contains(where: path.hasPrefix) else {
+                throw LibraryError.invalidResult(String(localized: "新记忆应放在 Wiki 或 Daily 中。"))
             }
         }
         return path
@@ -117,6 +130,13 @@ extension LibraryStore {
 
     func prepareMemoryLayout() throws {
         let directory = root.appendingPathComponent("Memory")
+        // Old notes remain readable at their original paths. Never remove a nonempty legacy folder.
+        _ = try MemoryLayout.url("Inbox/Memory.md", in: directory)
+        let legacyInbox = directory.appendingPathComponent("Inbox")
+        if FileManager.default.fileExists(atPath: legacyInbox.path),
+           try FileManager.default.contentsOfDirectory(atPath: legacyInbox.path).isEmpty {
+            try FileManager.default.removeItem(at: legacyInbox)
+        }
         if let layout = try database.run("SELECT value FROM vault_meta WHERE key='layout'").first?["value"].flatMap(Int.init) {
             guard layout < MemoryLayout.layoutVersion else { return }
             for (version, folders) in MemoryLayout.laterFolders where version > layout {

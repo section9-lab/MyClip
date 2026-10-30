@@ -4,6 +4,19 @@ import SQLite3
 // Owned by LibraryStore. FULLMUTEX also protects connection teardown.
 final class SQLiteConnection: @unchecked Sendable {
     private let handle: OpaquePointer
+    private let changes = TableChanges()
+
+    private final class TableChanges {
+        private let lock = NSLock()
+        private var revisions: [String: UInt64] = [:]
+        func record(_ table: String) { lock.lock(); revisions[table, default: 0] &+= 1; lock.unlock() }
+        func revision(_ tables: [String]) -> UInt64 {
+            lock.lock(); defer { lock.unlock() }
+            return tables.reduce(0) { $0 &+ (revisions[$1] ?? 0) }
+        }
+    }
+
+    func tableRevision(_ tables: [String]) -> UInt64 { changes.revision(tables) }
 
     init(url: URL) throws {
         var database: OpaquePointer?
@@ -15,9 +28,14 @@ final class SQLiteConnection: @unchecked Sendable {
         }
         handle = database
         sqlite3_busy_timeout(handle, 5_000)
+        sqlite3_update_hook(handle, { context, _, _, table, _ in
+            if let context, let table {
+                Unmanaged<TableChanges>.fromOpaque(context).takeUnretainedValue().record(String(cString: table))
+            }
+        }, Unmanaged.passUnretained(changes).toOpaque())
     }
 
-    deinit { sqlite3_close(handle) }
+    deinit { sqlite3_update_hook(handle, nil, nil); sqlite3_close(handle) }
 
     func script(_ sql: String) throws {
         var message: UnsafeMutablePointer<CChar>?
