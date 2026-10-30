@@ -120,8 +120,8 @@ private final class BackstageChecks: NSObject, NSApplicationDelegate {
         let original = model.library.jobs.first!
         for iteration in 0..<40 {
             model.organizationSection = OrganizationSection.allCases[iteration % 3]
-            var current = original
-            current.state = .running
+            let current = ClipJob(id: original.id, agent: original.agent, state: .running,
+                                  createdAt: original.createdAt, sourceIDs: original.sourceIDs, error: nil)
             model.currentJob = iteration.isMultiple(of: 2) ? current : nil
             model.activityText = "进度更新 \(iteration)：检查当前资料并保留来源。"
             if iteration % 8 == 0 {
