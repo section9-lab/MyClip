@@ -46,15 +46,27 @@ struct TaskDashboardView: View {
             }
             .background(Color(nsColor: .windowBackgroundColor))
         }
+        .onAppear { presentPendingTaskEditor() }
+        .onChange(of: model.shouldCreateTask) { _ in presentPendingTaskEditor() }
         .onChange(of: model.taskDiscoveryMessage) { _ in showingDiscoveryDetails = false }
         .sheet(isPresented: Binding(get: { selectedID != nil }, set: { if !$0 { selectedID = nil } })) {
             if let selectedID { TaskDetailView(model: model, taskID: selectedID) }
         }
         .sheet(item: $editing, onDismiss: {
             if let savedTaskID { selectedID = savedTaskID; self.savedTaskID = nil }
+            Task { @MainActor in
+                await Task.yield()
+                presentPendingTaskEditor()
+            }
         }) { request in
             TaskEditorView(model: model, task: request.task) { savedTaskID = $0 }
         }
+    }
+
+    private func presentPendingTaskEditor() {
+        guard model.shouldCreateTask, editing == nil else { return }
+        model.shouldCreateTask = false
+        editing = TaskEditRequest(task: nil)
     }
 
     private func board(width: CGFloat) -> some View {
@@ -138,7 +150,7 @@ struct TaskDashboardView: View {
                     .help("从最近 200 篇 Memory 发现待办并更新已有任务；新截图整理时也会自动更新。")
             }
             Button(String(localized: "新建待办"), systemImage: "plus") { editing = TaskEditRequest(task: nil) }
-                .buttonStyle(.borderedProminent).keyboardShortcut("n", modifiers: .command)
+                .buttonStyle(.borderedProminent)
         }.controlSize(.small).fixedSize(horizontal: true, vertical: false)
     }
 

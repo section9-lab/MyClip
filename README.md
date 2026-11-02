@@ -38,7 +38,7 @@ Requires **macOS 13+**, **Node.js 22+**, and an account for your selected Agent.
 2. Open MyClip, choose an Agent, and click **Get Started**.
 3. Grant **Screen Recording** and **Accessibility** permissions. MyClip captures and organizes automatically while it is open.
 
-Capture scope, excluded apps, and automatic organization can be changed in **Settings**. Quit MyClip to stop capture.
+Capture scope, excluded apps, and automatic organization can be changed in **Settings**. Pause or resume capture from the sidebar, menu bar popover, or **MyClip** menu; quitting also stops capture.
 
 Choose models in **Backstage**. Every supported Agent loads its own searchable list and remembers its selection for later sessions; no model names are hardcoded. See [model selection](docs/agent-model-selection.md).
 
@@ -61,7 +61,7 @@ Connected clients receive retrieved memory content and may receive short summari
 
 ## Anonymous usage statistics
 
-The app sends anonymous app-launch and daily-activity events to Mixpanel. Use **Share anonymous usage** in Settings to turn this off. Application content is not included. See the [analytics and privacy details](docs/analytics.md).
+Anonymous app-launch and daily-activity analytics are off by default. You can opt in with **Share anonymous usage** in Settings. Application content is never included. See the [analytics and privacy details](docs/analytics.md).
 
 ## Contributing
 

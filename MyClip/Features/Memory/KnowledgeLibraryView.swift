@@ -283,6 +283,17 @@ private struct KnowledgeDetailView: View {
                 .contextMenu { actions }
         }
         .background(Color(nsColor: .textBackgroundColor))
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    actions
+                } label: {
+                    Label(String(localized: "更多"), systemImage: "ellipsis.circle")
+                }
+                .help("编辑、导出、移动或删除这篇记忆")
+                .accessibilityLabel("记忆操作")
+            }
+        }
         .task(id: "\(entry.id)-\(entry.revision)") {
             do { sources = try await model.store.availableCaptures(ids: entry.sourceIDs); relations = try await model.store.relations(entry.id) }
             catch { model.notice = error.localizedDescription }

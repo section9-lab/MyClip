@@ -29,6 +29,6 @@ Nécessite **macOS 13+**, **Node.js 22+** et un compte pour l’agent choisi.
 2. Ouvrez MyClip, choisissez un agent et cliquez sur **Commencer**.
 3. Accordez les autorisations **Enregistrement de l’écran** et **Accessibilité**. MyClip capture et organise automatiquement tant qu’il est ouvert.
 
-Dans les **Réglages**, vous pouvez modifier la portée des captures, exclure des applications ou désactiver l’organisation automatique. Quittez MyClip pour arrêter les captures.
+Dans les **Réglages**, vous pouvez modifier la portée des captures, exclure des applications ou désactiver l’organisation automatique. Suspendez ou reprenez la capture depuis la barre latérale, le panneau de la barre des menus ou le menu **MyClip** ; quitter l’app l’arrête également.
 
 Les versions sont auto-signées et non notariées. Si macOS bloque le premier lancement, consultez l’[aide à l’installation](release-signing.md#installing-a-community-build).

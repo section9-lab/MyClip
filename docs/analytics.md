@@ -26,7 +26,7 @@ Every client event contains these coarse device-setting properties:
 
 Label the country report **Device country/region setting**. These are settings, not verified residence or current physical location. English and shared timezones cannot uniquely determine a country. The app never guesses a country from those signals, and worldwide/numeric regions remain unknown. IP-based geolocation remains disabled; no precise coordinates or location permission is used. Older events cannot acquire these fields retroactively. Regional hints are refreshed on each newly recorded active day.
 
-The settings disclosure includes language, system region and timezone. The existing anonymous-usage switch controls all client events. Opting out prevents initialization on future launches and opts out the running SDK. No conversations, screenshots, clipboard data, files, commands, account identifiers, hardware UUIDs or session replay are sent.
+Anonymous analytics are off by default. The Settings disclosure includes language, system region and timezone; people must opt in before the SDK sends client events. The anonymous-usage switch controls all client events. Opting out prevents initialization on future launches and opts out the running SDK. No conversations, screenshots, clipboard data, files, commands, account identifiers, hardware UUIDs or session replay are sent.
 
 ## Download analysis
 

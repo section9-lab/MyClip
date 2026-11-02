@@ -7,6 +7,7 @@ final class ClipPreferences: ObservableObject {
     private let defaults: UserDefaults
     @Published var enabledAgent: ClipAgent? { didSet { defaults.set(enabledAgent?.rawValue, forKey: "myclip.enabledAgent") } }
     @Published var autoOrganize: Bool { didSet { defaults.set(autoOrganize, forKey: "myclip.autoOrganize") } }
+    @Published var captureEnabled: Bool { didSet { defaults.set(captureEnabled, forKey: "myclip.captureEnabled") } }
     @Published var captureSettings: CaptureSettings { didSet { captureSettings.save(to: defaults) } }
     @Published var retentionDays: Int { didSet { defaults.set(retentionDays, forKey: "myclip.retentionDays") } }
     @Published var excludedApps: String { didSet { defaults.set(excludedApps, forKey: "myclip.excludedApps") } }
@@ -24,6 +25,7 @@ final class ClipPreferences: ObservableObject {
         self.defaults = defaults
         enabledAgent = ClipAgent(rawValue: defaults.string(forKey: "myclip.enabledAgent") ?? "")
         autoOrganize = defaults.object(forKey: "myclip.autoOrganize") as? Bool ?? true
+        captureEnabled = defaults.object(forKey: "myclip.captureEnabled") as? Bool ?? true
         captureSettings = CaptureSettings.load(from: defaults)
         retentionDays = defaults.object(forKey: "myclip.retentionDays") as? Int ?? 30
         excludedApps = defaults.string(forKey: "myclip.excludedApps") ?? "com.apple.Passwords\ncom.agilebits.onepassword7\ncom.1password.1password"
@@ -64,7 +66,16 @@ enum LibraryPage: String, CaseIterable, Identifiable {
         case .memory: "Memory"
         case .captures: "Timeline"
         case .agents: String(localized: "自动整理")
-        case .settings: "Settings"
+        case .settings: String(localized: "设置")
+        }
+    }
+    var supportsSearch: Bool { self == .memory || self == .captures || self == .dashboard }
+    var searchPlaceholder: String {
+        switch self {
+        case .memory: String(localized: "搜索记忆")
+        case .captures: String(localized: "搜索截图")
+        case .dashboard: String(localized: "搜索任务")
+        case .agents, .settings: ""
         }
     }
     var symbol: String {
@@ -138,6 +149,7 @@ final class MyClipModel: ObservableObject {
     var memoryScrollOffsets: [UUID: CGFloat] = [:]
     @Published var capturing = false
     @Published var workTasks: [WorkTask] = []
+    @Published var shouldCreateTask = false
     @Published private(set) var workTasksLoaded = false
     @Published private(set) var workTasksLoadError: String?
     @Published private(set) var workTasksUpdatedAt: Date?
@@ -202,6 +214,7 @@ final class MyClipModel: ObservableObject {
     var currentJobStartedAt: Date?
     var lastActivityAt = Date()
     var onOpenWindow: (() -> Void)?
+    var onOpenSettings: (() -> Void)?
 
     let captureService = FocusedCaptureService()
     let runtime: AgentRuntime
@@ -357,9 +370,27 @@ final class MyClipModel: ObservableObject {
     }
 
     func open(_ page: LibraryPage? = nil) {
+        if page == .settings, let onOpenSettings {
+            onOpenSettings()
+            return
+        }
         if let page { self.page = page }
         onOpenWindow?()
     }
+
+    func requestNewTask() {
+        page = .dashboard
+        shouldCreateTask = true
+        onOpenWindow?()
+    }
+
+    func setCaptureEnabled(_ enabled: Bool) {
+        guard !preview else { return }
+        preferences.captureEnabled = enabled
+        refreshPermissions()
+    }
+
+    func toggleCapture() { setCaptureEnabled(!preferences.captureEnabled) }
 
     func state(_ agent: ClipAgent) -> ClipAgentState { agents[agent] ?? .init() }
 

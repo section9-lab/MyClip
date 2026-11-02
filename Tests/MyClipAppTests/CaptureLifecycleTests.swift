@@ -50,7 +50,7 @@ struct CaptureLifecycleTests {
                        screen: Bool = true, accessibility: Bool = true) throws -> MyClipModel {
             FocusedCaptureService.initialScreenPermission = screen
             FocusedCaptureService.initialAccessibilityPermission = accessibility
-            var defaults: [String: Any] = ["myclip.autoOrganize": false]
+            var defaults: [String: Any] = ["myclip.autoOrganize": false, "myclip.captureEnabled": true]
             if let previousCapture { defaults["myclip.captureWasEnabled"] = previousCapture }
             UserDefaults.standard.setVolatileDomain(defaults, forName: UserDefaults.argumentDomain)
             return try MyClipModel(root: root.appendingPathComponent(name), preview: preview)
@@ -69,6 +69,13 @@ struct CaptureLifecycleTests {
             model.refreshPermissions()
             model.refreshPermissions()
             check(capture.startCount == starts, "Permission refresh does not restart active capture")
+            model.setCaptureEnabled(false)
+            check(!model.capturing && !capture.running && model.captureStatus == "采集已暂停", "People can pause capture without quitting the app")
+            let pausedStarts = capture.startCount
+            model.refreshPermissions()
+            check(capture.startCount == pausedStarts, "Permission refresh respects an explicit capture pause")
+            model.setCaptureEnabled(true)
+            check(model.capturing && capture.running, "People can resume capture explicitly")
             model.stop()
             check(!model.capturing && !capture.running, "App shutdown stops capture and clears its state")
             model.refreshPermissions()
@@ -84,12 +91,12 @@ struct CaptureLifecycleTests {
             check(!capture.running, "Capture waits when either required permission is missing")
             check(model.showPermissions && model.captureStatus.contains("权限"), "Startup explains the missing permission")
             model.open(.settings)
-            check(model.showPermissions, "Opening settings cannot bypass permission onboarding")
+            check(model.showPermissions, "Opening settings does not alter the missing permission state")
             model.requestAccessibilityPermission()
             check(model.showPermissions == !screen, "Granting one permission cannot bypass the other requirement")
             model.requestScreenPermission()
             check(model.capturing && capture.running, "Granting permissions starts capture without a switch")
-            check(!model.showPermissions, "Granting both permissions automatically opens the library")
+            check(!model.showPermissions, "Granting both permissions makes the library available")
             for revokeScreen in [true, false] {
                 capture.hasScreenPermission = !revokeScreen
                 capture.hasAccessibilityPermission = revokeScreen
@@ -97,11 +104,11 @@ struct CaptureLifecycleTests {
                 check(!model.capturing && !capture.running, "Revoking permission stops capture")
                 check(model.showPermissions, "Revoking either permission returns to onboarding")
                 model.open(.captures)
-                check(model.showPermissions, "Reopening the library cannot bypass a revoked permission")
+                check(model.showPermissions, "Reopening the library preserves the revoked permission state")
                 model.requestScreenPermission()
                 model.requestAccessibilityPermission()
                 check(model.capturing && capture.running, "Restoring permission automatically resumes capture")
-                check(!model.showPermissions, "Restoring both permissions returns to the library")
+                check(!model.showPermissions, "Restoring both permissions clears the missing permission state")
             }
             model.stop()
         }
@@ -159,6 +166,14 @@ struct CaptureLifecycleTests {
             }
             filtering.stop()
         }
+
+        let settingsModel = try makeModel("settings-window")
+        var settingsOpens = 0
+        settingsModel.onOpenSettings = { settingsOpens += 1 }
+        let previousPage = settingsModel.page
+        settingsModel.open(.settings)
+        check(settingsOpens == 1 && settingsModel.page == previousPage, "Settings opens independently without replacing the library page")
+        settingsModel.stop()
 
         let preview = try makeModel("preview", preview: true, screen: false, accessibility: false)
         let previewCapture = FocusedCaptureService.latest!

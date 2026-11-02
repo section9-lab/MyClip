@@ -72,11 +72,32 @@ struct MenuBarBoardView: View {
                 Text("更新失败").foregroundStyle(.secondary)
             } else if let date = model.workTasksUpdatedAt {
                 Text("更新于 \(date.formatted(date: .omitted, time: .shortened))")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondary).lineLimit(1)
             }
+            Button {
+                if model.showPermissions {
+                    openApplication()
+                    NotificationCenter.default.post(name: .init("MyClipShowOnboarding"), object: nil)
+                } else {
+                    model.toggleCapture()
+                }
+            } label: {
+                Label(captureActionTitle, systemImage: model.preferences.captureEnabled ? "pause.fill" : "play.fill")
+            }
+            .buttonStyle(.borderless)
+            .disabled(model.preview)
+            .help(captureActionHelp)
         }
         .font(.caption).padding(.horizontal, 16).frame(height: MenuBarBoardLayout.barHeight)
     }
+
+    private var captureActionTitle: String {
+        if model.preview { return String(localized: "界面预览 · 采集已停用") }
+        if model.showPermissions { return String(localized: "权限设置") }
+        return model.preferences.captureEnabled ? String(localized: "暂停采集") : String(localized: "继续采集")
+    }
+
+    private var captureActionHelp: String { model.captureStatus }
 
     @ViewBuilder private var content: some View {
         if !model.workTasksLoaded && model.workTasksLoadError == nil {

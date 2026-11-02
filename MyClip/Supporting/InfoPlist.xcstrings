@@ -94,6 +94,53 @@
           }
         }
       }
+    },
+    "NSScreenCaptureUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip erfasst Arbeitsinhalte im gewählten Bereich und speichert sie als lokal durchsuchbare Erinnerungen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip captures work content in the scope you choose and saves it as searchable memories on this Mac."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip captura contenido de trabajo en el área que elijas y lo guarda como recuerdos buscables en este Mac."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip capture le contenu de travail dans la zone choisie et l’enregistre comme mémoire consultable sur ce Mac."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip は選択した範囲の作業画面を取得し、この Mac 上で検索できるメモリとして保存します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip은 선택한 범위의 작업 화면을 캡처하여 이 Mac에서 검색 가능한 메모리로 저장합니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MyClip 会按你选择的范围采集工作画面，并保存为本机可搜索的记忆。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -15,7 +15,7 @@ final class AnalyticsState {
     }
 
     var isEnabled: Bool {
-        get { defaults.object(forKey: prefix + "enabled") as? Bool ?? true }
+        get { defaults.object(forKey: prefix + "enabled") as? Bool ?? false }
         set { defaults.set(newValue, forKey: prefix + "enabled") }
     }
 

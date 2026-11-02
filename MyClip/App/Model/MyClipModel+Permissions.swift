@@ -17,7 +17,12 @@ extension MyClipModel {
         if !screenPermission || !accessibilityPermission {
             if capturing { captureService.stop() }
             if capturing { capturing = false }
-            let status = String(localized: "等待屏幕录制和辅助功能权限，授权后将自动开始采集")
+            let status = String(localized: "等待屏幕录制和辅助功能权限")
+            if captureStatus != status { captureStatus = status }
+        } else if !preferences.captureEnabled {
+            if capturing { captureService.stop() }
+            if capturing { capturing = false }
+            let status = String(localized: "采集已暂停")
             if captureStatus != status { captureStatus = status }
         } else if !capturing {
             applyCaptureSettings()

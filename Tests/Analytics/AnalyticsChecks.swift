@@ -3,6 +3,16 @@ import Foundation
 
 @MainActor
 struct AnalyticsStateTests {
+    func defaultsToOptInRequired() {
+        withDefaults { defaults in
+            let state = AnalyticsState(
+                defaults: defaults, appID: "opt-in-default", timeZone: TimeZone(identifier: "America/Los_Angeles")!
+            )
+            precondition(!state.isEnabled)
+            precondition(state.claimActiveDay(at: date("2026-10-29T08:00:00Z")) == nil)
+        }
+    }
+
     func deduplicatesAcrossRestarts() {
         withDefaults { defaults in
             let first = makeState(defaults)
@@ -125,9 +135,12 @@ struct AnalyticsStateTests {
     }
 
     private func makeState(_ defaults: UserDefaults, appID: String = "vibe-hud") -> AnalyticsState {
-        AnalyticsState(
+        let state = AnalyticsState(
             defaults: defaults, appID: appID, timeZone: TimeZone(identifier: "America/Los_Angeles")!
         )
+        let key = "analytics.\(appID).enabled"
+        if defaults.object(forKey: key) == nil { state.isEnabled = true }
+        return state
     }
 
     private func date(_ value: String) -> Date {
@@ -145,6 +158,7 @@ struct AnalyticsStateTests {
 @main struct AnalyticsChecks {
     @MainActor static func main() {
         let checks = AnalyticsStateTests()
+        checks.defaultsToOptInRequired()
         checks.deduplicatesAcrossRestarts()
         checks.respectsReportingTimeZone()
         checks.handlesDaylightSaving()
@@ -156,6 +170,6 @@ struct AnalyticsStateTests {
         checks.ambiguousSettingsRemainUnknown()
         checks.languageDoesNotOverrideRegion()
         checks.regionalContextContainsOnlyCoarseSettings()
-        print("PASS: 11 anonymous analytics scenarios")
+        print("PASS: 12 anonymous analytics scenarios")
     }
 }

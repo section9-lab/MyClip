@@ -10,6 +10,7 @@ final class MyClipMenuBarController: NSObject, NSPopoverDelegate {
     let popover = NSPopover()
     private let terminate: () -> Void
     private var tasksObservation: AnyCancellable?
+    private var captureObservation: AnyCancellable?
 
     init(model: MyClipModel, terminate: @escaping () -> Void = { NSApp.terminate(nil) }) {
         self.model = model
@@ -30,17 +31,40 @@ final class MyClipMenuBarController: NSObject, NSPopoverDelegate {
             guard let self, self.popover.isShown else { return }
             self.resizePopover(tasks: tasks)
         }
+        captureObservation = Publishers.CombineLatest4(
+            model.$capturing, model.preferences.$captureEnabled,
+            model.$screenPermission, model.$accessibilityPermission
+        ).sink { [weak self] capturing, enabled, screen, accessibility in
+            self?.updateStatusIcon(capturing: capturing, enabled: enabled, hasPermissions: screen && accessibility)
+        }
         guard let button = statusItem.button else { return }
-        let icon = NSImage(named: MenuBarIcon.paperclip.rawValue)?.copy() as? NSImage
-        icon?.size = NSSize(width: 18, height: 18)
-        icon?.isTemplate = true
-        button.image = icon
         button.imagePosition = .imageOnly
-        button.toolTip = String(localized: "显示 MyClip 看板")
-        button.setAccessibilityLabel("MyClip")
-        button.setAccessibilityHelp(String(localized: "显示只读看板"))
+        updateStatusIcon(capturing: model.capturing, enabled: model.preferences.captureEnabled, hasPermissions: !model.showPermissions)
+        button.setAccessibilityHelp(String(localized: "显示 MyClip 看板"))
         button.target = self
         button.action = #selector(togglePopover)
+    }
+
+    private func updateStatusIcon(capturing: Bool, enabled: Bool, hasPermissions: Bool) {
+        guard let button = statusItem.button else { return }
+        let symbol: String
+        let status: String
+        if !hasPermissions {
+            symbol = "exclamationmark.triangle"
+            status = String(localized: "采集权限已关闭，请在设置中恢复")
+        } else if enabled && capturing {
+            symbol = "record.circle"
+            status = String(localized: "采集中")
+        } else {
+            symbol = "pause.circle"
+            status = String(localized: "采集已暂停")
+        }
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        image?.size = NSSize(width: 18, height: 18)
+        image?.isTemplate = true
+        button.image = image
+        button.toolTip = "MyClip · \(status)"
+        button.setAccessibilityLabel("MyClip, \(status)")
     }
 
     @objc private func togglePopover() {

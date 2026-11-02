@@ -31,7 +31,18 @@ struct MyClipSettingsView: View {
     private var captureSection: some View {
         @ObservedObject var preferences = model.preferences
         return SettingsSection(symbol: "camera.viewfinder", tint: .blue, title: String(localized: "截图"),
-                               description: String(localized: "应用打开后自动采集，退出后停止。MyClip、锁屏和排除的应用不会被记录。")) {
+                               description: String(localized: "采集开启时，MyClip 会记录工作中的画面；锁屏、MyClip 和排除的应用不会被记录。")) {
+            if model.showPermissions {
+                SettingsRow(String(localized: "采集权限"), subtitle: model.captureStatus, emphasized: true) {
+                    Button(String(localized: "设置权限…"), systemImage: "hand.raised") { openOnboarding() }
+                }
+            } else {
+                SettingsRow(String(localized: "采集状态"), subtitle: model.captureStatus, emphasized: true) {
+                    Toggle(String(localized: "应用运行时自动采集"), isOn: Binding(
+                        get: { preferences.captureEnabled }, set: { model.setCaptureEnabled($0) }
+                    )).labelsHidden().toggleStyle(.switch)
+                }
+            }
             SettingsRow(String(localized: "采集范围")) {
                 Picker("采集范围", selection: $preferences.captureSettings.scope) {
                     ForEach(CaptureScope.allCases) { Text($0.label).tag($0) }
@@ -181,11 +192,9 @@ struct MyClipSettingsView: View {
                 }
             }
             HStack {
-                Button(String(localized: "重新打开设置向导"), systemImage: "slider.horizontal.3") {
-                    NotificationCenter.default.post(name: .init("MyClipShowOnboarding"), object: nil)
-                }.disabled(model.preview)
+                Button(String(localized: "重新打开设置向导"), systemImage: "slider.horizontal.3", action: openOnboarding)
+                    .disabled(model.preview)
                 Spacer()
-                Button(String(localized: "退出 MyClip"), systemImage: "power") { NSApp.terminate(nil) }.tint(.red)
             }.padding(.horizontal, 16).padding(.vertical, 12)
         }
     }
@@ -214,6 +223,11 @@ struct MyClipSettingsView: View {
 
     private func removeExcludedApp(_ id: String) {
         model.preferences.excludedApps = excludedBundleIDs.filter { $0 != id }.joined(separator: "\n")
+    }
+
+    private func openOnboarding() {
+        model.open()
+        NotificationCenter.default.post(name: .init("MyClipShowOnboarding"), object: nil)
     }
 
     private var appVersion: String {
@@ -249,6 +263,7 @@ private struct SettingsSection<Content: View, Aside: View>: View {
                 HStack(spacing: 10) {
                     Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(tint)
                         .frame(width: 28, height: 28).background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+                        .accessibilityHidden(true)
                     Text(title).font(.system(size: 15, weight: .semibold))
                 }
                 Text(description).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -366,7 +381,7 @@ private struct ExcludedAppChips<Trailing: View>: View {
                     Text(app.name).font(.callout).lineLimit(1)
                     Button { remove(id) } label: {
                         Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
-                            .frame(width: 18, height: 18)
+                            .frame(width: 22, height: 22)
                     }.buttonStyle(.borderless).accessibilityLabel("移除 \(app.name)")
                 }
                 .padding(.leading, 10).padding(.trailing, 6).frame(height: 30)
@@ -450,6 +465,9 @@ private struct MCPClientTile: View {
                 .font(.system(size: 14)).background(Circle().fill(Color(nsColor: .windowBackgroundColor)).padding(1))
         case .failed? where selected:
             Image(systemName: "exclamationmark.circle.fill").symbolRenderingMode(.palette).foregroundStyle(.white, .orange)
+                .font(.system(size: 14)).background(Circle().fill(Color(nsColor: .windowBackgroundColor)).padding(1))
+        case nil where selected:
+            Image(systemName: "checkmark.circle.fill").symbolRenderingMode(.palette).foregroundStyle(.white, Color.accentColor)
                 .font(.system(size: 14)).background(Circle().fill(Color(nsColor: .windowBackgroundColor)).padding(1))
         default:
             EmptyView()

@@ -3,13 +3,14 @@ import SwiftUI
 struct LibrarySearchField: NSViewRepresentable {
     @Binding var text: String
     @Binding var focused: Bool
+    let placeholder: String
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeNSView(context: Context) -> NSSearchField {
         let field = NSSearchField()
-        field.placeholderString = String(localized: "搜索任务、记忆与截图")
-        field.setAccessibilityLabel(field.placeholderString)
+        field.placeholderString = placeholder
+        field.setAccessibilityLabel(placeholder)
         field.sendsSearchStringImmediately = true
         field.sendsWholeSearchString = false
         field.delegate = context.coordinator
@@ -21,6 +22,10 @@ struct LibrarySearchField: NSViewRepresentable {
 
     func updateNSView(_ field: NSSearchField, context: Context) {
         context.coordinator.parent = self
+        if field.placeholderString != placeholder {
+            field.placeholderString = placeholder
+            field.setAccessibilityLabel(placeholder)
+        }
         if field.stringValue != text { field.stringValue = text }
         if focused, field.currentEditor() == nil {
             DispatchQueue.main.async {

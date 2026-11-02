@@ -5,6 +5,7 @@ import MyClipCore
 struct CaptureOnboardingView: View {
     @ObservedObject var model: MyClipModel
     var onContinue: () -> Void = {}
+    var onCancel: () -> Void = {}
     @State private var showingPermissions = true
     @StateObject private var selection = OnboardingAgentSelection()
 
@@ -66,14 +67,14 @@ struct CaptureOnboardingView: View {
                 .padding(.bottom, compact ? 18 : 24)
             form
             HStack {
+                Button(showingPermissions && model.showPermissions ? String(localized: "稍后") : String(localized: "取消")) { onCancel() }
+                    .keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("onboarding-cancel")
+                    .disabled(selection.starting)
                 if !showingPermissions {
                     Button("上一步") { showingPermissions = true }
-                        .keyboardShortcut(.cancelAction)
                         .accessibilityIdentifier("onboarding-back")
                         .disabled(selection.starting)
-                } else {
-                    Button("退出 MyClip") { NSApp.terminate(nil) }
-                        .buttonStyle(.bordered)
                 }
                 Spacer()
                 Button(showingPermissions ? String(localized: "下一步") : String(localized: "开始使用"), systemImage: "arrow.right") {
@@ -164,10 +165,13 @@ struct CaptureOnboardingView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            // The switch reflects the OS permission; either tap opens the relevant authorization flow.
-            Toggle(title, isOn: Binding(get: { allowed }, set: { _ in action() }))
-                .labelsHidden().toggleStyle(.switch).controlSize(.small)
-                .accessibilityLabel(allowed ? String(localized: "\(title)已授权") : String(localized: "允许\(title)"))
+            VStack(alignment: .trailing, spacing: 6) {
+                Label(allowed ? String(localized: "\(title)已授权") : String(localized: "未授权"),
+                      systemImage: allowed ? "checkmark.circle.fill" : "exclamationmark.circle")
+                    .font(.caption).foregroundStyle(allowed ? Color.green : .secondary)
+                Button(allowed ? String(localized: "打开系统设置…") : String(localized: "授权…"), action: action)
+                    .controlSize(.small)
+            }
         }.padding(.vertical, 18)
     }
 }

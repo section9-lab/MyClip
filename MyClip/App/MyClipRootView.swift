@@ -9,10 +9,11 @@ struct MyClipRootView: View {
 
     var body: some View {
         Group {
-            if model.showPermissions || showingOnboarding {
-                CaptureOnboardingView(model: model) { showingOnboarding = false }
+            if showingOnboarding {
+                CaptureOnboardingView(model: model, onContinue: { showingOnboarding = false }, onCancel: { showingOnboarding = false })
+            } else {
+                libraryContent
             }
-            else { libraryContent }
         }
         .buttonStyle(.bordered)
         .menuStyle(.borderedButton)
@@ -30,21 +31,21 @@ struct MyClipRootView: View {
             #endif
         }
         .onChange(of: model.showPermissions) { if $0 { showingOnboarding = true } }
+        .onChange(of: model.page) { _ in
+            if !model.search.isEmpty { model.search = "" }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .init("MyClipShowOnboarding"))) { _ in
             if !model.preview { showingOnboarding = true }
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("MyClipFocusSearch"))) { _ in
-            if !model.showPermissions && !showingOnboarding { searchFocused = true }
+            if !showingOnboarding && model.page?.supportsSearch == true { searchFocused = true }
         }
     }
 
-    /// The footer gear behaves like an accessory-bar control: it highlights on hover and press, and stays lit while the
-    /// Settings page is showing. Turning the toggle off does nothing; the page only changes through the sidebar.
     @ViewBuilder private var settingsButton: some View {
-        let showingSettings = Binding(get: { model.page == .settings }, set: { if $0 { model.open(.settings) } })
         if #available(macOS 14, *) {
-            Toggle(isOn: showingSettings) { Image(systemName: "gearshape") }
-                .toggleStyle(.button).buttonStyle(.accessoryBar)
+            Button { model.open(.settings) } label: { Image(systemName: "gearshape") }
+                .buttonStyle(.accessoryBar)
                 .help("设置").accessibilityLabel("设置")
         } else {
             Button { model.open(.settings) } label: { Image(systemName: "gearshape") }
@@ -52,12 +53,48 @@ struct MyClipRootView: View {
         }
     }
 
+    private var captureButton: some View {
+        Button {
+            if model.showPermissions { showingOnboarding = true }
+            else { model.toggleCapture() }
+        } label: {
+            Label(captureLabel, systemImage: captureSymbol)
+        }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+        .disabled(model.preview)
+        .help(captureHelp)
+        .accessibilityLabel(captureAccessibilityLabel)
+        .accessibilityValue(model.captureStatus)
+    }
+
+    private var captureLabel: String {
+        if model.showPermissions { return String(localized: "权限设置") }
+        if !model.preferences.captureEnabled { return String(localized: "采集已暂停") }
+        return model.capturing ? String(localized: "采集中") : String(localized: "正在准备采集")
+    }
+
+    private var captureSymbol: String {
+        if model.showPermissions { return "exclamationmark.triangle" }
+        if !model.preferences.captureEnabled { return "pause.circle" }
+        return model.capturing ? "record.circle.fill" : "clock"
+    }
+
+    private var captureHelp: String { model.captureStatus }
+
+    private var captureAccessibilityLabel: String {
+        if model.showPermissions { return String(localized: "设置采集权限…") }
+        return model.preferences.captureEnabled ? String(localized: "暂停采集") : String(localized: "继续采集")
+    }
+
     private var libraryContent: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                LibrarySearchField(text: $model.search, focused: $searchFocused)
-                    .frame(height: 28)
-                    .padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 14)
+                if let page = model.page, page.supportsSearch {
+                    LibrarySearchField(text: $model.search, focused: $searchFocused, placeholder: page.searchPlaceholder)
+                        .frame(height: 28)
+                        .padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 14)
+                }
                 List(selection: $model.page) {
                     Section("资料库") {
                         sidebarRow(.memory)
@@ -69,6 +106,8 @@ struct MyClipRootView: View {
                 .listStyle(.sidebar)
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(spacing: 8) {
+                        captureButton
+                        Spacer(minLength: 4)
                         // The footer is a status light for the Agent in use; another one only appears while it finishes a batch.
                         ForEach(ClipAgent.allCases.filter { model.preferences.enabledAgent == $0 || model.state($0).phase == .working || model.state($0).phase == .permission }) { agent in
                             Button { model.open(.agents) } label: {
@@ -79,7 +118,6 @@ struct MyClipRootView: View {
                             Button { model.open(.agents) } label: { Image(systemName: "person.crop.circle.dashed").font(.system(size: 22)).foregroundStyle(.secondary) }
                                 .buttonStyle(.borderless).help("还没有选择整理 Agent")
                         }
-                        Spacer()
                         settingsButton
                     }
                     if model.preview { Text("界面预览 · 示例数据").font(.caption2).foregroundStyle(.orange) }
