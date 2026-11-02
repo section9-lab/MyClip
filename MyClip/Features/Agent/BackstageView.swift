@@ -1,3 +1,4 @@
+import Accessibility
 import Charts
 import SwiftUI
 import Combine
@@ -377,14 +378,10 @@ struct BackstageView: View {
     }
 
     private var usageSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("Token 用量").font(.title3.weight(.semibold))
-                    .help("只统计 Agent 回传的部分")
-                Spacer()
-                Picker("范围", selection: $usageRange) {
-                    ForEach(UsageRange.allCases) { Text($0.title).tag($0) }
-                }.pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(width: 170)
+                Text("只统计 Agent 回传的部分").font(.caption).foregroundStyle(.secondary)
             }
             if let error = model.tokenUsageLoadError {
                 Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.orange)
@@ -392,7 +389,15 @@ struct BackstageView: View {
             } else if !model.tokenUsageLoaded {
                 ProgressView("正在读取用量…").frame(maxWidth: .infinity).padding(32)
             } else {
-                BackstageCard { UsageDashboard(statistics: model.tokenUsage, days: usageRange.days, asTable: $usageAsTable) }
+                BackstageCard {
+                    UsageDashboard(
+                        statistics: model.tokenUsage, days: usageRange.days, asTable: $usageAsTable,
+                        rangeSelection: Binding(
+                            get: { usageRange.days },
+                            set: { value in usageRange = UsageRange.allCases.first { $0.days == value } ?? .month }
+                        )
+                    )
+                }
             }
         }
     }
@@ -851,6 +856,28 @@ struct UsageDashboard: View {
     let statistics: TokenUsageStatistics
     let days: Int?
     @Binding var asTable: Bool
+    private let rangeSelection: Binding<Int?>?
+    @State private var selectedTrendDate: Date?
+
+    init(statistics: TokenUsageStatistics, days: Int?, asTable: Binding<Bool>, rangeSelection: Binding<Int?>? = nil) {
+        self.statistics = statistics
+        self.days = days
+        _asTable = asTable
+        self.rangeSelection = rangeSelection
+    }
+
+    private struct TrendPoint: Identifiable, Equatable {
+        let date: Date
+        let tokens: Int
+        let calls: Int
+        var id: Date { date }
+    }
+
+    private struct AgentTotal: Identifiable {
+        let agent: ClipAgent
+        let tokens: Int
+        var id: ClipAgent { agent }
+    }
 
     private var calendar: Calendar { .current }
     private var summary: TokenUsageSummary { statistics.summary(days: days) }
@@ -860,202 +887,412 @@ struct UsageDashboard: View {
         return statistics.history.filter { $0.day >= start }
     }
     private var weekly: Bool { days == nil }
-    private var deltaText: String? {
+    private var dailyBuckets: [TokenUsageDay] {
+        let end = calendar.startOfDay(for: Date())
+        let start: Date
+        if let days {
+            start = calendar.date(byAdding: .day, value: -(days - 1), to: end) ?? end
+        } else {
+            start = statistics.history.first.map { calendar.startOfDay(for: $0.day) } ?? end
+        }
+        let count = max(1, (calendar.dateComponents([.day], from: start, to: end).day ?? 0) + 1)
+        let existing = Dictionary(uniqueKeysWithValues: statistics.history.map { (calendar.startOfDay(for: $0.day), $0) })
+        return (0..<count).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: start) else { return nil }
+            return existing[date] ?? TokenUsageDay(day: date)
+        }
+    }
+    private var trendPoints: [TrendPoint] {
+        if !weekly {
+            return dailyBuckets.map { bucket in
+                TrendPoint(date: bucket.day, tokens: bucket.total.totalTokens ?? 0, calls: bucket.total.calls)
+            }
+        }
+        let groups = Dictionary(grouping: dailyBuckets) {
+            calendar.dateInterval(of: .weekOfYear, for: $0.day)?.start ?? $0.day
+        }
+        return groups.map { date, days in
+            TrendPoint(date: date, tokens: days.compactMap { $0.total.totalTokens }.reduce(0, +),
+                       calls: days.reduce(0) { $0 + $1.total.calls })
+        }.sorted { $0.date < $1.date }
+    }
+    private var selectedPoint: TrendPoint? {
+        guard let selectedTrendDate else { return nil }
+        return trendPoints.first { $0.date == selectedTrendDate }
+    }
+    private var axisDates: [Date] {
+        let dates = trendPoints.map(\.date)
+        let step = max(1, Int(ceil(Double(dates.count) / 4)))
+        return dates.enumerated().compactMap { index, date in
+            index % step == 0 || index == dates.count - 1 ? date : nil
+        }
+    }
+    private var trendUpperBound: Double { max(1, Double(trendPoints.map(\.tokens).max() ?? 0) * 1.12) }
+    private var deltaValue: Int? {
         guard let days else { return nil }
         let previous = statistics.previousSummary(days: days)
         guard let now = summary.totalTokens, let before = previous.totalTokens, before > 0 else { return nil }
-        let change = Int((Double(now - before) / Double(before) * 100).rounded())
+        return Int((Double(now - before) / Double(before) * 100).rounded())
+    }
+    private var deltaText: String? {
+        guard let days, let change = deltaValue else { return nil }
         return String(localized: "较前 \(days) 天 \(change >= 0 ? "+" : "")\(change)%")
+    }
+    private var dateRangeText: String {
+        guard let first = dailyBuckets.first?.day, let last = dailyBuckets.last?.day else { return "–" }
+        return "\(first.formatted(.dateTime.year().month().day())) – \(last.formatted(.dateTime.year().month().day()))"
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            tiles
+            if let rangeSelection {
+                HStack {
+                    Spacer(minLength: 0)
+                    Picker("范围", selection: rangeSelection) {
+                        Text("7 天").tag(Int?.some(7))
+                        Text("30 天").tag(Int?.some(30))
+                        Text("全部").tag(Int?.none)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(maxWidth: 320)
+                    .accessibilityLabel("范围")
+                    Spacer(minLength: 0)
+                }.padding(.horizontal, 18).padding(.top, 14)
+            }
+            hero.padding(.horizontal, 18).padding(.top, rangeSelection == nil ? 18 : 12).padding(.bottom, 14)
             Divider()
-            HStack {
-                Text("只统计 Agent 回传的部分").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Picker("Token 用量", selection: $asTable) {
-                    Text("图表").tag(false)
-                    Text("表格").tag(true)
-                }.pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(width: 110)
-            }.padding(.horizontal, 14).padding(.vertical, 10)
             if summary.calls == 0 {
                 Text(days == nil ? String(localized: "还没有回传过用量。任务结束后会在这里汇总。") : String(localized: "这段时间没有整理任务。"))
-                    .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 24)
+                    .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 32)
+            } else if summary.reportedCalls == 0 {
+                VStack(spacing: 8) {
+                    Image(systemName: "chart.bar.xaxis").font(.title2).foregroundStyle(.secondary).accessibilityHidden(true)
+                    Text("这段时间的请求没有回传 Token 用量。").font(.callout)
+                    Text("请求仍保留在执行记录中，图表不会推测缺失数据。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity).padding(.vertical, 28)
             } else if asTable {
-                table
+                VStack(alignment: .leading, spacing: 12) {
+                    trendHeader
+                    table
+                }.padding(18)
             } else {
-                chart.padding(.horizontal, 14).padding(.bottom, 12)
+                VStack(alignment: .leading, spacing: 14) {
+                    trendHeader
+                    chart
+                    agentBreakdown
+                }.padding(18)
                 Divider()
-                composition.padding(.horizontal, 14).padding(.vertical, 12)
+                metrics.padding(18)
+                Divider()
+                composition.padding(18)
             }
             Divider()
             Text("含截图整理、任务识别和重试。旧任务和没有回传用量的请求不计入；缓存明细为已回传部分。")
-                .font(.caption).foregroundStyle(.tertiary).padding(.horizontal, 14).padding(.vertical, 10)
+                .font(.caption).foregroundStyle(.tertiary).padding(.horizontal, 18).padding(.vertical, 11)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private var tiles: some View {
-        HStack(spacing: 0) {
-            tile(days.map { String(localized: "近 \($0) 天 Token") } ?? String(localized: "累计 Token"), value: compact(summary.totalTokens),
-                 detail: deltaText ?? (days == nil ? String(localized: "\(summary.calls) 次请求") : String(localized: "全部 \(statistics.total.totalTokens?.formatted() ?? String(localized: "未记录"))")))
-            Divider()
-            tile(String(localized: "平均每次请求"), value: summary.reportedCalls > 0 ? compact((summary.totalTokens ?? 0) / summary.reportedCalls) : "–",
-                 detail: String(localized: "\(summary.calls) 次请求"))
-            Divider()
-            tile(String(localized: "缓存命中率"), value: summary.cacheHitRate.map { "\(Int(($0 * 100).rounded()))%" } ?? "–",
-                 detail: String(localized: "读取缓存比重新输入便宜"))
-            Divider()
-            tile(String(localized: "回传完整度"), value: summary.calls > 0 ? "\(Int((Double(summary.reportedCalls) / Double(summary.calls) * 100).rounded()))%" : "–",
-                 detail: String(localized: "\(summary.reportedCalls) / \(summary.calls) 次有用量"))
-        }.fixedSize(horizontal: false, vertical: true)
+    private var hero: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(days.map { String(localized: "近 \($0) 天 Token") } ?? String(localized: "累计 Token"))
+                .font(.caption).foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(compact(summary.totalTokens)).font(.system(size: 32, weight: .semibold)).monospacedDigit()
+                Text("Token").font(.callout).foregroundStyle(.secondary)
+                if let deltaText, let deltaValue {
+                    Label(deltaText, systemImage: deltaValue >= 0 ? "arrow.up.right" : "arrow.down.right")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(Color.secondary.opacity(0.1), in: Capsule())
+                }
+            }
+            Text(dateRangeText).font(.callout).foregroundStyle(.secondary)
+        }.accessibilityElement(children: .combine)
     }
 
-    private func tile(_ label: String, value: String, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label).font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.85)
-            Text(value).font(.system(size: 20, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.8)
-            Text(detail).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
-        }.padding(.horizontal, 14).padding(.vertical, 12).frame(maxWidth: .infinity, alignment: .leading)
-            .help(detail).accessibilityElement(children: .combine).accessibilityHint(detail)
-    }
-
-    private struct Bar: Identifiable {
-        let day: Date
-        let agent: ClipAgent
-        let tokens: Int
-        var id: String { "\(day.timeIntervalSince1970)-\(agent.rawValue)" }
-    }
-
-    private var bars: [Bar] {
-        buckets.flatMap { day in
-            ClipAgent.allCases.compactMap { agent in
-                day.agents[agent]?.totalTokens.map { Bar(day: day.day, agent: agent, tokens: $0) }
+    private var metrics: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 0) {
+                metric(String(localized: "平均每次请求"), value: summary.reportedCalls > 0 ? compact((summary.totalTokens ?? 0) / summary.reportedCalls) : "–",
+                       detail: String(localized: "\(summary.reportedCalls) 次请求"))
+                Divider().frame(height: 54).padding(.horizontal, 16)
+                metric(String(localized: "缓存命中率"), value: summary.cacheHitRate.map { "\(Int(($0 * 100).rounded()))%" } ?? "–",
+                       detail: String(localized: "读取缓存比重新输入便宜"))
+                Divider().frame(height: 54).padding(.horizontal, 16)
+                metric(String(localized: "回传完整度"), value: summary.calls > 0 ? "\(Int((Double(summary.reportedCalls) / Double(summary.calls) * 100).rounded()))%" : "–",
+                       detail: String(localized: "\(summary.reportedCalls) / \(summary.calls) 次有用量"))
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 20)], alignment: .leading, spacing: 14) {
+                metric(String(localized: "平均每次请求"), value: summary.reportedCalls > 0 ? compact((summary.totalTokens ?? 0) / summary.reportedCalls) : "–",
+                       detail: String(localized: "\(summary.reportedCalls) 次请求"))
+                metric(String(localized: "缓存命中率"), value: summary.cacheHitRate.map { "\(Int(($0 * 100).rounded()))%" } ?? "–",
+                       detail: String(localized: "读取缓存比重新输入便宜"))
+                metric(String(localized: "回传完整度"), value: summary.calls > 0 ? "\(Int((Double(summary.reportedCalls) / Double(summary.calls) * 100).rounded()))%" : "–",
+                       detail: String(localized: "\(summary.reportedCalls) / \(summary.calls) 次有用量"))
             }
         }
     }
 
-    private var axisDates: [Date] {
-        let dates = Set(bars.map { weekly ? calendar.dateInterval(of: .weekOfYear, for: $0.day)?.start ?? $0.day : $0.day }).sorted()
-        let step = max(1, Int(ceil(Double(dates.count) / 7)))
-        return dates.enumerated().compactMap { index, date in index % step == 0 || index == dates.count - 1 ? date : nil }
+    private func metric(_ label: String, value: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            Text(value).font(.title3.weight(.semibold)).monospacedDigit().lineLimit(1)
+            Text(detail).font(.caption).foregroundStyle(.tertiary).lineLimit(1).minimumScaleFactor(0.8)
+        }
+        .frame(minWidth: 130, maxWidth: .infinity, alignment: .leading)
+        .help(detail).accessibilityElement(children: .combine).accessibilityHint(detail)
+    }
+
+    private var trendHeader: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(weekly ? String(localized: "每周 Token 用量") : String(localized: "每日 Token 用量"))
+                    .font(.headline)
+                if let selectedPoint {
+                    Text("\(selectedPoint.date.formatted(.dateTime.year().month().day())) · \(compact(selectedPoint.tokens)) Token · \(String(localized: "\(selectedPoint.calls) 次请求"))")
+                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                } else {
+                    Text("移动指针查看明细").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Picker("Token 用量", selection: $asTable) {
+                Text("图表").tag(false)
+                Text("表格").tag(true)
+            }.pickerStyle(.segmented).labelsHidden().controlSize(.small).frame(width: 110)
+        }
     }
 
     private var chart: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(weekly ? String(localized: "每周用量，按 Agent") : String(localized: "每天用量，按 Agent")).font(.caption).foregroundStyle(.secondary)
-            HStack(spacing: 8) {
-                ForEach(ClipAgent.allCases) { agent in
-                    HStack(spacing: 4) {
-                        RoundedRectangle(cornerRadius: 2).fill(UsageDashboard.color(for: agent)).frame(width: 10, height: 10)
-                        Text(agent.name)
-                        Text(compact(agentTotal(agent))).monospacedDigit().foregroundStyle(.primary)
-                    }.font(.caption).foregroundStyle(.secondary)
-                        .lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            Chart(bars) { bar in
-                BarMark(x: .value(String(localized: "日期"), bar.day, unit: weekly ? .weekOfYear : .day),
-                        y: .value("Token", bar.tokens))
-                    .foregroundStyle(by: .value("Agent", bar.agent.rawValue))
+        Chart {
+            ForEach(trendPoints) { point in
+                BarMark(x: .value(String(localized: "日期"), point.date, unit: weekly ? .weekOfYear : .day),
+                        y: .value("Token", point.tokens))
+                    .foregroundStyle(Color.accentColor.opacity(selectedTrendDate == nil || selectedTrendDate == point.date ? 0.88 : 0.62))
                     .cornerRadius(3)
+                    .accessibilityLabel(point.date.formatted(.dateTime.year().month().day()))
+                    .accessibilityValue("\(point.tokens.formatted()) Token")
             }
-            // Keep the categorical domain complete and stable. A partial four-agent palette
-            // causes Charts to trap when WorkBuddy or Qwen Work contributes a bar.
-            .chartForegroundStyleScale(domain: ClipAgent.allCases.map(\.rawValue),
-                                       range: ClipAgent.allCases.map { UsageDashboard.color(for: $0) })
-            .chartLegend(.hidden)
-            .chartYAxis {
-                AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
-                    AxisGridLine().foregroundStyle(.quaternary)
-                    AxisValueLabel { if let tokens = value.as(Int.self) { Text(compact(tokens)).font(.caption2) } }
+            if let selectedPoint {
+                RuleMark(x: .value(String(localized: "日期"), selectedPoint.date))
+                    .foregroundStyle(Color.secondary.opacity(0.55))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            }
+        }
+        .chartXScale(range: .plotDimension(padding: 14))
+        .chartYScale(domain: 0...trendUpperBound)
+        .chartYAxis {
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(Color.secondary.opacity(0.17))
+                AxisValueLabel {
+                    if let tokens = value.as(Double.self) { Text(compact(Int(tokens))).font(.caption2).foregroundStyle(.secondary) }
                 }
             }
-            .chartXAxis {
-                AxisMarks(values: axisDates) { _ in
-                    AxisValueLabel(format: .dateTime.month(.defaultDigits).day()).font(.caption2)
+        }
+        .chartXAxis {
+            AxisMarks(values: axisDates) { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3])).foregroundStyle(Color.secondary.opacity(0.14))
+                AxisValueLabel {
+                    if let date = value.as(Date.self) {
+                        Text(date, format: .dateTime.month(.defaultDigits).day()).font(.caption2).foregroundStyle(.secondary)
+                    }
                 }
             }
-            .frame(height: 130)
-            .accessibilityLabel("按\(weekly ? String(localized: "周") : String(localized: "天"))的 Token 用量柱状图")
-            .accessibilityIdentifier("backstage.usage.chart")
+        }
+        .chartPlotStyle { plot in plot.background(Color.clear) }
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                Rectangle().fill(.clear).contentShape(Rectangle())
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let location): updateSelection(at: location, proxy: proxy, geometry: geometry)
+                        case .ended: selectedTrendDate = nil
+                        }
+                    }
+                    .gesture(DragGesture(minimumDistance: 0).onChanged { value in
+                        updateSelection(at: value.location, proxy: proxy, geometry: geometry)
+                    })
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(height: 210)
+        .accessibilityChartDescriptor(UsageTrendDescriptor(
+            points: trendPoints, weekly: weekly,
+            title: weekly ? String(localized: "每周 Token 用量") : String(localized: "每日 Token 用量"),
+            summary: "\(summary.totalTokens?.formatted() ?? String(localized: "未记录")) Token · \(String(localized: "\(summary.calls) 次请求"))"
+        ))
+        .accessibilityIdentifier("backstage.usage.chart")
+    }
+
+    private func updateSelection(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        let frame = geometry[proxy.plotAreaFrame]
+        guard frame.contains(location) else { selectedTrendDate = nil; return }
+        let x = location.x - frame.origin.x
+        guard let date: Date = proxy.value(atX: x) else { return }
+        selectedTrendDate = trendPoints.min {
+            abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
+        }?.date
+    }
+
+    private var agentTotals: [AgentTotal] {
+        var values: [ClipAgent: Int] = [:]
+        for bucket in buckets {
+            for (agent, usage) in bucket.agents {
+                if let tokens = usage.totalTokens { values[agent, default: 0] += tokens }
+            }
+        }
+        return values.map { AgentTotal(agent: $0.key, tokens: $0.value) }
+            .filter { $0.tokens > 0 }
+            .sorted { lhs, rhs in lhs.tokens == rhs.tokens ? lhs.agent.rawValue < rhs.agent.rawValue : lhs.tokens > rhs.tokens }
+    }
+
+    @ViewBuilder private var agentBreakdown: some View {
+        if !agentTotals.isEmpty {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Text("Agent 用量").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(agentTotals.reduce(0) { $0 + $1.tokens }.formatted())
+                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), spacing: 16)], alignment: .leading, spacing: 8) {
+                    ForEach(agentTotals) { value in
+                        HStack(spacing: 7) {
+                            Circle().fill(UsageDashboard.color(for: value.agent)).frame(width: 8, height: 8).accessibilityHidden(true)
+                            Text(value.agent.name).font(.caption).lineLimit(1)
+                            Spacer(minLength: 6)
+                            Text(compact(value.tokens)).font(.caption.weight(.medium)).monospacedDigit()
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(value.agent.name)
+                        .accessibilityValue("\(value.tokens.formatted()) Token")
+                    }
+                }
+            }
         }
     }
 
-    private func agentTotal(_ agent: ClipAgent) -> Int? {
-        let values = buckets.compactMap { $0.agents[agent]?.totalTokens }
-        return values.isEmpty ? nil : values.reduce(0, +)
+    private struct UsageTrendDescriptor: AXChartDescriptorRepresentable {
+        let points: [TrendPoint]
+        let weekly: Bool
+        let title: String
+        let summary: String
+
+        func makeChartDescriptor() -> AXChartDescriptor {
+            let labels = points.map { label(for: $0.date) }
+            let maximum = max(1, points.map(\.tokens).max() ?? 0)
+            let xAxis = AXCategoricalDataAxisDescriptor(title: String(localized: "日期"), categoryOrder: labels)
+            let yAxis = AXNumericDataAxisDescriptor(title: "Token", range: 0...Double(maximum), gridlinePositions: []) {
+                "\(Int($0).formatted()) Token"
+            }
+            let series = AXDataSeriesDescriptor(
+                name: title, isContinuous: false,
+                dataPoints: points.map { AXDataPoint(x: label(for: $0.date), y: Double($0.tokens)) }
+            )
+            return AXChartDescriptor(title: title, summary: summary, xAxis: xAxis, yAxis: yAxis,
+                                     additionalAxes: [], series: [series])
+        }
+
+        private func label(for date: Date) -> String {
+            date.formatted(weekly ? .dateTime.year().month().day() : .dateTime.month().day())
+        }
+    }
+
+    private struct CompositionPart: Identifiable {
+        let label: String
+        let value: Int?
+        let color: Color
+        let symbol: String
+        var id: String { label }
     }
 
     private var composition: some View {
-        let parts: [(String, Int?, Color)] = [
-            (String(localized: "输入"), summary.inputTokens, Color(hex: 0x2A78D6)),
-            (String(localized: "输出"), summary.outputTokens, Color(hex: 0x104281)),
-            (String(localized: "缓存读取"), summary.cachedReadTokens, Color(hex: 0x86B6EF)),
-            (String(localized: "缓存写入"), summary.cachedWriteTokens, Color(hex: 0x5598E7))
+        let parts = [
+            CompositionPart(label: String(localized: "输入"), value: summary.inputTokens, color: .blue, symbol: "arrow.down.circle.fill"),
+            CompositionPart(label: String(localized: "输出"), value: summary.outputTokens, color: .purple, symbol: "arrow.up.circle.fill"),
+            CompositionPart(label: String(localized: "缓存读取"), value: summary.cachedReadTokens, color: .teal, symbol: "tray.and.arrow.down.fill"),
+            CompositionPart(label: String(localized: "缓存写入"), value: summary.cachedWriteTokens, color: .indigo, symbol: "tray.and.arrow.up.fill")
         ]
-        let total = max(1, parts.compactMap(\.1).reduce(0, +))
-        return VStack(alignment: .leading, spacing: 10) {
+        let recorded = parts.filter { ($0.value ?? 0) > 0 }
+        let total = recorded.compactMap(\.value).reduce(0, +)
+        let denominator = max(1, total)
+        return VStack(alignment: .leading, spacing: 11) {
             HStack {
                 Text("构成").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Text(total.formatted()).font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }
             GeometryReader { geometry in
-                HStack(spacing: 2) {
-                    ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
-                        let share = Double(part.1 ?? 0) / Double(total)
-                        if share > 0 {
-                            RoundedRectangle(cornerRadius: 2).fill(part.2)
-                                .frame(width: max(2, (geometry.size.width - 6) * share))
-                                .overlay { if share >= 0.09 { Text("\(Int((share * 100).rounded()))%").font(.system(size: 10, weight: .medium)).foregroundStyle(.white) } }
-                        }
+                let spacing = CGFloat(max(0, recorded.count - 1))
+                HStack(spacing: 1) {
+                    ForEach(recorded) { part in
+                        let share = Double(part.value ?? 0) / Double(denominator)
+                        Rectangle().fill(part.color)
+                            .frame(width: max(1, (geometry.size.width - spacing) * share))
                     }
                 }
-            }.frame(height: 14)
-            HStack(alignment: .top, spacing: 18) {
-                ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            RoundedRectangle(cornerRadius: 2).fill(part.2).frame(width: 10, height: 10)
-                            Text(part.0).font(.caption).foregroundStyle(.secondary)
+                .background(Color.secondary.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Token 构成")
+                .accessibilityValue(recorded.map { "\($0.label) \(($0.value ?? 0).formatted())" }.joined(separator: "，"))
+            }.frame(height: 16)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 18)], alignment: .leading, spacing: 9) {
+                ForEach(parts) { part in
+                    let value = part.value ?? 0
+                    let share = Double(value) / Double(denominator)
+                    HStack(spacing: 7) {
+                        Image(systemName: part.symbol).foregroundStyle(part.color).accessibilityHidden(true)
+                        Text(part.label).font(.caption).foregroundStyle(.secondary)
+                        Spacer(minLength: 6)
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text(part.value?.formatted() ?? String(localized: "未记录")).font(.caption.weight(.medium)).monospacedDigit()
+                            if part.value != nil { Text("\(Int((share * 100).rounded()))%").font(.caption2).foregroundStyle(.tertiary) }
                         }
-                        Text(part.1?.formatted() ?? String(localized: "未记录")).font(.caption).monospacedDigit()
-                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(part.label)
+                    .accessibilityValue(part.value.map { "\($0.formatted()) Token，\(Int((share * 100).rounded()))%" } ?? String(localized: "未记录"))
                 }
             }
         }
     }
 
+    private var tableAgents: [ClipAgent] {
+        ClipAgent.allCases.filter { agent in buckets.contains { ($0.agents[agent]?.calls ?? 0) > 0 } }
+    }
+
     private var table: some View {
         ScrollView([.horizontal, .vertical]) {
-            Grid(alignment: .trailing, horizontalSpacing: 18, verticalSpacing: 6) {
+            Grid(alignment: .trailing, horizontalSpacing: 18, verticalSpacing: 7) {
                 GridRow {
                     Text("日期").gridColumnAlignment(.leading)
-                    ForEach(ClipAgent.allCases) { Text($0.name) }
+                    ForEach(tableAgents) { Text($0.name) }
                     Text("合计"); Text("回传")
                 }.font(.caption.weight(.medium)).foregroundStyle(.secondary)
                 Divider()
                 ForEach(buckets.reversed()) { day in
                     GridRow {
                         Text(day.day, format: .dateTime.month(.defaultDigits).day()).gridColumnAlignment(.leading)
-                        ForEach(ClipAgent.allCases) { Text(day.agents[$0]?.totalTokens?.formatted() ?? "–") }
+                        ForEach(tableAgents) { Text(day.agents[$0]?.totalTokens?.formatted() ?? "–") }
                         Text(day.total.totalTokens?.formatted() ?? "–")
                         Text("\(day.total.reportedCalls)/\(day.total.calls)")
                     }.font(.caption).monospacedDigit()
                 }
-            }.padding(.horizontal, 18).padding(.vertical, 12)
-        }.frame(maxHeight: 240).accessibilityIdentifier("backstage.usage.table")
+            }.padding(12)
+        }
+        .frame(minHeight: 150, maxHeight: 260)
+        .background(Color(nsColor: .textBackgroundColor).opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityIdentifier("backstage.usage.table")
     }
 
     static func color(for agent: ClipAgent) -> Color {
         switch agent {
-        case .claude: Color(hex: 0xEB6834)
-        case .codex: Color(hex: 0x2A78D6)
-        case .opencode: Color(hex: 0x1BAF7A)
-        case .cursor: Color(hex: 0x4A3AA7)
+        case .claude: .orange
+        case .codex: .blue
+        case .opencode: .green
+        case .cursor: .purple
         case .workbuddy: .teal
         case .qwenwork: .indigo
         }
@@ -1064,12 +1301,16 @@ struct UsageDashboard: View {
     private func compact(_ value: Int?) -> String {
         guard let value else { return String(localized: "未记录") }
         switch value {
-        case 1_000_000_000...: return String(format: "%.1fB", Double(value) / 1e9)
-        case 10_000_000...: return "\(value / 1_000_000)M"
-        case 1_000_000...: return String(format: "%.1fM", Double(value) / 1e6)
-        case 1_000...: return "\(value / 1_000)K"
-        default: return "\(value)"
+        case 1_000_000_000...: return compactUnit(value, divisor: 1_000_000_000, suffix: "B")
+        case 1_000_000...: return compactUnit(value, divisor: 1_000_000, suffix: "M")
+        case 1_000...: return compactUnit(value, divisor: 1_000, suffix: "K")
+        default: return value.formatted()
         }
+    }
+
+    private func compactUnit(_ value: Int, divisor: Int, suffix: String) -> String {
+        let scaled = Double(value) / Double(divisor)
+        return String(format: scaled >= 10 ? "%.0f%@" : "%.1f%@", scaled, suffix)
     }
 }
 
