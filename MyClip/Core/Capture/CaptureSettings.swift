@@ -19,6 +19,17 @@ public enum KeyboardCaptureMode: String, CaseIterable, Sendable, Identifiable {
     public var label: String { self == .returnKey ? String(localized: "回车后截图") : String(localized: "字母键后再回车") }
 }
 
+public enum CaptureWorkPolicy {
+    public static let automaticMaximumDimension: CGFloat = 2_560
+    public static let lowPowerMaximumDimension: CGFloat = 2_048
+    public static let manualMaximumDimension: CGFloat = 4_096
+
+    public static func maximumDimension(reason: CaptureReason, lowPower: Bool) -> CGFloat {
+        if reason == .manual { return manualMaximumDimension }
+        return lowPower ? lowPowerMaximumDimension : automaticMaximumDimension
+    }
+}
+
 public enum CaptureFilterStrategy: String, CaseIterable, Sendable, Identifiable {
     case similarImages, nearUniformImages
     public static let defaults: Set<Self> = [.similarImages, .nearUniformImages]

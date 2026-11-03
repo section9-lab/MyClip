@@ -124,7 +124,9 @@ private extension LibraryStore {
         observation.cancel()
         for thermal: ProcessInfo.ThermalState in [.nominal, .fair, .serious, .critical] {
             check(!BackgroundWorkBudget.maintenanceAllowed(lowPower: true, thermal: thermal), "Low-power mode defers automatic maintenance at thermal state \(thermal.rawValue)")
-            check(BackgroundWorkBudget.ocrAllowed(thermal: thermal) == (thermal == .nominal || thermal == .fair), "Background OCR respects thermal state \(thermal.rawValue)")
+            check(!BackgroundWorkBudget.ocrAllowed(lowPower: true, thermal: thermal), "Low-power mode defers background OCR at thermal state \(thermal.rawValue)")
+            check(BackgroundWorkBudget.ocrAllowed(lowPower: false, thermal: thermal) == (thermal == .nominal || thermal == .fair),
+                  "Background OCR respects thermal state \(thermal.rawValue)")
         }
 
         let version = try await model.store.refreshVersions()

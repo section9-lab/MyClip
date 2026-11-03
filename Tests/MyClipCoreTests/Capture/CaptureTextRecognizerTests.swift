@@ -93,6 +93,9 @@ final class CaptureTextRecognizerTests: XCTestCase {
         let text = try XCTUnwrap(CaptureTextRecognizer.recognize(pixels.pngData))
         XCTAssertTrue(text.contains("MyClip"), text)
         XCTAssertTrue(text.contains("截图"), text)
+        let fast = try XCTUnwrap(CaptureTextRecognizer.recognize(pixels.pngData, level: .fast))
+        XCTAssertTrue(fast.contains("MyClip"), fast)
+        XCTAssertTrue(fast.contains("截图"), fast)
     }
 
     private func textImage() throws -> CapturedImage {

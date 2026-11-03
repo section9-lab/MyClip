@@ -126,12 +126,15 @@ public enum BackgroundWorkBudget {
         maintenanceAllowed(lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled, thermal: ProcessInfo.processInfo.thermalState)
     }
     public static var allowsOCR: Bool {
-        ocrAllowed(thermal: ProcessInfo.processInfo.thermalState)
+        ocrAllowed(lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled, thermal: ProcessInfo.processInfo.thermalState)
     }
     static func maintenanceAllowed(lowPower: Bool, thermal: ProcessInfo.ThermalState) -> Bool {
-        !lowPower && ocrAllowed(thermal: thermal)
+        !lowPower && thermalAllowed(thermal)
     }
-    static func ocrAllowed(thermal: ProcessInfo.ThermalState) -> Bool {
+    static func ocrAllowed(lowPower: Bool, thermal: ProcessInfo.ThermalState) -> Bool {
+        !lowPower && thermalAllowed(thermal)
+    }
+    private static func thermalAllowed(_ thermal: ProcessInfo.ThermalState) -> Bool {
         thermal != .serious && thermal != .critical
     }
 }

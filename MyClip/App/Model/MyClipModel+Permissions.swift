@@ -2,7 +2,13 @@ import AppKit
 import MyClipCore
 
 extension MyClipModel {
-    func refreshPermissions() {
+    func refreshPermissionsIfNeeded(at date: Date = Date()) {
+        guard date.timeIntervalSince(lastPermissionRefresh) >= 60 else { return }
+        refreshPermissions(at: date)
+    }
+
+    func refreshPermissions(at date: Date = Date()) {
+        lastPermissionRefresh = date
         let screen = captureService.hasScreenPermission
         let accessibility = captureService.hasAccessibilityPermission
         if screenPermission != screen { screenPermission = screen }
@@ -44,9 +50,7 @@ extension MyClipModel {
         guard !preview else { return }
         if folderPermission { PermissionCoordinator.openFilesAndFoldersSettings(); return }
         PermissionCoordinator.markFolderAccessRequested()
-        let manager = FileManager.default
-        let home = manager.homeDirectoryForCurrentUser
-        for name in ["Desktop", "Documents"] { _ = try? manager.contentsOfDirectory(at: home.appendingPathComponent(name), includingPropertiesForKeys: nil) }
+        _ = PermissionCoordinator.hasFolderAccess()
         refreshPermissions()
         if !folderPermission { PermissionCoordinator.openFilesAndFoldersSettings() }
     }

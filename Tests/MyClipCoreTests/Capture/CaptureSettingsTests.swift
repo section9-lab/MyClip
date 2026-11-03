@@ -69,6 +69,12 @@ final class CaptureSettingsTests: XCTestCase {
         }
     }
 
+    func testAutomaticCaptureResolutionAdaptsToPowerMode() {
+        XCTAssertEqual(CaptureWorkPolicy.maximumDimension(reason: .scrollIdle, lowPower: false), 2_560)
+        XCTAssertEqual(CaptureWorkPolicy.maximumDimension(reason: .enter, lowPower: true), 2_048)
+        XCTAssertEqual(CaptureWorkPolicy.maximumDimension(reason: .manual, lowPower: true), 4_096)
+    }
+
     func testFocusedDisplayUsesLargestWindowOverlapAcrossMultipleScreens() {
         let screens = [
             DisplayCandidate(id: 1, frame: CGRect(x: 0, y: 0, width: 1920, height: 1080)),

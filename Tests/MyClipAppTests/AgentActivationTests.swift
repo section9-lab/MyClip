@@ -349,8 +349,13 @@ struct AgentActivationTests {
 
         let restarted = try MyClipModel(root: root.appendingPathComponent("Library"), preview: false)
         restarted.start()
+        try await Task.sleep(for: .milliseconds(250))
+        check(restarted.preferences.enabledAgent == .claude
+              && ClipAgent.allCases.allSatisfy { restarted.sessionCoordinator.client($0) == nil },
+              "Startup preserves the enabled Agent without eagerly reconnecting")
+        restarted.connect(.claude)
         try await waitUntil { restarted.state(.claude).available }
-        check(!restarted.state(.codex).available, "Startup reconnects only the previously enabled Agent")
+        check(!restarted.state(.codex).available, "An explicit connection starts only the enabled Agent")
         check(try requests(.claude, method: "session/resume").isEmpty, "Startup never restores previous conversation history")
         check(!FileManager.default.fileExists(atPath: root.appendingPathComponent("Library/Sessions/claude.json").path), "Temporary sessions do not create resumable session records")
         restarted.disableAgent()

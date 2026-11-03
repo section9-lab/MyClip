@@ -11,7 +11,8 @@ final class FocusedCaptureService {
     var onStatus: ((String) -> Void)?
     private var trigger = CaptureTrigger()
     private var monitors: [Any] = []
-    private var timer: Timer?
+    private var deadlineTimer: Timer?
+    private var pointerTimer: Timer?
     private var observers: [NSObjectProtocol] = []
     private var lockObservers: [NSObjectProtocol] = []
     private var enabled = false
@@ -22,7 +23,7 @@ final class FocusedCaptureService {
     private var pendingCaptures: [(CaptureReason, Focus, Int)] = []
     private var lastPointer = NSEvent.mouseLocation
     private var keyboardFocus: Focus?
-    private var lastPermissionCheck: TimeInterval = 0
+    private var lastKeyboardFocusCheck: TimeInterval = 0
 
     var hasScreenPermission: Bool { CGPreflightScreenCaptureAccess() }
     var hasAccessibilityPermission: Bool { AXIsProcessTrusted() }
@@ -38,6 +39,7 @@ final class FocusedCaptureService {
         generation += 1
         pendingCaptures.removeAll()
         lastPointer = NSEvent.mouseLocation
+        if enabled { updateTimers() }
     }
 
     func requestScreenPermission() {
@@ -55,7 +57,6 @@ final class FocusedCaptureService {
         guard hasScreenPermission, hasAccessibilityPermission else { return false }
         stop()
         enabled = true
-        lastPermissionCheck = 0
         suspended = false
         screenLocked = false
         lastPointer = NSEvent.mouseLocation
@@ -76,12 +77,7 @@ final class FocusedCaptureService {
             let isShortcut = !event.modifierFlags.intersection([.command, .control, .option]).isEmpty
             Task { @MainActor in self?.keyDown(code: code, isRepeat: isRepeat, isShortcut: isShortcut) }
         }) { monitors.append(monitor) }
-        let poller = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.poll() }
-        }
-        poller.tolerance = 0.05
-        timer = poller
-        RunLoop.main.add(poller, forMode: .common)
+        updateTimers()
         let center = NSWorkspace.shared.notificationCenter
         observers.append(center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
@@ -115,8 +111,10 @@ final class FocusedCaptureService {
         pendingCaptures.removeAll()
         trigger.reset()
         keyboardFocus = nil
-        timer?.invalidate()
-        timer = nil
+        deadlineTimer?.invalidate()
+        deadlineTimer = nil
+        pointerTimer?.invalidate()
+        pointerTimer = nil
         monitors.forEach(NSEvent.removeMonitor)
         monitors.removeAll()
         observers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
@@ -128,46 +126,46 @@ final class FocusedCaptureService {
 
     private func setScreenLocked(_ value: Bool) {
         screenLocked = value
-        updatePollingState()
         generation += 1
         pendingCaptures.removeAll()
         trigger.reset()
         keyboardFocus = nil
         lastPointer = NSEvent.mouseLocation
+        updateTimers()
         onStatus?(value ? String(localized: "屏幕已锁定，等待解锁") : String(localized: "等待应用中的活动"))
     }
 
     private func suspend(_ value: Bool) {
         suspended = value
-        updatePollingState()
         generation += 1
         pendingCaptures.removeAll()
         trigger.reset()
         keyboardFocus = nil
         lastPointer = NSEvent.mouseLocation
+        updateTimers()
         onStatus?(value ? String(localized: "屏幕休眠，等待恢复") : String(localized: "等待应用中的活动"))
-    }
-
-    private func updatePollingState() {
-        timer?.fireDate = suspended || screenLocked ? .distantFuture : Date().addingTimeInterval(0.15)
-        lastPermissionCheck = 0
     }
 
     private func activity(type: NSEvent.EventType, at time: TimeInterval, clickCount: Int, scrollDeltaY: Double) {
         guard enabled, !suspended, !screenLocked else { return }
         switch type {
         case .scrollWheel:
-            guard trigger.scroll(at: time, deltaY: scrollDeltaY) else { return }
+            let triggered = trigger.scroll(at: time, deltaY: scrollDeltaY)
+            scheduleDeadlineTimer()
+            guard triggered else { return }
             onStatus?(String(localized: "已检测到向下滚动，静止 5 秒后截图"))
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
             guard settings.mouseTriggers.contains(.click) else { return }
             updatePointer(at: time)
-            trigger.press(at: time, clickCount: clickCount)
+            _ = trigger.press(at: time, clickCount: clickCount)
+            scheduleDeadlineTimer()
         case .leftMouseUp, .rightMouseUp, .otherMouseUp:
-            updateKeyboardFocus()
             guard settings.mouseTriggers.contains(.click) else { return }
+            updateKeyboardFocus(at: time)
             updatePointer(at: time)
-            guard trigger.click(at: time, doubleClickInterval: NSEvent.doubleClickInterval) else { return }
+            let triggered = trigger.click(at: time, doubleClickInterval: NSEvent.doubleClickInterval)
+            scheduleDeadlineTimer()
+            guard triggered else { return }
             onStatus?(String(localized: "已检测到鼠标移动后 5 秒内的点击，等待单击或双击结束后截图"))
         default:
             guard settings.mouseTriggers.contains(.click) else { return }
@@ -176,7 +174,9 @@ final class FocusedCaptureService {
         }
     }
 
-    private func updateKeyboardFocus() {
+    private func updateKeyboardFocus(at time: TimeInterval, force: Bool = false) {
+        guard force || keyboardFocus == nil || time - lastKeyboardFocusCheck >= 1 else { return }
+        lastKeyboardFocusCheck = time
         let current = focus()
         if let current, let previous = keyboardFocus,
            current.app.processIdentifier == previous.app.processIdentifier, CFEqual(current.window, previous.window) {
@@ -188,26 +188,53 @@ final class FocusedCaptureService {
 
     private func keyDown(code: UInt16, isRepeat: Bool, isShortcut: Bool) {
         guard enabled, !suspended, !screenLocked else { return }
-        updateKeyboardFocus()
+        let time = ProcessInfo.processInfo.systemUptime
+        let isEnter = code == 36 || code == 76
+        updateKeyboardFocus(at: time, force: isEnter)
         guard keyboardFocus != nil, let reason = trigger.keyDown(keyCode: code, isRepeat: isRepeat, isShortcut: isShortcut) else { return }
         lastPointer = NSEvent.mouseLocation
         onStatus?(String(localized: "已检测到回车，正在读取截图"))
         capture(reason: reason)
     }
 
-    private func poll() {
+    private func updateTimers() {
+        deadlineTimer?.invalidate()
+        deadlineTimer = nil
+        pointerTimer?.invalidate()
+        pointerTimer = nil
         guard enabled, !suspended, !screenLocked else { return }
-        let time = ProcessInfo.processInfo.systemUptime
-        if time - lastPermissionCheck >= 3 {
-            lastPermissionCheck = time
-            guard hasScreenPermission, hasAccessibilityPermission else {
-                stop()
-                onStatus?(String(localized: "采集权限已关闭，请在设置中恢复"))
-                return
+        if settings.mouseTriggers.contains(.click) {
+            let timer = Timer(timeInterval: 0.75, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.updatePointer(at: ProcessInfo.processInfo.systemUptime)
+                }
             }
+            timer.tolerance = 0.25
+            pointerTimer = timer
+            RunLoop.main.add(timer, forMode: .common)
         }
-        updatePointer(at: time)
-        if let reason = trigger.poll(at: time) { capture(reason: reason) }
+        scheduleDeadlineTimer()
+    }
+
+    private func scheduleDeadlineTimer() {
+        deadlineTimer?.invalidate()
+        deadlineTimer = nil
+        guard enabled, !suspended, !screenLocked, let deadline = trigger.nextDeadline else { return }
+        let interval = max(0.01, deadline - ProcessInfo.processInfo.systemUptime)
+        let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.deadlineReached() }
+        }
+        timer.tolerance = min(0.1, interval / 4)
+        deadlineTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func deadlineReached() {
+        deadlineTimer = nil
+        guard enabled, !suspended, !screenLocked else { return }
+        if let reason = trigger.poll(at: ProcessInfo.processInfo.systemUptime) { capture(reason: reason) }
+        else { scheduleDeadlineTimer() }
     }
 
     // Pointer position also covers applications that consume global move events.
@@ -318,7 +345,9 @@ final class FocusedCaptureService {
                     bounds = captureFrame
                     pixelScale = focusedDisplay.map { Double($0.width) / $0.frame.width } ?? 2
                 }
-                let scale = min(pixelScale, 4096 / max(bounds.width, bounds.height))
+                let maximumDimension = CaptureWorkPolicy.maximumDimension(
+                    reason: reason, lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled)
+                let scale = min(pixelScale, maximumDimension / max(bounds.width, bounds.height))
                 config.width = max(1, Int(bounds.width * scale))
                 config.height = max(1, Int(bounds.height * scale))
                 config.showsCursor = false

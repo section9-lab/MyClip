@@ -37,6 +37,7 @@ public struct CaptureTrigger: Sendable {
     private var pressedClick = false
     private var pending: (deadline: TimeInterval, reason: CaptureReason)?
     private var hasTypedLetter = false
+    public var nextDeadline: TimeInterval? { pending?.deadline }
     private static let scrollIdleDelay: TimeInterval = 5
     private static let letterKeys: Set<UInt16> = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 31, 32, 34, 35, 37, 38, 40, 45, 46]
 

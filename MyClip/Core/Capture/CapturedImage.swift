@@ -34,7 +34,7 @@ public struct CapturedImage: Sendable {
         context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         var hash = SHA256()
         hash.update(data: Data("\(image.width)x\(image.height):".utf8))
-        hash.update(data: Data(bytes: bytes, count: image.width * image.height * 4))
+        hash.update(bufferPointer: UnsafeRawBufferPointer(start: bytes, count: image.width * image.height * 4))
         fingerprint = hash.finalize().map { String(format: "%02x", $0) }.joined()
         let output = NSMutableData()
         guard let normalized = context.makeImage(),

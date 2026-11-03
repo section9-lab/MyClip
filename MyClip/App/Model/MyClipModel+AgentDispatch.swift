@@ -27,6 +27,7 @@ extension MyClipModel {
             }
             _ = try await connectedClient(agent)
             enable(agent)
+            scheduleAgentIdleTeardown(agent)
         } catch { setFailure(agent, error) }
     }
 
@@ -85,7 +86,7 @@ extension MyClipModel {
         agents[agent]?.phase = .connecting
         agents[agent]?.detail = String(localized: "正在连接…")
         Task {
-            do { _ = try await connectedClient(agent) }
+            do { _ = try await connectedClient(agent); scheduleAgentIdleTeardown(agent) }
             catch { setFailure(agent, error) }
         }
     }
@@ -98,13 +99,22 @@ extension MyClipModel {
             do { try await store.handoffQueuedOrganizationJobs(to: agent) }
             catch { notice = error.localizedDescription }
             await refresh()
+            wakeWorker()
         }
     }
 
     func disableAgent() {
         guard !preview else { return }
+        let disabled = preferences.enabledAgent
         preferences.enabledAgent = nil
         interruptAgentWork()
+        if let disabled, organizationAgent != disabled, discoveryAgent != disabled {
+            Task {
+                guard preferences.enabledAgent != disabled else { return }
+                await releaseSession(disabled)
+            }
+        }
+        wakeWorker()
     }
 
     private func interruptAgentWork(except enabled: ClipAgent? = nil) {
@@ -167,6 +177,7 @@ extension MyClipModel {
                 agents[agent]?.phase = .disconnected
                 agents[agent]?.detail = String(localized: "组件已安装，可以连接")
                 _ = try await connectedClient(agent)
+                scheduleAgentIdleTeardown(agent)
             } catch { setFailure(agent, error) }
         }
     }
@@ -185,6 +196,7 @@ extension MyClipModel {
                 _ = try await session(for: agent, using: client)
                 agents[agent]?.phase = .ready
                 agents[agent]?.detail = String(localized: "已就绪 · 每批独立整理")
+                scheduleAgentIdleTeardown(agent)
             } catch { setFailure(agent, error) }
         }
     }
@@ -213,6 +225,7 @@ extension MyClipModel {
                 _ = try await session(for: agent, using: client)
                 agents[agent]?.phase = .ready
                 agents[agent]?.detail = String(localized: "已就绪 · 每批独立整理")
+                scheduleAgentIdleTeardown(agent)
             } catch { if !Task.isCancelled { setFailure(agent, error) } }
         }
     }
@@ -230,7 +243,7 @@ extension MyClipModel {
     func refreshAgentAccount(_ agent: ClipAgent) {
         guard canConfigureAgentModel(agent), organizationTask == nil, runtime.usesAccountBridge(agent, customPath: preferences.path(for: agent)) else { return }
         Task {
-            do { let client = try await connectedClient(agent); try await client.refreshAccount() }
+            do { let client = try await connectedClient(agent); try await client.refreshAccount(); scheduleAgentIdleTeardown(agent) }
             catch { notice = error.localizedDescription }
         }
     }
@@ -348,6 +361,7 @@ extension MyClipModel {
     }
 
     private func connectedClient(_ agent: ClipAgent, applyingSavedModel: Bool = true) async throws -> ACPClient {
+        agentIdleTasks.removeValue(forKey: agent)?.cancel()
         try Task.checkCancellation()
         if let client = sessionCoordinator.client(agent), state(agent).available { return client }
         guard let command = try runtime.organizationCommand(for: agent, customPath: preferences.path(for: agent)) else {
@@ -357,16 +371,21 @@ extension MyClipModel {
         try Task.checkCancellation()
         agents[agent]?.phase = .connecting
         agents[agent]?.detail = String(localized: "正在连接…")
-        let (client, handshake) = try await sessionCoordinator.open(agent, command: command)
-        try Task.checkCancellation()
-        agents[agent]?.authMethods = handshake.authMethods
-        guard handshake.supportsImages else { throw ACPError.unsupportedImages }
-        _ = try await session(for: agent, using: client, applyingSavedModel: applyingSavedModel)
-        try Task.checkCancellation()
-        agentRetryAt[agent] = nil
-        agents[agent]?.phase = .ready
-        agents[agent]?.detail = String(localized: "已就绪 · 每批独立整理")
-        return client
+        do {
+            let (client, handshake) = try await sessionCoordinator.open(agent, command: command)
+            try Task.checkCancellation()
+            agents[agent]?.authMethods = handshake.authMethods
+            guard handshake.supportsImages else { throw ACPError.unsupportedImages }
+            _ = try await session(for: agent, using: client, applyingSavedModel: applyingSavedModel)
+            try Task.checkCancellation()
+            agentRetryAt[agent] = nil
+            agents[agent]?.phase = .ready
+            agents[agent]?.detail = String(localized: "已就绪 · 每批独立整理")
+            return client
+        } catch {
+            await releaseSession(agent)
+            throw error
+        }
     }
 
     private func workspaceDirectory() throws -> URL {
@@ -413,6 +432,7 @@ extension MyClipModel {
         agents[agent]?.modelError = nil
         do {
             _ = try await connectedClient(agent)
+            scheduleAgentIdleTeardown(agent)
         } catch {
             if !runtime.usesAccountBridge(agent, customPath: preferences.path(for: agent)) { await releaseSession(agent) }
             if Task.isCancelled {
@@ -448,6 +468,7 @@ extension MyClipModel {
             preferences.setSelectedModel(modelID, for: agent)
             agents[agent]?.phase = .ready
             agents[agent]?.detail = String(localized: "已就绪 · 每批独立整理")
+            scheduleAgentIdleTeardown(agent)
             return true
         } catch {
             agents[agent]?.modelError = error.localizedDescription
@@ -458,9 +479,26 @@ extension MyClipModel {
     }
 
     private func releaseSession(_ agent: ClipAgent) async {
+        agentIdleTasks.removeValue(forKey: agent)?.cancel()
         await sessionCoordinator.teardown(agent)
         agents[agent]?.sessionID = nil
         permissions.removeAll { $0.agent == agent }
+    }
+
+    private func scheduleAgentIdleTeardown(_ agent: ClipAgent) {
+        agentIdleTasks.removeValue(forKey: agent)?.cancel()
+        agentIdleTasks[agent] = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(60)) } catch { return }
+            guard let self else { return }
+            agentIdleTasks[agent] = nil
+            guard currentJob?.agent != agent, discoveryAgent != agent,
+                  !configuringAgentModels.contains(agent), !authorizingAccounts.contains(agent) else { return }
+            await releaseSession(agent)
+            if agents[agent]?.phase == .ready {
+                agents[agent]?.phase = .disconnected
+                agents[agent]?.detail = String(localized: "等待整理")
+            }
+        }
     }
 
     /// Connects (or reuses) `agent`'s client, ensures a session, runs `body`, then always releases the
@@ -537,11 +575,17 @@ extension MyClipModel {
                 await repairTaskIngestion(stage, agent: enabled)
                 return
             }
-            try await store.handoffQueuedOrganizationJobs(to: enabled)
+            var queue = try await store.organizationQueue()
+            if let queuedAgent = queue.nextAgent, queuedAgent != enabled {
+                try await store.handoffQueuedOrganizationJobs(to: enabled)
+                queue = try await store.organizationQueue()
+            }
             try Task.checkCancellation()
             // Once a day, when nothing is waiting and the user has been away, the queue gets a dream.
-            if jobID == nil, BackgroundWorkBudget.allowsMaintenance { try await store.enqueueDreamIfDue(agent: enabled) }
-            let queue = try await store.organizationQueue()
+            if jobID == nil, BackgroundWorkBudget.allowsMaintenance {
+                try await store.enqueueDreamIfDue(agent: enabled)
+                queue = try await store.organizationQueue()
+            }
             guard let target = agent ?? queue.nextAgent, target == preferences.enabledAgent,
                   !state(target).busy, state(target).phase != .failed else { return }
             if !immediately {
@@ -625,6 +669,9 @@ extension MyClipModel {
                 }
             }
             await releaseSession(job.agent)
+            if let enabled = preferences.enabledAgent, enabled != job.agent {
+                try await store.handoffQueuedOrganizationJobs(to: enabled)
+            }
             cancelledJobs.remove(job.id)
             interruptedJobs.remove(job.id)
             currentJob = nil
@@ -634,6 +681,9 @@ extension MyClipModel {
         } catch {
             if let job = currentJob {
                 await releaseSession(job.agent)
+                if let enabled = preferences.enabledAgent, enabled != job.agent {
+                    try? await store.handoffQueuedOrganizationJobs(to: enabled)
+                }
                 interruptedJobs.remove(job.id)
             }
             currentJob = nil
@@ -801,12 +851,14 @@ extension MyClipModel {
         let retryable = automaticallyRetry && preferences.enabledAgent == agent && RetryPolicy.classify(error) == .transient
         agents[agent]?.detail = retryable ? String(localized: "\(firstLine(error)) · 将自动重试") : firstLine(error)
         agentRetryAt[agent] = retryable ? Date().addingTimeInterval(RetryPolicy.delay(afterAttempt: 1)) : nil
+        wakeWorker()
     }
 
     /// Runs before the worker's pause check, so a retryable pause cannot prevent its own recovery.
     func recoverOrganizationIfNeeded(at date: Date = Date()) async {
         guard !preview, !dispatching, organizationTask == nil, currentJob == nil, !discoveringTasks, configuringAgentModels.isEmpty,
               let agent = preferences.enabledAgent, !state(agent).busy else { return }
+        guard state(agent).phase == .failed || library.queue.pauseReason != nil else { return }
         if state(agent).phase == .failed {
             guard let retryAt = agentRetryAt[agent], date >= retryAt else { return }
             agentRetryAt[agent] = nil

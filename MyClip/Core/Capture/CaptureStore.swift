@@ -94,12 +94,16 @@ extension LibraryStore {
     /// Groups pre-v11 captures into scenes by window and time so the Timeline folds history too.
     public func nextImageForTextIndex(excluding: Set<String> = []) throws -> (id: String, url: URL)? {
         let placeholders = excluding.map { _ in "?" }.joined(separator: ",")
-        let filter = excluding.isEmpty ? "" : " AND id NOT IN (\(placeholders))"
-        guard let id = try database.run("SELECT id FROM images WHERE available=1 AND id NOT IN (SELECT image_id FROM image_text)\(filter) ORDER BY rowid LIMIT 1", Array(excluding)).first?["id"] else { return nil }
+        let filter = excluding.isEmpty ? "" : " AND i.id NOT IN (\(placeholders))"
+        guard let id = try database.run("""
+            SELECT i.id FROM images i WHERE i.available=1
+              AND NOT EXISTS (SELECT 1 FROM image_text t WHERE t.image_id=i.id)\(filter)
+            ORDER BY i.rowid LIMIT 1
+            """, Array(excluding)).first?["id"] else { return nil }
         return (id, root.appendingPathComponent("Images/\(id).png"))
     }
 
-    public func recognizeImageText(id: String) async throws -> String {
+    public func recognizeImageText(id: String, level: CaptureTextRecognitionLevel = .accurate) async throws -> String {
         guard try !database.run("SELECT id FROM images WHERE id=? AND available=1", [id]).isEmpty else { throw LibraryError.missingSource }
         let documentURL = root.appendingPathComponent("Images/\(id).txt")
         if let text = try database.run("SELECT body FROM image_text WHERE image_id=?", [id]).first?["body"] {
@@ -115,8 +119,8 @@ extension LibraryStore {
         } else {
             let imageURL = root.appendingPathComponent("Images/\(id).png")
             task = Task.detached(priority: .utility) {
-                let data = try Data(contentsOf: imageURL)
-                guard let text = CaptureTextRecognizer.recognize(data) else { throw LibraryError.textRecognitionFailed }
+                let data = try Data(contentsOf: imageURL, options: .mappedIfSafe)
+                guard let text = CaptureTextRecognizer.recognize(data, level: level) else { throw LibraryError.textRecognitionFailed }
                 return text
             }
             textRecognitionTasks[id] = task

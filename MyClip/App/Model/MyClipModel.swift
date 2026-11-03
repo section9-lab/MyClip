@@ -173,7 +173,7 @@ final class MyClipModel: ObservableObject {
         get { library.queue.paused }
         set {
             Task {
-                do { try await store.setOrganizationPaused(newValue); await refresh() }
+                do { try await store.setOrganizationPaused(newValue); await refresh(); wakeWorker() }
                 catch { notice = error.localizedDescription }
             }
         }
@@ -217,6 +217,7 @@ final class MyClipModel: ObservableObject {
     var accountAuthorizationTasks: [ClipAgent: Task<Void, Never>] = [:]
     var modelImageCapabilities: [ClipAgent: [String: Bool]] = [:]
     var agentRetryAt: [ClipAgent: Date] = [:]
+    var agentIdleTasks: [ClipAgent: Task<Void, Never>] = [:]
     @Published var permissions: [ClipPermission] = []
     @Published var currentJob: ClipJob?
     @Published var activityText = "" { didSet { lastActivityAt = Date() } }
@@ -234,6 +235,10 @@ final class MyClipModel: ObservableObject {
     private var workspaceObservation: AnyCancellable?
     private var backgroundSuspended = false
     var worker: Task<Void, Never>?
+    private var workerSleep: Task<Void, Never>?
+    private var workerSleepToken: UUID?
+    private var workerWakePending = false
+    var lastPermissionRefresh = Date.distantPast
     private var searchTask: Task<Void, Never>?
     private var refreshOperation: Task<Void, Never>?
     private var refreshAgain = false
@@ -274,6 +279,7 @@ final class MyClipModel: ObservableObject {
                                             filterStrategies: self.preferences.captureSettings.filterStrategies)
                 await self.refreshIfNeeded()
                 self.startTextRecognition()
+                self.wakeWorker()
                 self.captureStatus = repeated ? String(localized: "已记录本次出现，相同画面共用原图") : String(localized: "已保存 \(context.appName) · \(context.date.formatted(date: .omitted, time: .standard))")
             } catch { self.captureStatus = String(localized: "保存失败：\(error.localizedDescription)"); self.notice = error.localizedDescription }
         }
@@ -295,12 +301,19 @@ final class MyClipModel: ObservableObject {
         let center = NSWorkspace.shared.notificationCenter
         let sleepNames = [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification, NSWorkspace.sessionDidResignActiveNotification]
         let wakeNames = [NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification, NSWorkspace.sessionDidBecomeActiveNotification]
+        if !preview, let agent = preferences.enabledAgent, agents[agent]?.phase == .disconnected {
+            agents[agent]?.detail = String(localized: "等待整理")
+        }
         workspaceObservation = Publishers.MergeMany((sleepNames + wakeNames).map { center.publisher(for: $0) })
             .sink { [weak self] notification in
                 let sleeping = sleepNames.contains(notification.name)
-                Task { @MainActor in self?.backgroundSuspended = sleeping }
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.backgroundSuspended = sleeping
+                    if !sleeping { self.refreshPermissions() }
+                    self.wakeWorker()
+                }
             }
-        if !preview, let agent = preferences.enabledAgent { connect(agent) }
         worker = Task { [weak self] in
             guard let self else { return }
             do {
@@ -320,7 +333,7 @@ final class MyClipModel: ObservableObject {
                 #endif
             } catch { notice = error.localizedDescription }
             while !Task.isCancelled {
-                if !backgroundSuspended { refreshPermissions() }
+                if !backgroundSuspended { refreshPermissionsIfNeeded() }
                 if !preview && !backgroundSuspended {
                     await cleanupIfNeeded()
                     await recoverOrganizationIfNeeded()
@@ -328,7 +341,7 @@ final class MyClipModel: ObservableObject {
                     await refreshIfNeeded()
                     startTextRecognition()
                 }
-                do { try await Task.sleep(for: .seconds(3)) } catch { break }
+                await waitForWorker(nextWorkerDelay())
             }
         }
         refreshPermissions()
@@ -349,9 +362,8 @@ final class MyClipModel: ObservableObject {
                             continue
                         }
                         do {
-                            _ = try await store.recognizeImageText(id: image.id)
+                            _ = try await store.recognizeImageText(id: image.id, level: .fast)
                             await refreshIfNeeded()
-                            if ProcessInfo.processInfo.isLowPowerModeEnabled { try await Task.sleep(for: .milliseconds(500)) }
                         } catch is CancellationError { return }
                         catch { textRecognitionFailures.insert(image.id) }
                     } else { return }
@@ -367,6 +379,10 @@ final class MyClipModel: ObservableObject {
         workspaceObservation = nil
         worker?.cancel()
         worker = nil
+        workerSleep?.cancel()
+        workerSleep = nil
+        workerSleepToken = nil
+        workerWakePending = false
         captureService.stop()
         capturing = false
         textWorker?.cancel()
@@ -375,6 +391,8 @@ final class MyClipModel: ObservableObject {
         taskDiscovery?.cancel()
         organizationTask?.cancel()
         accountAuthorizationTasks.values.forEach { $0.cancel() }
+        agentIdleTasks.values.forEach { $0.cancel() }
+        agentIdleTasks.removeAll()
         Task { [sessionCoordinator] in await sessionCoordinator.stopAll() }
     }
 
@@ -400,6 +418,46 @@ final class MyClipModel: ObservableObject {
     }
 
     func toggleCapture() { setCaptureEnabled(!preferences.captureEnabled) }
+
+    func wakeWorker() {
+        workerWakePending = true
+        workerSleepToken = nil
+        workerSleep?.cancel()
+        workerSleep = nil
+    }
+
+    private func waitForWorker(_ duration: Duration) async {
+        guard !Task.isCancelled else { return }
+        if workerWakePending {
+            workerWakePending = false
+            return
+        }
+        let token = UUID()
+        let sleep = Task<Void, Never> {
+            do { try await Task.sleep(for: duration) } catch { }
+        }
+        workerSleepToken = token
+        workerSleep = sleep
+        await sleep.value
+        if workerSleepToken == token {
+            workerSleepToken = nil
+            workerSleep = nil
+        } else {
+            workerWakePending = false
+        }
+    }
+
+    private func nextWorkerDelay(at date: Date = Date()) -> Duration {
+        guard !backgroundSuspended else { return .seconds(60) }
+        if currentJob != nil || dispatching || discoveringTasks { return .seconds(3) }
+        var next = date.addingTimeInterval(30)
+        if !processingPaused {
+            if library.queue.pendingCount > 0, let ready = library.queue.readyAt { next = min(next, ready) }
+            if let retry = jobAwaitingRetry?.retryAt { next = min(next, retry) }
+        }
+        if let agent = preferences.enabledAgent, let retry = agentRetryAt[agent] { next = min(next, retry) }
+        return .seconds(max(1, next.timeIntervalSince(date)))
+    }
 
     func state(_ agent: ClipAgent) -> ClipAgentState { agents[agent] ?? .init() }
 
@@ -428,7 +486,6 @@ final class MyClipModel: ObservableObject {
 
     private func performRefresh(forceReconcile: Bool) async {
         do {
-            if let agent = preferences.enabledAgent { try await store.reassignPendingCaptures(to: agent) }
             let versions = try await store.refreshVersions()
             let reconcile = Date().timeIntervalSince(lastLibraryRefresh) >= 60
             let libraryChanged = forceReconcile || reconcile || lastLibraryVersion != versions.library

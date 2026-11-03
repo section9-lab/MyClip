@@ -162,10 +162,13 @@ final class CaptureTriggerTests: XCTestCase {
     func testContinuedScrollingRestartsTheDeadline() {
         var trigger = CaptureTrigger()
         trigger.scroll(at: 10, deltaY: -1)
+        XCTAssertEqual(trigger.nextDeadline, 15)
         trigger.scroll(at: 11.5, deltaY: -1)
+        XCTAssertEqual(trigger.nextDeadline, 16.5)
         XCTAssertNil(trigger.poll(at: 15))
         XCTAssertNil(trigger.poll(at: 16.499))
         XCTAssertEqual(trigger.poll(at: 16.5), .scrollIdle)
+        XCTAssertNil(trigger.nextDeadline)
     }
 
     func testUpwardAndHorizontalScrollingDoNotTriggerCapture() {

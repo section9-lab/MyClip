@@ -50,6 +50,21 @@ import Combine
         defaults.set(executable.path, forKey: "myclip.opencodePath")
         let preferences = ClipPreferences(preview: false, defaults: defaults)
         preferences.enabledAgent = .opencode
+
+        try setScenario("task_recovery_empty")
+        let coldStartKey = "myclip.coldStartIngestionAttempted"
+        let previousColdStartValue = UserDefaults.standard.object(forKey: coldStartKey)
+        UserDefaults.standard.set(true, forKey: coldStartKey)
+        let lazyModel = try MyClipModel(root: root.appendingPathComponent("LazyLibrary"), preview: false, preferences: preferences)
+        try await lazyModel.store.recordConsolidation()
+        lazyModel.start()
+        try await Task.sleep(for: .milliseconds(250))
+        check(lazyModel.sessionCoordinator.client(.opencode) == nil && lazyModel.state(.opencode).phase == .disconnected,
+              "Startup keeps an enabled Agent stopped until work or explicit configuration needs it")
+        lazyModel.stop()
+        if let previousColdStartValue { UserDefaults.standard.set(previousColdStartValue, forKey: coldStartKey) }
+        else { UserDefaults.standard.removeObject(forKey: coldStartKey) }
+
         let model = try MyClipModel(root: root.appendingPathComponent("Library"), preview: false, preferences: preferences)
         defer { model.stop() }
 

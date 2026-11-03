@@ -1,6 +1,7 @@
 import AppKit
 import AVFAudio
 import CoreGraphics
+import Darwin
 import Foundation
 
 @available(macOS 14.0, *)
@@ -76,10 +77,13 @@ enum PermissionCoordinator {
     /// permissions are polled every few seconds and would otherwise raise the prompt unasked.
     static func hasFolderAccess(defaults: UserDefaults = .standard) -> Bool {
         guard defaults.bool(forKey: folderAccessRequestedKey) else { return false }
-        let manager = FileManager.default
-        let home = manager.homeDirectoryForCurrentUser
-        return ["Desktop", "Documents"].allSatisfy {
-            (try? manager.contentsOfDirectory(at: home.appendingPathComponent($0), includingPropertiesForKeys: nil)) != nil
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        return ["Desktop", "Documents"].allSatisfy { name in
+            home.appendingPathComponent(name).path.withCString { path in
+                guard let directory = opendir(path) else { return false }
+                closedir(directory)
+                return true
+            }
         }
     }
 
