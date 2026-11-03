@@ -105,6 +105,27 @@ struct MemoryDirectoryTests {
         check(model.search.isEmpty && model.memoryFolder == nil, "Opening a saved file clears the previous search and folder")
         model.results.entries = [original] // An older in-flight search can finish after the document opens.
         check(model.selectedMemoryEntry?.body.contains("Newly saved memory") == true, "The reader prefers the saved revision over a stale search result")
+
+        let staleProfile = model.library.entries.first { $0.relativePath == "Profile.md" }!
+        try await model.store.updateEntry(id: staleProfile.id, title: staleProfile.title,
+                                          body: staleProfile.body + "\n\n后台更新。", expectedRevision: staleProfile.revision)
+        model.notice = nil
+        let draft = staleProfile.body + "\n\n编辑器中的草稿。"
+        let firstSave = await model.saveMemory(id: staleProfile.id, title: staleProfile.title, body: draft,
+                                               expectedRevision: staleProfile.revision)
+        if case .conflict(let latest) = firstSave {
+            check(latest.revision == staleProfile.revision + 1, "A stale editor receives the latest revision instead of a repeating global alert")
+            check(model.notice == nil, "A normal edit conflict stays inside the editor")
+            let retry = await model.saveMemory(id: staleProfile.id, title: staleProfile.title, body: draft,
+                                               expectedRevision: latest.revision)
+            if case .saved = retry { check(true, "The preserved draft can be saved deliberately as a new version") }
+            else { check(false, "The preserved draft can be saved deliberately as a new version") }
+            let final = try await model.store.readMemory(staleProfile.id)
+            check(final.body == draft && final.revision == staleProfile.revision + 2,
+                  "Resolving the conflict preserves history and publishes the chosen draft")
+        } else {
+            check(false, "A stale editor receives the latest revision instead of a repeating global alert")
+        }
         print("Memory directory checks: \(failures) failure(s)")
         if failures > 0 { exit(1) }
     }

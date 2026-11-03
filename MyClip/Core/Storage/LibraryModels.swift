@@ -20,7 +20,7 @@ public enum LibraryError: Error, LocalizedError, Sendable {
         case .rolledBack(let files): String(localized: "已恢复上一版：\(files)。其余改动已保存，将先拆分过长页面再重新整理本批。")
         case .missingSource: String(localized: "来源截图已过期或不可用。")
         case .textRecognitionFailed: String(localized: "OCR 文字提取失败，请重试。")
-        case .conflict: String(localized: "这条知识已更新，请重新整理后再保存。")
+        case .conflict: String(localized: "这条知识已更新，请刷新后再试。")
         case .agentStopped: String(localized: "Agent 在完成前停止，请重试。")
         }
     }

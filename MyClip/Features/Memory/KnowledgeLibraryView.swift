@@ -417,6 +417,8 @@ private struct EntryEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
     @State private var bodyText = ""
+    @State private var expectedRevision = 0
+    @State private var latestConflict: KnowledgeEntry?
     @State private var saving = false
     @State private var previewing = false
 
@@ -450,12 +452,58 @@ private struct EntryEditor: View {
                 Text("Markdown · 保存时保留来源与历史版本").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("取消") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("保存") {
-                    saving = true
-                    Task { if await model.save(entry, title: title, body: bodyText) { dismiss() }; saving = false }
-                }.keyboardShortcut("s", modifiers: .command).disabled(saving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || bodyText.isEmpty)
+                Button("保存", action: save)
+                    .keyboardShortcut("s", modifiers: .command)
+                    .disabled(saving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || bodyText.isEmpty)
             }
         }.padding(24).frame(width: 760, height: 600)
-        .onAppear { title = entry.title; bodyText = entry.body }
+        .onAppear {
+            title = entry.title
+            bodyText = entry.body
+            expectedRevision = entry.revision
+        }
+        .alert("知识已更新", isPresented: Binding(
+            get: { latestConflict != nil },
+            set: { if !$0 { latestConflict = nil } }
+        )) {
+            Button("载入最新版本") { loadLatestVersion() }
+            Button("将我的修改保存为新版") {
+                guard let latestConflict else { return }
+                self.latestConflict = nil
+                save(expectedRevision: latestConflict.revision)
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("这条知识在你编辑期间发生了变化。你的草稿仍然保留；你可以载入最新内容，或把当前草稿保存为新版本。")
+        }
+    }
+
+    private func save() { save(expectedRevision: expectedRevision) }
+
+    private func save(expectedRevision: Int) {
+        guard !saving else { return }
+        saving = true
+        let draftTitle = title
+        let draftBody = bodyText
+        Task { @MainActor in
+            switch await model.saveMemory(id: entry.id, title: draftTitle, body: draftBody, expectedRevision: expectedRevision) {
+            case .saved:
+                dismiss()
+            case .conflict(let latest):
+                self.expectedRevision = latest.revision
+                latestConflict = latest
+            case .failed:
+                break
+            }
+            saving = false
+        }
+    }
+
+    private func loadLatestVersion() {
+        guard let latestConflict else { return }
+        title = latestConflict.title
+        bodyText = latestConflict.body
+        expectedRevision = latestConflict.revision
+        self.latestConflict = nil
     }
 }

@@ -1,6 +1,12 @@
 import Foundation
 import MyClipCore
 
+enum MemorySaveOutcome {
+    case saved
+    case conflict(KnowledgeEntry)
+    case failed
+}
+
 extension MyClipModel {
     var selectedMemoryEntry: KnowledgeEntry? {
         (library.entries + results.entries).first { $0.id == selectedEntry }
@@ -13,12 +19,24 @@ extension MyClipModel {
         open(.memory)
     }
 
-    func save(_ entry: KnowledgeEntry, title: String, body: String) async -> Bool {
+    func saveMemory(id: UUID, title: String, body: String, expectedRevision: Int) async -> MemorySaveOutcome {
         do {
-            try await store.updateEntry(id: entry.id, title: title, body: body, expectedRevision: entry.revision)
+            try await store.updateEntry(id: id, title: title, body: body, expectedRevision: expectedRevision)
             await refresh()
-            return true
-        } catch { notice = error.localizedDescription; return false }
+            return .saved
+        } catch LibraryError.conflict {
+            do {
+                let latest = try await store.readMemory(id)
+                await refresh()
+                return .conflict(latest)
+            } catch {
+                notice = error.localizedDescription
+                return .failed
+            }
+        } catch {
+            notice = error.localizedDescription
+            return .failed
+        }
     }
 
     func delete(_ entry: KnowledgeEntry) {
