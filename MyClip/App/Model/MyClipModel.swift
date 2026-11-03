@@ -196,7 +196,16 @@ final class MyClipModel: ObservableObject {
     @Published var screenPermission = false
     @Published var accessibilityPermission = false
     @Published var folderPermission = false
-    @Published var notice: String?
+    @Published private var displayedNotice: String?
+    var notice: String? {
+        get { displayedNotice }
+        set {
+            // Revision conflicts are recovered by refreshing or by the Memory editor's inline choices. A generic
+            // modal alert has no useful action and can otherwise interrupt unrelated pages during background sync.
+            guard newValue != LibraryError.conflict.localizedDescription else { return }
+            displayedNotice = newValue
+        }
+    }
     @Published var mcpEnabled: Bool
     @Published var configuringMCP = false
     @Published var mcpSetupResults: [MCPClient: MCPSetupResult] = [:]

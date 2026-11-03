@@ -79,12 +79,32 @@ extension LibraryStore {
             try upgradeLegacyIndexTemplate()
             try importPlainMarkdownFiles()
             let scan = try MemoryLayout.scan(in: root.appendingPathComponent("Memory"), cache: &memoryReadCache)
-            let files = scan.documents
+            var files = scan.documents
             invalid = scan.invalid
             let known = try database.run("SELECT * FROM memory_files")
             let paths = Dictionary(uniqueKeysWithValues: known.compactMap { row -> (String, String)? in
                 guard let id = row["id"], let path = row["path"] else { return nil }; return (id, path)
             })
+            let knownIDs = Set(paths.keys.compactMap(UUID.init(uuidString:)))
+            let scannedIDs = Set(files.map { $0.3.id })
+            let ownersByPath = Dictionary(uniqueKeysWithValues: known.compactMap { row -> (String, UUID)? in
+                guard let id = row["id"].flatMap(UUID.init(uuidString:)), let path = row["path"] else { return nil }
+                return (path.lowercased(), id)
+            })
+            var repairedIdentity = false
+            for index in files.indices {
+                let (path, url, text, document) = files[index]
+                guard let owner = ownersByPath[path.lowercased()], owner != document.id,
+                      !knownIDs.contains(document.id), !scannedIDs.contains(owner) else { continue }
+                // Agents edit published Markdown directly and can occasionally regenerate front matter. A known path
+                // remains the stable identity when the replacement ID belongs to no other Memory; restore it while
+                // importing the body as a normal external edit instead of blocking every library refresh.
+                let corrected = try Self.restoringMemoryID(owner, in: text)
+                try corrected.write(to: url, atomically: true, encoding: .utf8)
+                files[index] = (path, url, corrected, try MemoryDocument(corrected))
+                repairedIdentity = true
+            }
+            if repairedIdentity { memoryReadCache.reset() }
             let publishedHashes = Dictionary(uniqueKeysWithValues: known.compactMap { row -> (String, String)? in
                 guard let id = row["id"], let hash = row["published_hash"], row["pending"] == "0" else { return nil }
                 return (id, hash)
@@ -147,6 +167,16 @@ extension LibraryStore {
             }
         }
         return invalid
+    }
+
+    private static func restoringMemoryID(_ id: UUID, in text: String) throws -> String {
+        guard let range = text.range(of: #"(?m)^id:[ \t]*[\"']?[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}[\"']?[ \t]*$"#,
+                                     options: .regularExpression) else {
+            throw LibraryError.invalidResult(String(localized: "Memory 元信息不完整。"))
+        }
+        var corrected = text
+        corrected.replaceSubrange(range, with: "id: \(id.uuidString)")
+        return corrected
     }
 
     /// Refresh only the exact seeded overview. Authored overviews and all legacy notes stay untouched.

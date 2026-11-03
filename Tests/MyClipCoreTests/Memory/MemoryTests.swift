@@ -37,6 +37,27 @@ final class MemoryTests: XCTestCase {
         XCTAssertEqual(found.entries.first?.revision, 2)
     }
 
+    func testExternalEditCannotReplaceTheIdentityOfAKnownPath() async throws {
+        let store = try LibraryStore(root: root)
+        let entry = try await seed(store)
+        let replacementID = UUID()
+        let original = try String(contentsOf: entry.fileURL, encoding: .utf8)
+        let changed = original
+            .replacingOccurrences(of: entry.id.uuidString, with: replacementID.uuidString)
+            .replacingOccurrences(of: "回车记录焦点窗口。", with: "外部工具修改了正文。")
+        try changed.write(to: entry.fileURL, atomically: true, encoding: .utf8)
+
+        let snapshot = try await store.snapshot(query: "外部工具")
+        let repaired = try XCTUnwrap(snapshot.entries.first)
+        XCTAssertEqual(repaired.id, entry.id, "The established path keeps its canonical Memory identity")
+        XCTAssertEqual(repaired.revision, entry.revision + 1)
+        XCTAssertEqual(repaired.body, "外部工具修改了正文。")
+        XCTAssertFalse(snapshot.entries.contains { $0.id == replacementID })
+        let published = try String(contentsOf: entry.fileURL, encoding: .utf8)
+        XCTAssertTrue(published.contains("id: \(entry.id.uuidString)"))
+        XCTAssertFalse(published.contains(replacementID.uuidString))
+    }
+
     func testAgentCannotOverwriteManuallyEditedMemory() async throws {
         let store = try LibraryStore(root: root)
         let entry = try await seed(store)

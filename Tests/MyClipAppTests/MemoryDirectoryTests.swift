@@ -106,6 +106,9 @@ struct MemoryDirectoryTests {
         model.results.entries = [original] // An older in-flight search can finish after the document opens.
         check(model.selectedMemoryEntry?.body.contains("Newly saved memory") == true, "The reader prefers the saved revision over a stale search result")
 
+        model.notice = LibraryError.conflict.localizedDescription
+        check(model.notice == nil, "A revision conflict never becomes an unexplained global alert")
+
         let staleProfile = model.library.entries.first { $0.relativePath == "Profile.md" }!
         try await model.store.updateEntry(id: staleProfile.id, title: staleProfile.title,
                                           body: staleProfile.body + "\n\n后台更新。", expectedRevision: staleProfile.revision)
