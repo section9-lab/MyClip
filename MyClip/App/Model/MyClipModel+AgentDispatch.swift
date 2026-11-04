@@ -594,6 +594,9 @@ extension MyClipModel {
             guard target == preferences.enabledAgent, !state(target).busy, state(target).phase != .failed,
                   let job = try await store.claimNextJob(immediately: immediately, jobID: jobID) else { return }
             dispatching = true
+            liveActivities = []
+            responseBuffer = ""
+            responsePublishedAt = .distantPast
             currentJob = job
             if Task.isCancelled || target != preferences.enabledAgent { interruptedJobs.insert(job.id) }
             currentJobStartedAt = Date()
@@ -813,6 +816,14 @@ extension MyClipModel {
             // Streaming deltas often carry the same status. Keep the liveness timestamp accurate
             // without invalidating the entire SwiftUI tree for every token.
             lastActivityAt = Date()
+            if liveActivities.last?.isResponse == true {
+                responseFlushTask?.cancel()
+                responseFlushTask = nil
+                liveActivities[liveActivities.count - 1].text = responseBuffer
+                if activityText == text {
+                    liveActivities = Array((liveActivities + [LiveActivity(text: text)]).suffix(4))
+                }
+            }
             if activityText != text { activityText = text }
         } else if discoveryAgent == agent, taskDiscoveryMessage != text { taskDiscoveryMessage = text }
     }
@@ -826,7 +837,34 @@ extension MyClipModel {
             guard state(agent).sessionID == session else { return }
             agents[agent]?.modelSelection = selection.annotatingImages(modelImageCapabilities[agent] ?? [:])
             agents[agent]?.modelsLoaded = true
-        case .message(let session, _): updateActivity(String(localized: "\(agent.name) 正在生成结果…"), session: session, agent: agent)
+        case .message(let session, let text):
+            guard state(agent).sessionID == session else { break }
+            if currentJob?.agent == agent {
+                lastActivityAt = Date()
+                if liveActivities.last?.isResponse != true {
+                    responseBuffer = ""
+                    liveActivities = Array((liveActivities + [LiveActivity(text: "", isResponse: true)]).suffix(4))
+                    responsePublishedAt = .distantPast
+                }
+                responseBuffer = String((responseBuffer + text).suffix(500))
+                if Date().timeIntervalSince(responsePublishedAt) >= 0.5 {
+                    responseFlushTask?.cancel()
+                    responseFlushTask = nil
+                    liveActivities[liveActivities.count - 1].text = responseBuffer
+                    responsePublishedAt = Date()
+                } else if responseFlushTask == nil, let responseID = liveActivities.last?.id {
+                    // Flush the last delta even if the stream goes quiet before another event arrives.
+                    let delay = max(0, 0.5 - Date().timeIntervalSince(responsePublishedAt))
+                    responseFlushTask = Task { [weak self] in
+                        do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+                        guard let self else { return }
+                        self.responseFlushTask = nil
+                        guard self.currentJob?.agent == agent, self.liveActivities.last?.id == responseID else { return }
+                        self.liveActivities[self.liveActivities.count - 1].text = self.responseBuffer
+                        self.responsePublishedAt = Date()
+                    }
+                }
+            } else { updateActivity(String(localized: "\(agent.name) 正在生成结果…"), session: session, agent: agent) }
         case .thinking(let session): updateActivity(String(localized: "\(agent.name) 正在思考…"), session: session, agent: agent)
         case .tool(let session, let title, _): updateActivity(title, session: session, agent: agent)
         case .permission(let request):

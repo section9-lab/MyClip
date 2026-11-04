@@ -211,7 +211,7 @@ private extension LibraryStore {
         model.lastActivityAt = Date().addingTimeInterval(-120)
         let activityBefore = model.lastActivityAt
         for _ in 0..<1000 { model.handle(.message(sessionID: "performance-session", text: "delta"), agent: .codex) }
-        check(progressPublications == 0, "A thousand same-status streaming deltas do not redraw the page")
+        check(progressPublications <= 3, "A thousand streaming deltas publish only the initial response and a throttled update (\(progressPublications) publications)")
         check(model.lastActivityAt > activityBefore, "Streaming liveness timestamps still advance")
         progress.cancel()
 

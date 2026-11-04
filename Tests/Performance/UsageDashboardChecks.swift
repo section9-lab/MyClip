@@ -117,6 +117,18 @@ private struct UsageFixtureView: View {
     try await settle()
     check(scrollViews(host).count == 1, "Runtime mounts one status scroller, not the history list or chart")
     try snapshot("status-light")
+    model.currentJob = ClipJob(id: UUID(), agent: .workbuddy, state: .running, createdAt: Date(), sourceIDs: [capture.id], error: nil)
+    model.liveActivities = [
+        .init(text: "正在读取截图"),
+        .init(text: "WorkBuddy 正在思考…"),
+        .init(text: "正在更新 Memory 文件"),
+        .init(text: "已整理这批截图并更新相关记忆。", isResponse: true)
+    ]
+    try await settle()
+    check(scrollViews(host).count == 1, "Four live activity entries do not introduce nested scrolling")
+    try snapshot("status-running-light")
+    model.currentJob = nil
+    model.liveActivities = []
     model.organizationSection = .history
     try await settle()
     check(!model.tokenUsageLoaded, "Opening history does not load token statistics")

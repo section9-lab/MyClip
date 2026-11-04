@@ -352,16 +352,23 @@ extension KnowledgeEntry {
             return stems.reduce(0) { total, item in text.contains(item.1) ? total + weights[item.0]! : total }
         }
         let passages = MemoryPassage.parse(body, sourceIDs: sourceIDs).filter { $0.text.range(of: #"^\s*#{1,6}\s"#, options: .regularExpression) == nil }
-        let scored = passages.compactMap { passage -> (passage: MemoryPassage, best: Double, lines: [(text: Substring, score: Double, offset: Int)])? in
-            var offset = 0, lines: [(text: Substring, score: Double, offset: Int)] = []
+        typealias ScoredLine = (text: Substring, score: Double, offset: Int)
+        typealias ScoredPassage = (passage: MemoryPassage, best: Double, lines: [ScoredLine])
+        var scored: [ScoredPassage] = []
+        for passage in passages {
+            var offset = 0
+            var lines: [ScoredLine] = []
             for line in passage.text.split(separator: "\n", omittingEmptySubsequences: false) {
-                lines.append((Substring(Self.displayed(line)), score(line), offset))
+                lines.append((text: Substring(Self.displayed(line)), score: score(line), offset: offset))
                 offset += line.count + 1
             }
-            let best = lines.map(\.score).max() ?? 0
-            return best > 0 ? (passage, best, lines) : nil
+            let best = lines.map { $0.score }.max() ?? 0
+            if best > 0 { scored.append((passage: passage, best: best, lines: lines)) }
         }
-        return scored.sorted { $0.best != $1.best ? $0.best > $1.best : $0.passage.ordinal < $1.passage.ordinal }.prefix(count).map { item in
+        let ranked = scored.sorted { lhs, rhs in
+            lhs.best != rhs.best ? lhs.best > rhs.best : lhs.passage.ordinal < rhs.passage.ordinal
+        }
+        return ranked.prefix(count).map { item -> MemoryPassage in
             let display = item.lines.map { String($0.text) }.joined(separator: "\n")
             guard display.count > limit else {
                 return MemoryPassage(ordinal: item.passage.ordinal, text: display, startOffset: item.passage.startOffset,

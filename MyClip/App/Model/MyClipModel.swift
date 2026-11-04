@@ -219,8 +219,40 @@ final class MyClipModel: ObservableObject {
     var agentRetryAt: [ClipAgent: Date] = [:]
     var agentIdleTasks: [ClipAgent: Task<Void, Never>] = [:]
     @Published var permissions: [ClipPermission] = []
-    @Published var currentJob: ClipJob?
-    @Published var activityText = "" { didSet { lastActivityAt = Date() } }
+    @Published var currentJob: ClipJob? {
+        didSet {
+            if currentJob == nil {
+                responseFlushTask?.cancel()
+                responseFlushTask = nil
+            }
+            if currentJob == nil, liveActivities.last?.isResponse == true {
+                liveActivities[liveActivities.count - 1].text = responseBuffer
+            }
+        }
+    }
+    struct LiveActivity: Identifiable {
+        let id = UUID()
+        var text: String
+        let date = Date()
+        var isResponse = false
+    }
+    @Published var liveActivities: [LiveActivity] = []
+    @Published var activityText = "" {
+        didSet {
+            lastActivityAt = Date()
+            if currentJob != nil, !activityText.isEmpty, activityText != oldValue {
+                if liveActivities.last?.isResponse == true {
+                    responseFlushTask?.cancel()
+                    responseFlushTask = nil
+                    liveActivities[liveActivities.count - 1].text = responseBuffer
+                }
+                liveActivities = Array((liveActivities + [LiveActivity(text: activityText)]).suffix(4))
+            }
+        }
+    }
+    var responseBuffer = ""
+    var responsePublishedAt = Date.distantPast
+    var responseFlushTask: Task<Void, Never>?
     var currentJobStartedAt: Date?
     var lastActivityAt = Date()
     var onOpenWindow: (() -> Void)?

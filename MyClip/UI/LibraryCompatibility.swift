@@ -1,4 +1,20 @@
 import SwiftUI
+import MyClipCore
+
+/// Shared thumbnail used by the capture library and the organization flow.
+struct CaptureThumbnail: View {
+    let capture: ClipCapture
+    @State private var image: NSImage?
+    var body: some View {
+        ZStack {
+            Color(nsColor: .underPageBackgroundColor)
+            if let image { Image(nsImage: image).resizable().scaledToFit() }
+            else { Label(String(localized: "图片已过期"), systemImage: "photo").font(.caption).foregroundStyle(.secondary) }
+        }
+        .task(id: capture.imageID) { image = NSImage(contentsOf: capture.imageURL) }
+        .accessibilityLabel("\(capture.appName) 的窗口截图")
+    }
+}
 
 struct LibrarySearchField: NSViewRepresentable {
     @Binding var text: String

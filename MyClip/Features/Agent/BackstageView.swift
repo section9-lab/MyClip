@@ -12,6 +12,7 @@ struct BackstageView: View {
     @State private var usageRange = UsageRange.month
     @State private var usageAsTable = false
     @State private var showingAgentConfiguration = false
+    @State private var showingRules = false
     @State private var configurationModelAgent: ClipAgent?
     @StateObject private var history = OrganizationHistoryState()
     @State private var windowVisible = false
@@ -244,8 +245,25 @@ struct BackstageView: View {
     }
 
     private var runtimeSection: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("自动整理").font(.title2.weight(.semibold))
+                    Text("查看队列与 Agent 的最新进展").font(.callout).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button { showingRules.toggle() } label: {
+                    Image(systemName: "questionmark.circle")
+                }
+                .buttonStyle(.plain).font(.title3).foregroundStyle(.secondary)
+                .accessibilityLabel(Text("整理规则"))
+                .help("查看整理规则")
+                .popover(isPresented: $showingRules, arrowEdge: .bottom) {
+                    rulesPopover
+                }
+            }
             ForEach(model.permissions) { permission in PermissionRequestView(model: model, permission: permission) }
+            OrganizationFlowView(model: model) { showingAgentConfiguration = true }
             HStack(spacing: 12) {
                 if let agent = model.preferences.enabledAgent {
                     AgentBrandIcon(agent: agent, size: 32)
@@ -293,38 +311,97 @@ struct BackstageView: View {
                             .font(.callout).foregroundStyle(.secondary)
                     }
                 }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
+                executionWindow
+                    .padding(.horizontal, 20).padding(.bottom, 20)
                 Divider()
-                Text("待整理 \(model.library.queue.pendingCount) 张截图").font(.callout).foregroundStyle(.secondary)
-                    .padding(.horizontal, 20).padding(.vertical, 12).frame(maxWidth: .infinity, alignment: .leading)
+                ViewThatFits(in: .horizontal) {
+                    HStack {
+                        queueCount
+                        Spacer(minLength: 12)
+                        if model.preferences.enabledAgent != nil { HStack(spacing: 8) { queueActions } }
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        queueCount
+                        if model.preferences.enabledAgent != nil { HStack(spacing: 8) { queueActions } }
+                    }
+                }.padding(.horizontal, 20).padding(.vertical, 14)
             }
-            if model.preferences.enabledAgent != nil { HStack(spacing: 10) { queueActions } }
             if model.taskIngestionSummary.failedCount > 0 {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("部分任务线索仍待补处理。", systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(.orange)
                     Button("重试任务识别") { model.retryTaskIngestionFailures() }.disabled(!model.canStartOrganization)
                 }
             }
-            if model.currentJob == nil, let completed = model.library.jobs.first(where: { $0.state == .completed }) {
-                HStack(alignment: .top, spacing: 12) {
+        }
+    }
+
+    private var executionWindow: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "terminal").foregroundStyle(.secondary)
+                Text("执行状态").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Spacer()
+                Button("全部执行记录") { model.organizationSection = .history }
+                    .buttonStyle(.link).font(.caption)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(Color(nsColor: .controlBackgroundColor))
+            Divider()
+            if !model.liveActivities.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(model.liveActivities) { activity in
+                        HStack(alignment: .top, spacing: 10) {
+                            Text(activity.date, format: .dateTime.hour().minute().second())
+                                .font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
+                            Image(systemName: activity.isResponse ? "text.bubble" : "chevron.right")
+                                .font(.caption).foregroundStyle(.secondary).frame(width: 14)
+                                .accessibilityHidden(true)
+                            Text(activity.text.isEmpty ? String(localized: "正在生成回答…") : activity.text)
+                                .font(.callout).lineLimit(3).textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }.padding(.horizontal, 14).padding(.vertical, 8)
+                    }
+                }.padding(.vertical, 4)
+            } else if model.currentJob != nil {
+                Text("等待 Agent 的最新动态…").font(.callout).foregroundStyle(.secondary)
+                    .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+            } else if let completed = model.library.jobs.first(where: { $0.state == .completed }) {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle").foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("最近完成").font(.caption).foregroundStyle(.secondary)
                         Text(organizationOutcome(completed)).font(.callout)
-                        Text(completed.createdAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.tertiary)
+                        Text(completed.createdAt, format: .dateTime.month().day().hour().minute())
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Button("查看结果") { selectedJob = completed }
-                }
-            }
-            Button("查看全部执行记录") { model.organizationSection = .history }.buttonStyle(.link)
-            DisclosureGroup("整理规则") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("按截图时间先后整理，自动整理之间至少间隔 5 分钟。")
-                    Text("最多 8 张截图。")
-                    Text("回车、鼠标和手动截图都将原图交给 Agent；OCR 文字只用于本机搜索和原文查看。")
-                    Text(dreamHelp)
-                }.font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true).padding(.top, 8)
+                }.padding(14)
+            } else {
+                Text("暂无执行动态").font(.callout).foregroundStyle(.secondary)
+                    .padding(14).frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.12)))
+        .accessibilityElement(children: .contain)
+    }
+
+    private var queueCount: some View {
+        Label("待整理 \(model.library.queue.pendingCount) 张截图", systemImage: "photo.stack")
+            .font(.callout).foregroundStyle(.secondary)
+    }
+
+    private var rulesPopover: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("整理规则").font(.headline)
+            Text("按截图时间先后整理，自动整理之间至少间隔 5 分钟。")
+            Text("最多 8 张截图。")
+            Text("回车、鼠标和手动截图都将原图交给 Agent；OCR 文字只用于本机搜索和原文查看。")
+            Text(dreamHelp)
+        }
+        .font(.callout).fixedSize(horizontal: false, vertical: true)
+        .padding(20).frame(width: 340, alignment: .leading)
     }
 
     /// What the dream button does, since “dream” alone does not say it.
@@ -402,6 +479,152 @@ struct BackstageView: View {
         }
     }
 
+}
+
+/// A live overview of the capture-to-memory pipeline. Movement represents real events, not simulated work.
+private struct OrganizationFlowView: View {
+    @ObservedObject var model: MyClipModel
+    let selectAgent: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var captureEvent = 0
+    @State private var consumptionEvent = 0
+    @State private var memoryEvent = 0
+    @State private var captureMoving = false
+    @State private var consumptionMoving = false
+    @State private var memoryMoving = false
+    @State private var lastCompletedID: UUID?
+    @State private var activeJobID: UUID?
+
+    private var latestCompleted: ClipJob? {
+        model.library.jobs.first { $0.state == .completed }
+    }
+
+    private var agentStatus: String {
+        if !model.permissions.isEmpty { return String(localized: "等待确认") }
+        if model.library.queue.pauseReason != nil { return String(localized: "需要处理") }
+        if let agent = model.preferences.enabledAgent, model.state(agent).phase == .failed { return String(localized: "出错") }
+        if model.currentJob != nil { return String(localized: "整理中") }
+        if model.processingPaused { return String(localized: "已暂停") }
+        return model.preferences.enabledAgent == nil ? String(localized: "未选择") : String(localized: "等待中")
+    }
+
+    private var statusColor: Color {
+        if !model.permissions.isEmpty || model.library.queue.pauseReason != nil { return .orange }
+        if let agent = model.preferences.enabledAgent, model.state(agent).phase == .failed { return .red }
+        return model.currentJob == nil ? .secondary : .green
+    }
+
+    var body: some View {
+        BackstageCard {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("整理流程").font(.headline)
+                        Text("从截图到记忆，查看当前流转情况").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                HStack(alignment: .top, spacing: 0) {
+                    flowStep(String(localized: "最近截图"), detail: model.preferences.captureEnabled ? model.captureStatus : String(localized: "采集已暂停")) {
+                        if let capture = model.library.captures.first {
+                            CaptureThumbnail(capture: capture)
+                                .frame(width: 46, height: 38).clipShape(RoundedRectangle(cornerRadius: 5))
+                                .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.quaternary))
+                        } else {
+                            Image(systemName: "photo").font(.title2).foregroundStyle(.secondary)
+                        }
+                    }
+                    connector
+                    flowStep(String(localized: "待整理队列"), detail: String(localized: "\(model.library.queue.pendingCount) 张等待")) {
+                        Image(systemName: "square.stack.3d.up")
+                            .font(.title2).foregroundStyle(model.library.queue.pendingCount > 0 ? Color.accentColor : Color.secondary)
+                    }
+                    connector
+                    Button(action: selectAgent) {
+                        flowStep(model.preferences.enabledAgent?.name ?? String(localized: "Agent"), detail: agentStatus, detailColor: statusColor) {
+                            if let agent = model.preferences.enabledAgent {
+                                AgentBrandIcon(agent: agent, size: 32)
+                            } else {
+                                Image(systemName: "person.crop.circle.badge.questionmark").font(.title2).foregroundStyle(.secondary)
+                            }
+                        }.contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Agent 与账号…")
+                    .accessibilityLabel(Text("Agent 与账号"))
+                    .accessibilityValue(Text("\(model.preferences.enabledAgent?.name ?? String(localized: "未选择")) · \(agentStatus)"))
+                    connector
+                    flowStep(String(localized: "Memory"), detail: String(localized: "Markdown 记忆")) {
+                        Image(systemName: "doc.text").font(.title2).foregroundStyle(.secondary)
+                    }
+                }
+                .overlay {
+                    GeometryReader { geometry in
+                        movingSymbol("photo", moving: captureMoving, from: 0.13, to: 0.37, width: geometry.size.width)
+                        movingSymbol("photo", moving: consumptionMoving, from: 0.38, to: 0.62, width: geometry.size.width)
+                        movingSymbol("doc.text", moving: memoryMoving, from: 0.63, to: 0.87, width: geometry.size.width)
+                    }.allowsHitTesting(false).accessibilityHidden(true)
+                }
+            }.padding(20)
+        }
+        .accessibilityElement(children: .contain)
+        .onAppear {
+            lastCompletedID = latestCompleted?.id
+            activeJobID = model.currentJob?.id
+        }
+        .onChange(of: model.library.captureCount) { count in
+            // Changes to the capture count can also be deletions or a library reload.
+            if count > previousCaptureCount { captureEvent += 1 }
+            previousCaptureCount = count
+        }
+        .onChange(of: model.currentJob?.id) { id in
+            if let id {
+                activeJobID = id
+                if model.currentJob?.kind == .batch { consumptionEvent += 1 }
+            }
+        }
+        .onChange(of: latestCompleted?.id) { id in
+            defer { lastCompletedID = id }
+            if let id, id == activeJobID, id != lastCompletedID, let completed = latestCompleted,
+               !(completed.memoryChanges?.written.isEmpty ?? true) { memoryEvent += 1 }
+        }
+        .onAppear { previousCaptureCount = model.library.captureCount }
+        .task(id: captureEvent) { await animateEvent(captureEvent, moving: $captureMoving) }
+        .task(id: consumptionEvent) { await animateEvent(consumptionEvent, moving: $consumptionMoving) }
+        .task(id: memoryEvent) { await animateEvent(memoryEvent, moving: $memoryMoving) }
+    }
+
+    @State private var previousCaptureCount = 0
+
+    private func flowStep<Icon: View>(_ title: String, detail: String, detailColor: Color = .secondary,
+                                      @ViewBuilder icon: () -> Icon) -> some View {
+        VStack(spacing: 6) {
+            icon().frame(height: 42)
+            Text(title).font(.callout.weight(.medium)).lineLimit(1)
+            Text(detail).font(.caption).foregroundStyle(detailColor).lineLimit(1).minimumScaleFactor(0.8)
+        }.frame(maxWidth: .infinity)
+    }
+
+    private var connector: some View {
+        Image(systemName: "chevron.right").font(.caption.weight(.medium)).foregroundStyle(.quaternary)
+            .frame(width: 16, height: 42).accessibilityHidden(true)
+    }
+
+    private func movingSymbol(_ symbol: String, moving: Bool, from: CGFloat, to: CGFloat, width: CGFloat) -> some View {
+        Image(systemName: symbol).font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
+            .padding(5).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 5))
+            .position(x: width * (moving ? to : from), y: 21)
+            .opacity(moving ? 1 : 0)
+    }
+
+    @MainActor private func animateEvent(_ event: Int, moving: Binding<Bool>) async {
+        moving.wrappedValue = false
+        guard event > 0, !reduceMotion else { return }
+        withAnimation(.easeInOut(duration: 0.9)) { moving.wrappedValue = true }
+        try? await Task.sleep(for: .milliseconds(900))
+        guard !Task.isCancelled else { return }
+        withTransaction(Transaction(animation: nil)) { moving.wrappedValue = false }
+    }
 }
 
 /// History owns its filters, pagination and cancellation separately from the live runtime surface.
