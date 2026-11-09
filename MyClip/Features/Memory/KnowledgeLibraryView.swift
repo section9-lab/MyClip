@@ -80,15 +80,32 @@ struct KnowledgeLibraryView: View {
     @ObservedObject var model: MyClipModel
     @State private var proposal: MemoryProposal?
     @State private var showingCloudSync = false
+    @State private var showingInvalidFiles = false
 
     private var selected: KnowledgeEntry? {
         model.selectedMemoryEntry
     }
 
     var body: some View {
-        HSplitView {
-            MemoryDirectoryView(model: model)
-            content.frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 0) {
+            if !model.library.invalidMemoryFiles.isEmpty {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange).accessibilityHidden(true)
+                    Text("\(model.library.invalidMemoryFiles.count) 个 Memory 文件未索引，内容仍保留在磁盘。")
+                        .font(.callout).foregroundStyle(.secondary)
+                    Spacer(minLength: 12)
+                    Button("查看") { showingInvalidFiles.toggle() }
+                        .controlSize(.small)
+                        .popover(isPresented: $showingInvalidFiles, arrowEdge: .bottom) { invalidFilesPopover }
+                }
+                .padding(.horizontal, 14).padding(.vertical, 9)
+                .background(Color.orange.opacity(0.08))
+                Divider()
+            }
+            HSplitView {
+                MemoryDirectoryView(model: model)
+                content.frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
@@ -105,6 +122,27 @@ struct KnowledgeLibraryView: View {
                 model.selectedEntry = model.library.entries.first { $0.relativePath == "Memory.md" }?.id
             }
         }
+    }
+
+    private var invalidFilesPopover: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("未索引的 Memory 文件").font(.headline)
+            Text("这些文件没有合适的元信息，暂未进入索引；修复元信息后会自动恢复。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(model.library.invalidMemoryFiles, id: \.self) { item in
+                        Text(item).font(.caption).textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }.frame(maxHeight: 260)
+            Divider()
+            Button("在 Finder 中显示") {
+                NSWorkspace.shared.open(model.store.root.appendingPathComponent("Memory"))
+            }
+        }.padding(18).frame(width: 420, alignment: .leading)
     }
 
     private var content: some View {

@@ -249,13 +249,19 @@ final class MemoryLayoutTests: XCTestCase {
         XCTAssertEqual(oldLink.id, note.id)
     }
 
-    func testDuplicateIDsAndSymlinksFailWithoutChangingIndex() async throws {
+    func testDuplicateIDsAreRepairedAndSymlinksFailWithoutChangingIndex() async throws {
         let store = try LibraryStore(root: root)
         let note = try await seed(store)
+        let before = try await store.snapshot().entries.count
         let copied = root.appendingPathComponent("Memory/Wiki/Topics/copy.md")
         try FileManager.default.copyItem(at: note.fileURL, to: copied)
-        do { _ = try await store.snapshot(); XCTFail("Duplicate IDs must be rejected") }
-        catch LibraryError.invalidResult { }
+        let repaired = try await store.snapshot()
+        XCTAssertEqual(repaired.entries.count, before + 1, "A duplicated ID must not hide the rest of the library")
+        XCTAssertEqual(repaired.entries.first { $0.relativePath == note.relativePath }?.id, note.id,
+                       "The established path keeps its identity")
+        XCTAssertEqual(Set(repaired.entries.map(\.id)).count, repaired.entries.count)
+        let copiedID = try MemoryDocument(String(contentsOf: copied, encoding: .utf8)).id
+        XCTAssertNotEqual(copiedID, note.id)
         try FileManager.default.removeItem(at: copied)
         try FileManager.default.createSymbolicLink(at: copied, withDestinationURL: note.fileURL)
         do { _ = try await store.readMemory(path: "Wiki/Topics/copy.md"); XCTFail("Symlinks must not be followed") }

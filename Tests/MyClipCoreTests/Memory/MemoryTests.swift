@@ -58,6 +58,25 @@ final class MemoryTests: XCTestCase {
         XCTAssertFalse(published.contains(replacementID.uuidString))
     }
 
+    func testDuplicatedMemoryIDIsRepairedInsteadOfHidingTheLibrary() async throws {
+        let store = try LibraryStore(root: root)
+        let entry = try await seed(store)
+        let before = try await store.snapshot().entries.count
+        let copy = try MemoryDocument.encode(id: entry.id, title: "复制页", body: "复制页的正文。", revision: 1, agent: .codex,
+                                             sourceIDs: [], path: "Wiki/复制页.md")
+        try copy.write(to: root.appendingPathComponent("Memory/Wiki/复制页.md"), atomically: true, encoding: .utf8)
+
+        let snapshot = try await store.snapshot()
+        XCTAssertEqual(snapshot.entries.count, before + 1, "A duplicated ID must not hide the rest of the library")
+        XCTAssertEqual(Set(snapshot.entries.map(\.id)).count, snapshot.entries.count)
+        XCTAssertEqual(snapshot.entries.first { $0.relativePath == entry.relativePath }?.id, entry.id,
+                       "The established path keeps its stable identity")
+        XCTAssertTrue(snapshot.invalidMemoryFiles.isEmpty)
+        let repaired = try String(contentsOf: root.appendingPathComponent("Memory/Wiki/复制页.md"), encoding: .utf8)
+        XCTAssertFalse(repaired.contains("id: \(entry.id.uuidString)"))
+        XCTAssertNoThrow(try MemoryDocument(repaired))
+    }
+
     func testAgentCannotOverwriteManuallyEditedMemory() async throws {
         let store = try LibraryStore(root: root)
         let entry = try await seed(store)

@@ -82,7 +82,7 @@ public enum MemoryLayout {
     }
 
     /// One unreadable, empty or oversized file is reported rather than failing the whole vault.
-    /// Two files claiming one ID still fail: the index could not tell which one is the memory.
+    /// A duplicate ID is reported as invalid instead of failing every other page; the sync repairs it before scanning.
     static func scan(in directory: URL) throws -> (documents: [(String, URL, String, MemoryDocument)], invalid: [InvalidFile]) {
         var cache = MemoryReadCache()
         return try scan(in: directory, cache: &cache)
@@ -107,7 +107,11 @@ public enum MemoryLayout {
                 invalid.append(InvalidFile(path: path, reason: explanation))
                 continue
             }
-            guard ids.updateValue(path, forKey: document.id) == nil else { throw LibraryError.invalidResult(String(localized: "多个文件使用同一 Memory ID：\(path)")) }
+            if let owner = ids[document.id] {
+                invalid.append(InvalidFile(path: path, reason: String(localized: "与 \(owner) 使用同一 Memory ID，已跳过。")))
+                continue
+            }
+            ids[document.id] = path
             result.append((path, url, text, document))
         }
         return (result.sorted { $0.0 < $1.0 }, invalid.sorted { $0.path < $1.path })

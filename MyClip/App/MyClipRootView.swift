@@ -122,19 +122,41 @@ struct MyClipRootView: View {
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 280)
         } detail: {
-            Group {
-                switch model.page ?? .captures {
-                case .dashboard: AnalyticsView(model: model)
-                case .memory: KnowledgeLibraryView(model: model)
-                case .captures: CaptureLibraryView(model: model)
-                case .agents: BackstageView(model: model)
-                case .settings: MyClipSettingsView(model: model)
+            VStack(spacing: 0) {
+                if let notice = model.notice { noticeBanner(notice) }
+                Group {
+                    switch model.page ?? .captures {
+                    case .dashboard: AnalyticsView(model: model)
+                    case .memory: KnowledgeLibraryView(model: model)
+                    case .captures: CaptureLibraryView(model: model)
+                    case .agents: BackstageView(model: model)
+                    case .settings: MyClipSettingsView(model: model)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .textBackgroundColor))
             .navigationTitle(model.page?.title ?? "MyClip")
         }
+    }
+
+    /// A failed library load must never look like an empty library. Keep the reason visible with a retry.
+    private func noticeBanner(_ notice: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            Text(notice).font(.callout).textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("重试") { Task { await model.refresh() } }
+                .controlSize(.small)
+            Button { model.notice = nil } label: { Image(systemName: "xmark") }
+                .buttonStyle(.borderless).accessibilityLabel("关闭")
+        }
+        .padding(.horizontal, 14).padding(.vertical, 9)
+        .background(Color.orange.opacity(0.1))
+        .overlay(alignment: .bottom) { Divider() }
+        .accessibilityElement(children: .contain)
     }
 
     private func sidebarRow(_ page: LibraryPage) -> some View {

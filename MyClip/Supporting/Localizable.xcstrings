@@ -1,6 +1,12 @@
 {
   "sourceLanguage": "zh-Hans",
   "strings": {
+    "查看": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "View" } } } },
+    "在 Finder 中显示": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Show in Finder" } } } },
+    "未索引的 Memory 文件": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Unindexed Memory files" } } } },
+    "这些文件没有合适的元信息，暂未进入索引；修复元信息后会自动恢复。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "These files lack valid metadata and stay out of the index until it is repaired." } } } },
+    "%lld 个 Memory 文件未索引，内容仍保留在磁盘。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "%lld Memory files are not indexed; their content is still on disk." } } } },
+    "与 %@ 使用同一 Memory ID，已跳过。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Shares a Memory ID with %@ and was skipped." } } } },
     "整理流程": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Organization flow" } } } },
     "从截图到记忆，查看当前流转情况": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Follow screenshots as they become memories" } } } },
     "最近截图": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Latest capture" } } } },

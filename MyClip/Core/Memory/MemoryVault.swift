@@ -78,6 +78,7 @@ extension LibraryStore {
             try flushMemoryFiles()
             try upgradeLegacyIndexTemplate()
             try importPlainMarkdownFiles()
+            try repairDuplicateMemoryIDs()
             let scan = try MemoryLayout.scan(in: root.appendingPathComponent("Memory"), cache: &memoryReadCache)
             var files = scan.documents
             invalid = scan.invalid
@@ -167,6 +168,43 @@ extension LibraryStore {
             }
         }
         return invalid
+    }
+
+    /// Agents occasionally copy a page and keep its front-matter ID. One duplicated ID must not hide the whole
+    /// library, so the established path keeps the identity and every other copy gets a new one before scanning.
+    private func repairDuplicateMemoryIDs() throws {
+        let knownPaths = Dictionary(uniqueKeysWithValues: try database.run("SELECT id,path FROM memory_files").compactMap { row -> (UUID, String)? in
+            guard let id = row["id"].flatMap(UUID.init(uuidString:)), let path = row["path"] else { return nil }
+            return (id, path)
+        })
+        var groups: [UUID: [(path: String, url: URL, updatedAt: Date?)]] = [:]
+        for (path, url) in try MemoryLayout.markdownFiles(in: root.appendingPathComponent("Memory")) {
+            // Read the raw ID too: a copy whose other metadata is invalid still claims the same identity.
+            guard let text = try? memoryReadCache.text(at: url), let id = Self.memoryID(in: text) else { continue }
+            let updated = (try? memoryReadCache.document(at: url))?.updatedAt
+                ?? (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+            groups[id, default: []].append((path, url, updated))
+        }
+        var repaired = false
+        for (id, files) in groups where files.count > 1 {
+            func updated(_ file: (path: String, url: URL, updatedAt: Date?)) -> Date { file.updatedAt ?? .distantPast }
+            let canonical = files.first { knownPaths[id] == $0.path }
+                ?? files.max { lhs, rhs in updated(lhs) == updated(rhs) ? lhs.path > rhs.path : updated(lhs) < updated(rhs) }!
+            for file in files where file.path != canonical.path {
+                guard let text = try? memoryReadCache.text(at: file.url) else { continue }
+                let rewritten = try Self.restoringMemoryID(UUID(), in: text)
+                try rewritten.write(to: file.url, atomically: true, encoding: .utf8)
+                repaired = true
+            }
+        }
+        if repaired { memoryReadCache.reset() }
+    }
+
+    private static func memoryID(in text: String) -> UUID? {
+        guard let range = text.range(of: #"(?m)^id:[ \t]*[\"']?[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}[\"']?[ \t]*$"#,
+                                     options: .regularExpression) else { return nil }
+        let line = text[range].dropFirst(3).trimmingCharacters(in: .whitespaces.union(CharacterSet(charactersIn: "\"'")))
+        return UUID(uuidString: line)
     }
 
     private static func restoringMemoryID(_ id: UUID, in text: String) throws -> String {

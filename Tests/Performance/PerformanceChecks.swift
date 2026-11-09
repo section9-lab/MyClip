@@ -145,7 +145,9 @@ private extension LibraryStore {
         _ = try await other.createWorkTask(title: "Board survives invalid Memory", project: "Checks")
         await model.refresh()
         check(model.workTasks.contains { $0.title == "Board survives invalid Memory" }, "Broken Memory does not prevent independent board refresh")
-        check(model.notice != nil, "Invalid Memory remains visible as an error")
+        check(model.library.entries.contains { $0.relativePath == "Wiki/Topics/Duplicate.md" },
+              "A duplicated Memory ID is repaired into a separate page")
+        check(model.notice == nil, "A duplicated Memory ID no longer hides the library")
         try FileManager.default.removeItem(at: duplicate)
         model.notice = nil
         await model.refresh()
