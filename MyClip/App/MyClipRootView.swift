@@ -19,9 +19,6 @@ struct MyClipRootView: View {
         .menuStyle(.borderedButton)
         .textFieldStyle(.roundedBorder)
         .scrollIndicators(.automatic)
-        .alert("MyClip", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
-            Button("好", role: .cancel) { model.notice = nil }
-        } message: { Text(model.notice ?? "") }
         .frame(minWidth: 840, minHeight: 580)
         .onAppear {
             showingOnboarding = model.showPermissions

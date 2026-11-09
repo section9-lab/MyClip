@@ -197,11 +197,12 @@ final class MyClipModel: ObservableObject {
     @Published var accessibilityPermission = false
     @Published var folderPermission = false
     @Published private var displayedNotice: String?
+    /// Runtime failures are recorded without interrupting the user with a global modal alert.
+    /// Contextual conflicts stay inside the Memory editor or the affected page.
     var notice: String? {
         get { displayedNotice }
         set {
-            // Revision conflicts are recovered by refreshing or by the Memory editor's inline choices. A generic
-            // modal alert has no useful action and can otherwise interrupt unrelated pages during background sync.
+            // Conflicts are handled by the Memory editor; they should not become a generic failure even in diagnostics.
             guard newValue != LibraryError.conflict.localizedDescription else { return }
             displayedNotice = newValue
         }

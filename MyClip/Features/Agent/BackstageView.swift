@@ -1089,10 +1089,11 @@ struct UsageDashboard: View {
         self.rangeSelection = rangeSelection
     }
 
-    private struct TrendPoint: Identifiable, Equatable {
+    struct TrendPoint: Identifiable, Equatable {
         let date: Date
         let tokens: Int
         let calls: Int
+        let agentTokens: [ClipAgent: Int]
         var id: Date { date }
     }
 
@@ -1126,17 +1127,22 @@ struct UsageDashboard: View {
         }
     }
     private var trendPoints: [TrendPoint] {
-        if !weekly {
-            return dailyBuckets.map { bucket in
-                TrendPoint(date: bucket.day, tokens: bucket.total.totalTokens ?? 0, calls: bucket.total.calls)
-            }
-        }
-        let groups = Dictionary(grouping: dailyBuckets) {
-            calendar.dateInterval(of: .weekOfYear, for: $0.day)?.start ?? $0.day
+        Self.makeTrendPoints(from: dailyBuckets, weekly: weekly, calendar: calendar)
+    }
+
+    static func makeTrendPoints(from buckets: [TokenUsageDay], weekly: Bool, calendar: Calendar) -> [TrendPoint] {
+        let groups = Dictionary(grouping: buckets) { bucket in
+            weekly ? (calendar.dateInterval(of: .weekOfYear, for: bucket.day)?.start ?? bucket.day) : bucket.day
         }
         return groups.map { date, days in
-            TrendPoint(date: date, tokens: days.compactMap { $0.total.totalTokens }.reduce(0, +),
-                       calls: days.reduce(0) { $0 + $1.total.calls })
+            var agentTokens: [ClipAgent: Int] = [:]
+            for day in days {
+                for (agent, usage) in day.agents {
+                    if let tokens = usage.totalTokens { agentTokens[agent, default: 0] += tokens }
+                }
+            }
+            return TrendPoint(date: date, tokens: days.compactMap { $0.total.totalTokens }.reduce(0, +),
+                              calls: days.reduce(0) { $0 + $1.total.calls }, agentTokens: agentTokens)
         }.sorted { $0.date < $1.date }
     }
     private var selectedPoint: TrendPoint? {
@@ -1275,6 +1281,11 @@ struct UsageDashboard: View {
                 if let selectedPoint {
                     Text("\(selectedPoint.date.formatted(.dateTime.year().month().day())) · \(compact(selectedPoint.tokens)) Token · \(String(localized: "\(selectedPoint.calls) 次请求"))")
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    Text(ClipAgent.allCases.compactMap { agent in
+                        guard let tokens = selectedPoint.agentTokens[agent], tokens > 0 else { return nil }
+                        return "\(agent.name) \(compact(tokens))"
+                    }.joined(separator: " · "))
+                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 } else {
                     Text("移动指针查看明细").font(.caption).foregroundStyle(.secondary)
                 }
@@ -1290,12 +1301,15 @@ struct UsageDashboard: View {
     private var chart: some View {
         Chart {
             ForEach(trendPoints) { point in
-                BarMark(x: .value(String(localized: "日期"), point.date, unit: weekly ? .weekOfYear : .day),
-                        y: .value("Token", point.tokens))
-                    .foregroundStyle(Color.accentColor.opacity(selectedTrendDate == nil || selectedTrendDate == point.date ? 0.88 : 0.62))
-                    .cornerRadius(3)
-                    .accessibilityLabel(point.date.formatted(.dateTime.year().month().day()))
-                    .accessibilityValue("\(point.tokens.formatted()) Token")
+                ForEach(ClipAgent.allCases) { agent in
+                    if let tokens = point.agentTokens[agent], tokens > 0 {
+                        BarMark(x: .value(String(localized: "日期"), point.date, unit: weekly ? .weekOfYear : .day),
+                                y: .value("Token", tokens))
+                            .foregroundStyle(by: .value("Agent", agent.rawValue))
+                            .accessibilityLabel("\(point.date.formatted(.dateTime.year().month().day())) · \(agent.name)")
+                            .accessibilityValue("\(tokens.formatted()) Token")
+                    }
+                }
             }
             if let selectedPoint {
                 RuleMark(x: .value(String(localized: "日期"), selectedPoint.date))
@@ -1303,6 +1317,8 @@ struct UsageDashboard: View {
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
             }
         }
+        .chartForegroundStyleScale(domain: ClipAgent.allCases.map(\.rawValue), range: ClipAgent.allCases.map { Self.color(for: $0) })
+        .chartLegend(.hidden)
         .chartXScale(range: .plotDimension(padding: 14))
         .chartYScale(domain: 0...trendUpperBound)
         .chartYAxis {
@@ -1409,12 +1425,16 @@ struct UsageDashboard: View {
             let yAxis = AXNumericDataAxisDescriptor(title: "Token", range: 0...Double(maximum), gridlinePositions: []) {
                 "\(Int($0).formatted()) Token"
             }
-            let series = AXDataSeriesDescriptor(
-                name: title, isContinuous: false,
-                dataPoints: points.map { AXDataPoint(x: label(for: $0.date), y: Double($0.tokens)) }
-            )
+            let series = ClipAgent.allCases.filter { agent in
+                points.contains { ($0.agentTokens[agent] ?? 0) > 0 }
+            }.map { agent in
+                AXDataSeriesDescriptor(
+                    name: agent.name, isContinuous: false,
+                    dataPoints: points.map { AXDataPoint(x: label(for: $0.date), y: Double($0.agentTokens[agent] ?? 0)) }
+                )
+            }
             return AXChartDescriptor(title: title, summary: summary, xAxis: xAxis, yAxis: yAxis,
-                                     additionalAxes: [], series: [series])
+                                     additionalAxes: [], series: series)
         }
 
         private func label(for date: Date) -> String {

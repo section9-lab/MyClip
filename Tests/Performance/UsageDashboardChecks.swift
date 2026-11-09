@@ -244,6 +244,25 @@ private struct UsageFixtureView: View {
     func scrollViews(_ view: NSView) -> [NSScrollView] {
         ((view as? NSScrollView).map { [$0] } ?? []) + view.subviews.flatMap(scrollViews)
     }
+    let calendar = Calendar.current
+    let weekStart = calendar.dateInterval(of: .weekOfYear, for: Date())!.start
+    var firstDay = TokenUsageDay(day: weekStart)
+    let workbuddy = TokenUsage(totalTokens: 100, inputTokens: 60, outputTokens: 40)
+    let opencode = TokenUsage(totalTokens: 250, inputTokens: 150, outputTokens: 100)
+    firstDay.agents[.workbuddy, default: TokenUsageSummary()].add(workbuddy)
+    firstDay.agents[.opencode, default: TokenUsageSummary()].add(opencode)
+    firstDay.total.add(workbuddy); firstDay.total.add(opencode)
+    var secondDay = TokenUsageDay(day: calendar.date(byAdding: .day, value: 1, to: weekStart)!)
+    secondDay.agents[.opencode, default: TokenUsageSummary()].add(opencode)
+    secondDay.total.add(opencode)
+    let daily = UsageDashboard.makeTrendPoints(from: [firstDay, secondDay], weekly: false, calendar: calendar)
+    let weekly = UsageDashboard.makeTrendPoints(from: [firstDay, secondDay], weekly: true, calendar: calendar)
+    check(daily.count == 2 && daily[0].tokens == 350 && daily[0].agentTokens[.workbuddy] == 100
+          && daily[0].agentTokens[.opencode] == 250 && daily[1].agentTokens[.workbuddy] == nil,
+          "Daily chart preserves the split when an Agent changes or multiple Agents run on one day")
+    check(weekly.count == 1 && weekly[0].tokens == 600 && weekly[0].calls == 3
+          && weekly[0].agentTokens[.workbuddy] == 100 && weekly[0].agentTokens[.opencode] == 500,
+          "Weekly chart aggregates each Agent without changing the total or request count")
     for agents in [[ClipAgent.workbuddy], [.qwenwork], ClipAgent.allCases] {
         let state = UsageFixtureState(usageFixture(agents: agents))
         let host = NSHostingView(rootView: UsageFixtureView(state: state))
