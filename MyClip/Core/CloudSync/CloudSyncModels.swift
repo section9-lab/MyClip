@@ -71,8 +71,6 @@ public struct CloudMemorySnapshot: Sendable {
             guard !entry.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
             if let template = MemoryLayout.initialBody(for: entry.relativePath), entry.body.trimmingCharacters(in: .whitespacesAndNewlines) == template.trimmingCharacters(in: .whitespacesAndNewlines) { return false }
             if entry.relativePath.hasPrefix("Daily/") && !options.includeDaily { return false }
-            // Legacy unconfirmed notes stay local; removing the option must not start publishing them.
-            if entry.relativePath.hasPrefix("Inbox/") { return false }
             return true
         }.sorted { $0.relativePath < $1.relativePath }
         guard !self.entries.isEmpty else { documents = []; return }

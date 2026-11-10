@@ -810,22 +810,39 @@ extension MyClipModel {
         return String(localized: "\(activityText) · 已用时 \(elapsed / 60) 分 \(elapsed % 60) 秒\(waiting)")
     }
 
-    private func updateActivity(_ text: String, session: String, agent: ClipAgent) {
+    private func flushResponseDraft() {
+        responseFlushTask?.cancel()
+        responseFlushTask = nil
+        guard liveActivities.last?.isResponse == true else { return }
+        liveActivities[liveActivities.count - 1].text = responseBuffer
+    }
+
+    private func updateActivity(_ text: String, toolID: String? = nil, session: String, agent: ClipAgent) {
         guard state(agent).sessionID == session else { return }
-        if currentJob?.agent == agent {
-            // Streaming deltas often carry the same status. Keep the liveness timestamp accurate
-            // without invalidating the entire SwiftUI tree for every token.
-            lastActivityAt = Date()
-            if liveActivities.last?.isResponse == true {
-                responseFlushTask?.cancel()
-                responseFlushTask = nil
-                liveActivities[liveActivities.count - 1].text = responseBuffer
-                if activityText == text {
-                    liveActivities = Array((liveActivities + [LiveActivity(text: text)]).suffix(4))
-                }
+        guard currentJob?.agent == agent else {
+            if discoveryAgent == agent, taskDiscoveryMessage != text { taskDiscoveryMessage = text }
+            return
+        }
+        lastActivityAt = Date()
+        // A tool call reports its name first and its command later. Replace the row for the same
+        // call so both stay on one line instead of occupying two entries.
+        if let toolID, let index = liveActivities.lastIndex(where: { $0.toolID == toolID }) {
+            guard liveActivities[index].text != text else { return }
+            if index == liveActivities.count - 1 {
+                liveActivities[index].text = text
+            } else {
+                flushResponseDraft()
+                liveActivities.remove(at: index)
+                appendActivity(text, toolID: toolID)
             }
-            if activityText != text { activityText = text }
-        } else if discoveryAgent == agent, taskDiscoveryMessage != text { taskDiscoveryMessage = text }
+            setActivityTextWithoutAppending(text)
+            return
+        }
+        let shouldAppend = activityText != text || liveActivities.last?.isResponse == true
+        flushResponseDraft()
+        guard shouldAppend else { return }
+        appendActivity(text, toolID: toolID)
+        setActivityTextWithoutAppending(text)
     }
 
     func handle(_ event: ACPEvent, agent: ClipAgent) {
@@ -866,7 +883,7 @@ extension MyClipModel {
                 }
             } else { updateActivity(String(localized: "\(agent.name) 正在生成结果…"), session: session, agent: agent) }
         case .thinking(let session): updateActivity(String(localized: "\(agent.name) 正在思考…"), session: session, agent: agent)
-        case .tool(let session, let title, _): updateActivity(title, session: session, agent: agent)
+        case .tool(let session, let id, let title, _): updateActivity(title, toolID: id, session: session, agent: agent)
         case .permission(let request):
             permissions.removeAll { $0.agent == agent && $0.request.id == request.id }
             permissions.append(ClipPermission(agent: agent, request: request))

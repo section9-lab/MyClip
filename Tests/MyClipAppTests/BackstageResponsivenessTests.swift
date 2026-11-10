@@ -127,12 +127,12 @@ private final class BackstageChecks: NSObject, NSApplicationDelegate {
         model.handle(.thinking(sessionID: "other-session"), agent: .workbuddy)
         check(model.liveActivities.isEmpty, "Events from another session do not appear in live activity")
         model.handle(.thinking(sessionID: "live-session"), agent: .workbuddy)
-        model.handle(.tool(sessionID: "live-session", title: "读取记忆", status: "in_progress"), agent: .workbuddy)
+        model.handle(.tool(sessionID: "live-session", id: "read-1", title: "读取记忆", status: "in_progress"), agent: .workbuddy)
         model.handle(.message(sessionID: "live-session", text: "已整理"), agent: .workbuddy)
         model.handle(.message(sessionID: "live-session", text: "完成"), agent: .workbuddy)
         try await settle(650)
         check(model.liveActivities.last?.text == "已整理完成", "A quiet stream flushes its last throttled reply")
-        model.handle(.tool(sessionID: "live-session", title: "写入记忆", status: "completed"), agent: .workbuddy)
+        model.handle(.tool(sessionID: "live-session", id: "write-1", title: "写入记忆", status: "completed"), agent: .workbuddy)
         model.handle(.thinking(sessionID: "live-session"), agent: .workbuddy)
         check(model.liveActivities.count == 4 && model.liveActivities[1].text == "已整理完成"
               && model.liveActivities[1].isResponse, "Live activity keeps four recent entries and joins streaming replies")
@@ -140,6 +140,13 @@ private final class BackstageChecks: NSObject, NSApplicationDelegate {
         model.handle(.message(sessionID: "live-session", text: "结果"), agent: .workbuddy)
         model.currentJob = nil
         check(model.liveActivities.last?.text == "最终结果", "The final streamed reply is flushed when the job ends")
+        model.currentJob = ClipJob(id: UUID(), agent: .workbuddy, state: .running,
+                                   createdAt: Date(), sourceIDs: [], error: nil)
+        model.liveActivities = []
+        model.handle(.tool(sessionID: "live-session", id: "cmd-1", title: "bash", status: "in_progress"), agent: .workbuddy)
+        model.handle(.tool(sessionID: "live-session", id: "cmd-1", title: "bash · cd Daily && ls -la", status: "completed"), agent: .workbuddy)
+        check(model.liveActivities.count == 1 && model.liveActivities[0].text == "bash · cd Daily && ls -la",
+              "A tool call keeps its label and command on one row instead of adding a second row")
         model.liveActivities = []
         for iteration in 0..<40 {
             model.organizationSection = OrganizationSection.allCases[iteration % 3]

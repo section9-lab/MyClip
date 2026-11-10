@@ -274,8 +274,8 @@ final class ACPClientTests: XCTestCase {
         let completed = expectation(description: "completed tool retains its command")
         let observer = Task {
             for await event in client.events {
-                if case .tool(_, let title, let status) = event, status == "completed" {
-                    XCTAssertEqual(title, "cat Memory/notes.md")
+                if case .tool(_, _, let title, let status) = event, status == "completed" {
+                    XCTAssertEqual(title, "shell · cat Memory/notes.md")
                     completed.fulfill()
                 }
             }
@@ -284,6 +284,31 @@ final class ACPClientTests: XCTestCase {
         _ = try await client.connect(command: command("tool_details"))
         _ = try await client.prompt(sessionID: "s1", text: "inspect", images: [])
         await fulfillment(of: [completed], timeout: 2)
+    }
+
+    func testBareToolLabelStaysBesideItsCommand() async throws {
+        let client = ACPClient()
+        addTeardownBlock { await client.close() }
+        let label = expectation(description: "first update carries the tool label")
+        let completed = expectation(description: "completed update combines label and command")
+        let observer = Task {
+            for await event in client.events {
+                if case .tool(_, let id, let title, let status) = event {
+                    XCTAssertEqual(id, "cmd-1")
+                    if status == "in_progress" {
+                        XCTAssertEqual(title, "bash")
+                        label.fulfill()
+                    } else if status == "completed" {
+                        XCTAssertEqual(title, "bash · cd Daily && ls -la")
+                        completed.fulfill()
+                    }
+                }
+            }
+        }
+        defer { observer.cancel() }
+        _ = try await client.connect(command: command("bare_tool_label"))
+        _ = try await client.prompt(sessionID: "s1", text: "inspect", images: [])
+        await fulfillment(of: [label, completed], timeout: 2)
     }
 
     func testMalformedModelUsageFallsBackToPromptUsage() async throws {

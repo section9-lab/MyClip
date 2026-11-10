@@ -61,7 +61,7 @@ public enum ACPEvent: Sendable {
     case models(sessionID: String, selection: ACPModelSelection)
     case message(sessionID: String, text: String)
     case thinking(sessionID: String)
-    case tool(sessionID: String, title: String, status: String)
+    case tool(sessionID: String, id: String?, title: String, status: String)
     case permission(ACPPermissionRequest)
     case permissionResolved(String)
     case disconnected(String)
@@ -669,9 +669,10 @@ public actor ACPClient {
                     guard responses[session] != nil else { break }
                     recordPromptActivity(session)
                     if let tool = try await recordTool(update, session: session) {
-                        eventContinuation.yield(.tool(sessionID: session, title: tool.title, status: tool.status))
+                        eventContinuation.yield(.tool(sessionID: session, id: tool.id, title: tool.activityTitle, status: tool.status))
                     } else {
-                        eventContinuation.yield(.tool(sessionID: session, title: update["title"].string ?? String(localized: "正在整理"),
+                        eventContinuation.yield(.tool(sessionID: session, id: nil,
+                                                      title: update["title"].string ?? String(localized: "正在整理"),
                                                       status: update["status"].string ?? "in_progress"))
                     }
                 case "usage_update":
@@ -722,9 +723,14 @@ public actor ACPClient {
     private func recordTool(_ update: JSONValue, session: String) async throws -> ACPToolCall? {
         guard let id = update["toolCallId"].string, !id.isEmpty else { return nil }
         var tool = executions[session]?.tools[id] ?? ACPToolCall(id: id, title: String(localized: "工具调用"), startedAt: .now, updatedAt: .now)
-        if let title = update["title"].string { tool.title = title }
-        if let name = update["name"].string { tool.name = name }
         if let kind = update["kind"].string { tool.kind = kind }
+        if let name = update["name"].string, !name.isEmpty { tool.name = name }
+        if let title = update["title"].string, !title.isEmpty {
+            // The first update often carries only the tool name (“bash”); remember it as the label so
+            // the later command can share its row instead of appearing as a second activity.
+            if tool.name == nil, isBareToolLabel(title) { tool.name = title }
+            tool.title = title
+        }
         if let status = update["status"].string { tool.status = status }
         if let input = update["rawInput"].formatted { tool.rawInput = input }
         if let output = update["rawOutput"].formatted { tool.rawOutput = output }
@@ -752,6 +758,10 @@ public actor ACPClient {
         executions[session]?.tools[id] = tool
         try await executions[session]?.onUpdate?(.tool(tool))
         return tool
+    }
+
+    private func isBareToolLabel(_ title: String) -> Bool {
+        title.count <= 24 && !title.contains(where: { $0.isWhitespace || $0 == "/" })
     }
 
     private func receiveDiagnostics(_ data: Data) {

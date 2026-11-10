@@ -49,84 +49,19 @@ final class MemoryLayoutTests: XCTestCase {
         for name in ["Memory.md", "Profile.md", "Now.md", "Wiki/Projects", "Wiki/Topics", "Wiki/People", "Wiki/Reading", "Wiki/Workflows", "Daily"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("Memory/" + name).path), name)
         }
-        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("Memory/Inbox").path))
-        XCTAssertFalse(snapshot.memoryFolders.contains("Inbox"))
-        XCTAssertFalse(try XCTUnwrap(snapshot.entries.first { $0.relativePath == "Memory.md" }).body.contains("Inbox"))
         XCTAssertEqual(Set(snapshot.entries.map { $0.fileURL.lastPathComponent }), ["Memory.md", "Profile.md", "Now.md"])
         let again = try await store.snapshot()
         XCTAssertEqual(Set(snapshot.entries.map(\.id)), Set(again.entries.map(\.id)))
     }
 
-    func testRetiredInboxRemovesOnlyEmptyFoldersAndKeepsLegacyNotes() async throws {
-        let store = try LibraryStore(root: root)
-        let note = try await seed(store)
-        let directory = root.appendingPathComponent("Memory/Inbox")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        _ = try await store.snapshot()
-        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
-
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try FileManager.default.moveItem(at: note.fileURL, to: directory.appendingPathComponent("历史.md"))
-        let legacy = try await store.readMemory(path: "Inbox/历史.md")
-        XCTAssertEqual(legacy.id, note.id)
-        XCTAssertEqual(legacy.body, note.body)
-        XCTAssertEqual(legacy.sourceIDs, note.sourceIDs)
-        let reopened = try LibraryStore(root: root)
-        let found = try await reopened.searchMemories(query: "焦点")
-        XCTAssertTrue(found.contains { $0.id == note.id })
-        let linked = try await reopened.resolveMemoryLink("Inbox/历史")
-        XCTAssertEqual(linked.id, note.id)
-        let service = MemoryMCP(store: reopened)
-        _ = await service.respond(#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#)
-        let reply = await service.respond(#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"memory_get","arguments":{"path":"Inbox/历史.md"}}}"#)
-        let decoded = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(XCTUnwrap(reply).utf8)) as? [String: Any])
-        XCTAssertEqual((decoded["result"] as? [String: Any])?["isError"] as? Bool, false)
-        try await reopened.updateEntry(id: legacy.id, title: legacy.title, body: "历史修订", expectedRevision: legacy.revision)
-        let edited = try await reopened.readMemory(path: "Inbox/历史.md")
-        XCTAssertEqual(edited.body, "历史修订")
-        do {
-            try await reopened.moveMemory(edited.id, to: "Inbox/new.md", expectedRevision: edited.revision)
-            XCTFail("Moving must not create new Inbox notes")
-        } catch LibraryError.invalidResult { }
-        try await reopened.moveMemory(edited.id, to: "Daily/历史.md", expectedRevision: edited.revision)
-        _ = try await reopened.snapshot()
-        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
-    }
-
-    func testLegacyOverviewUpgradePreservesAuthoredContentAndProfile() async throws {
-        let store = try LibraryStore(root: root)
-        let index = try await store.readMemory(path: "Memory.md")
-        let profile = try await store.readMemory(path: "Profile.md")
-        _ = try await store.saveEntry(id: index.id, kind: .memory, title: index.title, body: MemoryLayout.legacyIndexBody,
-                                     revision: 1, agent: index.agent, sourceIDs: [], relativePath: "Memory.md")
-        try await store.publishMemoryFiles()
-        let upgraded = try await store.readMemory(path: "Memory.md")
-        XCTAssertEqual(upgraded.id, index.id)
-        XCTAssertEqual(upgraded.body, MemoryLayout.initialBody(for: "Memory.md"))
-        XCTAssertEqual(upgraded.revision, 2)
-        let unchanged = try await store.readMemory(path: "Profile.md")
-        XCTAssertEqual(unchanged.body, profile.body)
-        XCTAssertEqual(unchanged.revision, profile.revision)
-        let authored = MemoryLayout.legacyIndexBody + "\n用户自己的记录。"
-        try authored.write(to: upgraded.fileURL, atomically: true, encoding: .utf8)
-        let preserved = try await store.readMemory(path: "Memory.md")
-        XCTAssertEqual(preserved.body, authored)
-        let again = try await store.readMemory(path: "Memory.md")
-        XCTAssertEqual(again.revision, preserved.revision)
-    }
-
-    func testExistingLibraryGainsNewFoldersOnceAndKeepsRemovalsAfterward() async throws {
+    func testMissingLayoutFoldersAreRecreated() async throws {
         _ = try await LibraryStore(root: root).snapshot()
         let directory = root.appendingPathComponent("Memory")
-        for folder in ["Wiki/People", "Wiki/Reading"] { try FileManager.default.removeItem(at: directory.appendingPathComponent(folder)) }
-        let database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
-        try database.run("UPDATE vault_meta SET value='1' WHERE key='layout'")
-        _ = try await LibraryStore(root: root).snapshot()
-        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("Wiki/People").path), "A library laid out before v2 gains the folder")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("Wiki/Reading").path))
         try FileManager.default.removeItem(at: directory.appendingPathComponent("Wiki/Reading"))
         _ = try await LibraryStore(root: root).snapshot()
-        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("Wiki/Reading").path), "A folder the user removed stays removed")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("Wiki/Reading").path))
+        let reopened = try await LibraryStore(root: root).snapshot()
+        XCTAssertEqual(reopened.entries.count, 3, "Existing root documents are never re-seeded")
     }
 
     func testTypeFollowsTheNewFolders() throws {
@@ -148,7 +83,7 @@ final class MemoryLayoutTests: XCTestCase {
         try FileManager.default.removeItem(at: custom.deletingLastPathComponent())
         try FileManager.default.removeItem(at: directory.appendingPathComponent("Wiki/Topics"))
         let updated = try await store.snapshot(query: "不存在的关键词")
-        XCTAssertEqual(Set(updated.memoryFolders), Set(MemoryLayout.folders.filter { $0 != "Wiki/Topics" }))
+        XCTAssertEqual(Set(updated.memoryFolders), Set(MemoryLayout.folders), "Custom folders disappear; layout folders are restored")
     }
 
     func testExternalMoveAndDeleteDoNotResurrectOldFiles() async throws {
@@ -205,7 +140,7 @@ final class MemoryLayoutTests: XCTestCase {
         let note = try await seed(store)
         try await store.enqueue(sourceIDs: note.sourceIDs, agent: .codex)
         let job = try await store.claimNextJob(immediately: true)
-        for path in ["../escape.md", "/tmp/escape.md", "Wiki/../escape.md", "Wiki//empty.md", "Wiki/test.txt", "Profile.md", "Inbox/new.md"] {
+        for path in ["../escape.md", "/tmp/escape.md", "Wiki/../escape.md", "Wiki//empty.md", "Wiki/test.txt", "Profile.md", "Topics/new.md"] {
             do {
                 try await store.commit(jobID: XCTUnwrap(job).id, drafts: [KnowledgeDraft(kind: .memory, title: "拒绝", body: "不应保存", sourceIDs: note.sourceIDs, path: path)])
                 XCTFail("Reject \(path)")
@@ -325,7 +260,7 @@ final class MemoryLayoutTests: XCTestCase {
     }
 
     func testInitializationCannotCreateFoldersThroughSymlinks() async throws {
-        for path in ["Memory", "Memory/Wiki", "Memory/Inbox"] {
+        for path in ["Memory", "Memory/Wiki", "Memory/Daily"] {
             let library = root.appendingPathComponent(UUID().uuidString)
             let outside = root.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)

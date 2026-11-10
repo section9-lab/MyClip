@@ -131,8 +131,6 @@ final class CloudSyncChecks {
         try await store.updateEntry(id: profile.id, title: profile.title, body: "# Profile\n\nI prefer concise replies. See [[Wiki/Topic|the topic]].", expectedRevision: profile.revision)
         try "# Topic\n\nA durable topic. [[Profile|About me]]\n\n`[[Profile]]`".write(to: root.appendingPathComponent("Memory/Wiki/Topic.md"), atomically: true, encoding: .utf8)
         try "# Daily\n\nDaily fixture".write(to: root.appendingPathComponent("Memory/Daily/Day.md"), atomically: true, encoding: .utf8)
-        try FileManager.default.createDirectory(at: root.appendingPathComponent("Memory/Inbox"), withIntermediateDirectories: true)
-        try "# Inbox\n\nUnconfirmed fixture".write(to: root.appendingPathComponent("Memory/Inbox/Pending.md"), atomically: true, encoding: .utf8)
         let transport = CloudTestTransport(), credentials = CloudTestCredentials()
         return (store, transport, credentials, CloudSyncEngine(store: store, credentials: credentials, transport: transport, notionDelay: .zero))
     }
@@ -148,7 +146,7 @@ final class CloudSyncChecks {
         let (store, _, _, _) = try await fixture()
         let entries = try await store.cloudMemoryEntries()
         let snapshot = CloudMemorySnapshot(entries: entries, options: CloudSyncOptions())
-        try cloudEqual(snapshot.documents.count, 3, "Overview, confirmed profile and topic; seeded roots, Daily and Inbox excluded")
+        try cloudEqual(snapshot.documents.count, 3, "Overview, confirmed profile and topic; seeded roots and Daily excluded")
         let items = Dictionary(uniqueKeysWithValues: snapshot.documents.map { ($0.id, CloudSyncItem(remoteID: $0.id, url: "https://example.invalid/" + $0.id, path: $0.path)) })
         let topic = try cloudUnwrap(snapshot.documents.first { $0.path == "Wiki/Topic.md" })
         let rendered = snapshot.rendered(topic, items: items)
@@ -159,10 +157,6 @@ final class CloudSyncChecks {
         var options = CloudSyncOptions(); options.includeDaily = true
         let expanded = CloudMemorySnapshot(entries: entries, options: options)
         try cloudEqual(expanded.documents.count, 4)
-        try cloudFalse(expanded.documents.contains { $0.path.hasPrefix("Inbox/") }, "Legacy unconfirmed notes must never start uploading")
-        let legacyOptions = try JSONDecoder().decode(CloudSyncOptions.self, from: Data(#"{"automatic":true,"includeDaily":true,"includeInbox":true}"#.utf8))
-        try cloudEqual(legacyOptions, options, "Old saved options still decode without the removed Inbox flag")
-        try cloudFalse(String(decoding: try JSONEncoder().encode(legacyOptions), as: UTF8.self).contains("includeInbox"))
     }
 
     func testBothDestinationsAreIncrementalAndKeepRemoteIDsAcrossRestart() async throws {

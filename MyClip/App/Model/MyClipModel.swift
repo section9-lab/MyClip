@@ -236,20 +236,30 @@ final class MyClipModel: ObservableObject {
         var text: String
         let date = Date()
         var isResponse = false
+        var toolID: String?
     }
     @Published var liveActivities: [LiveActivity] = []
     @Published var activityText = "" {
         didSet {
             lastActivityAt = Date()
-            if currentJob != nil, !activityText.isEmpty, activityText != oldValue {
-                if liveActivities.last?.isResponse == true {
-                    responseFlushTask?.cancel()
-                    responseFlushTask = nil
-                    liveActivities[liveActivities.count - 1].text = responseBuffer
-                }
-                liveActivities = Array((liveActivities + [LiveActivity(text: activityText)]).suffix(4))
+            guard !suppressingActivityAppend, currentJob != nil, !activityText.isEmpty, activityText != oldValue else { return }
+            if liveActivities.last?.isResponse == true {
+                responseFlushTask?.cancel()
+                responseFlushTask = nil
+                liveActivities[liveActivities.count - 1].text = responseBuffer
             }
+            appendActivity(activityText)
         }
+    }
+    var suppressingActivityAppend = false
+    func appendActivity(_ text: String, toolID: String? = nil, isResponse: Bool = false) {
+        liveActivities = Array((liveActivities + [LiveActivity(text: text, isResponse: isResponse, toolID: toolID)]).suffix(4))
+    }
+    func setActivityTextWithoutAppending(_ text: String) {
+        guard activityText != text else { return }
+        suppressingActivityAppend = true
+        activityText = text
+        suppressingActivityAppend = false
     }
     var responseBuffer = ""
     var responsePublishedAt = Date.distantPast

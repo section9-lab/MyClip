@@ -3,9 +3,6 @@ import Foundation
 public enum MemoryLayout {
     public static let rootFiles = ["Memory.md", "Profile.md", "Now.md"]
     public static let folders = ["Wiki", "Wiki/Projects", "Wiki/Topics", "Wiki/People", "Wiki/Reading", "Wiki/Workflows", "Daily"]
-    /// Folders added after a library was laid out; created once, so a folder the user removes stays removed.
-    static let laterFolders = [2: ["Wiki/People", "Wiki/Reading"]]
-    static let layoutVersion = 2
 
     public static func initialBody(for path: String) -> String? {
         let templates: [String: String] = [
@@ -14,11 +11,6 @@ public enum MemoryLayout {
             "Now.md": String(localized: "# Now\n\n## 当前项目\n尚未整理。\n\n## 当前问题\n\n## 下一步\n")
         ]
         return templates[path]
-    }
-
-    /// Only used to upgrade an untouched overview from before the Inbox was retired.
-    static var legacyIndexBody: String {
-        String(localized: "# Memory\n\n## 关于我\n- [[Profile|个人信息与偏好]]\n- [[Now|当前关注事项]]\n\n## 重要记忆\n主题积累在 Wiki/，每日记录保存在 Daily/。\n\n## 待确认\n待确认内容保存在 Inbox/。\n")
     }
 
     static func defaultPath(id: UUID, title: String) -> String {
@@ -134,28 +126,13 @@ extension LibraryStore {
 
     func prepareMemoryLayout() throws {
         let directory = root.appendingPathComponent("Memory")
-        // Old notes remain readable at their original paths. Never remove a nonempty legacy folder.
-        _ = try MemoryLayout.url("Inbox/Memory.md", in: directory)
-        let legacyInbox = directory.appendingPathComponent("Inbox")
-        if FileManager.default.fileExists(atPath: legacyInbox.path),
-           try FileManager.default.contentsOfDirectory(atPath: legacyInbox.path).isEmpty {
-            try FileManager.default.removeItem(at: legacyInbox)
-        }
-        if let layout = try database.run("SELECT value FROM vault_meta WHERE key='layout'").first?["value"].flatMap(Int.init) {
-            guard layout < MemoryLayout.layoutVersion else { return }
-            for (version, folders) in MemoryLayout.laterFolders where version > layout {
-                for folder in folders {
-                    _ = try MemoryLayout.url(folder + "/Memory.md", in: directory)
-                    try FileManager.default.createDirectory(at: directory.appendingPathComponent(folder), withIntermediateDirectories: true)
-                }
-            }
-            try database.run("UPDATE vault_meta SET value=? WHERE key='layout'", [String(MemoryLayout.layoutVersion)])
-            return
-        }
         for folder in MemoryLayout.folders {
-            _ = try MemoryLayout.url(folder + "/Memory.md", in: directory)
-            try FileManager.default.createDirectory(at: directory.appendingPathComponent(folder), withIntermediateDirectories: true)
+            let url = try MemoryLayout.url(folder + "/Memory.md", in: directory)
+            if !FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.createDirectory(at: directory.appendingPathComponent(folder), withIntermediateDirectories: true)
+            }
         }
+        guard try database.run("SELECT value FROM vault_meta WHERE key='layout'").isEmpty else { return }
         try database.transaction {
             guard try database.run("SELECT value FROM vault_meta WHERE key='layout'").isEmpty else { return }
             for name in MemoryLayout.rootFiles where !FileManager.default.fileExists(atPath: directory.appendingPathComponent(name).path) {
@@ -163,9 +140,7 @@ extension LibraryStore {
                 _ = try saveEntry(id: id, kind: .memory, title: String(name.dropLast(3)), body: MemoryLayout.initialBody(for: name)!, revision: 1, agent: .codex, sourceIDs: [], relativePath: name)
                 if name == "Profile.md" { try database.run("INSERT INTO protected_entries VALUES(?)", [id.uuidString]) }
             }
-            try database.run("INSERT INTO vault_meta VALUES('layout',?)", [String(MemoryLayout.layoutVersion)])
-            // Never move the schema version backwards; a fresh library is already current.
-            if (Int(try database.run("PRAGMA user_version").first?["user_version"] ?? "0") ?? 0) < 5 { try database.script("PRAGMA user_version=5") }
+            try database.run("INSERT INTO vault_meta VALUES('layout','1')")
         }
     }
 }

@@ -250,30 +250,6 @@ final class MemoryLinkGraphTests: XCTestCase {
         XCTAssertTrue(report.lines.contains { $0.hasPrefix("引用了没有记录的截图 ID") })
     }
 
-    func testExistingLibraryRepairsCitedSourcesOnceAndKeepsTheEditTime() async throws {
-        let capture = fixtureContext()
-        try writeMemory(path: "Wiki/Topics/Notes.md", title: "Notes", body: "编译失败。来源：截图 `\(capture.id)`", updatedAt: 500)
-        let store = try LibraryStore(root: root)
-        _ = try await store.snapshot()
-        // The page was indexed before the screenshot's record existed, as in a library saved by an older app.
-        try await store.record(image: fixtureImage(), context: capture, agent: .codex, organize: false)
-        let before = try await store.readMemory(path: "Wiki/Topics/Notes.md")
-        XCTAssertEqual(before.sourceIDs, [])
-        try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite")).script("PRAGMA user_version=14;")
-        let migrated = try LibraryStore(root: root)
-        _ = try await migrated.snapshot()
-        let after = try await migrated.readMemory(path: "Wiki/Topics/Notes.md")
-        XCTAssertEqual(after.sourceIDs, [capture.id])
-        XCTAssertEqual(after.revision, before.revision + 1)
-        XCTAssertEqual(after.updatedAt, before.updatedAt, "Only the evidence list changed")
-        let database = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite"))
-        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "16")
-        XCTAssertTrue(try database.run("SELECT value FROM vault_meta WHERE key='source_repair'").isEmpty)
-        _ = try await migrated.snapshot()
-        let again = try await migrated.readMemory(path: "Wiki/Topics/Notes.md")
-        XCTAssertEqual(again.revision, after.revision, "The repair runs once")
-    }
-
     func testEdgeTextKeepsTheFactLineHeadingAndDate() async throws {
         let long = String(repeating: "背景说明很长。", count: 60) + "关键结论见 [[Wiki/Topics/JEV|JEV]]。后面还有别的话。"
         try writeMemory(path: "Wiki/Topics/JEV.md", title: "JEV", body: "模型。")

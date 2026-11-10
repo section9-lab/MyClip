@@ -319,46 +319,6 @@
         }
       }
     },
-    "# Memory\n\n## 关于我\n- [[Profile|个人信息与偏好]]\n- [[Now|当前关注事项]]\n\n## 重要记忆\n主题积累在 Wiki/，每日记录保存在 Daily/。\n\n## 待确认\n待确认内容保存在 Inbox/。\n": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "# Memory\n\n## Über mich\n- [[Profile|Persönliche Informationen und Vorlieben]]\n- [[Now|Aktuelle Themen]]\n\n## Wichtige Memory-Seiten\nThemen sammeln sich in Wiki/, tägliche Aufzeichnungen liegen in Daily/.\n\n## Zu bestätigen\nZu bestätigende Inhalte liegen in Inbox/.\n"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "# Memory\n\n## About Me\n- [[Profile|Personal information and preferences]]\n- [[Now|Current focus]]\n\n## Key Memory\nTopics accumulate in Wiki/, and daily records are kept in Daily/.\n\n## To Confirm\nContent awaiting confirmation is kept in Inbox/.\n"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "# Memory\n\n## Sobre mí\n- [[Profile|Información personal y preferencias]]\n- [[Now|Enfoque actual]]\n\n## Páginas de Memory importantes\nLos temas se acumulan en Wiki/ y los registros diarios se guardan en Daily/.\n\n## Por confirmar\nEl contenido por confirmar se guarda en Inbox/.\n"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "# Memory\n\n## À propos de moi\n- [[Profile|Informations personnelles et préférences]]\n- [[Now|Priorités actuelles]]\n\n## Pages Memory importantes\nLes sujets s'accumulent dans Wiki/, les notes quotidiennes sont enregistrées dans Daily/.\n\n## À confirmer\nLe contenu à confirmer est enregistré dans Inbox/.\n"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "# Memory\n\n## 私について\n- [[Profile|個人情報と好み]]\n- [[Now|現在の関心事項]]\n\n## 重要な Memory\nテーマ別の蓄積は Wiki/ に、日々の記録は Daily/ に保存されます。\n\n## 確認待ち\n確認待ちの内容は Inbox/ に保存されます。\n"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "# Memory\n\n## 나에 관하여\n- [[Profile|개인 정보와 선호]]\n- [[Now|현재 관심 사항]]\n\n## 중요한 Memory\n주제는 Wiki/에 누적되고, 일일 기록은 Daily/에 저장됩니다.\n\n## 확인 대기\n확인 대기 중인 내용은 Inbox/에 저장됩니다.\n"
-          }
-        }
-      }
-    },
     "# Memory\n\n## 关于我\n- [[Profile|个人信息与偏好]]\n- [[Now|当前关注事项]]\n\n## 重要记忆\n主题积累在 Wiki/，每日记录保存在 Daily/。\n": {
       "localizations": {
         "de": {

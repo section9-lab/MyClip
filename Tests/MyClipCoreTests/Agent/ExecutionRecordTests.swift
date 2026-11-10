@@ -28,6 +28,17 @@ final class ExecutionRecordTests: XCTestCase {
         return try XCTUnwrap(claimed)
     }
 
+    func testToolActivityTitleJoinsItsLabelAndCommand() {
+        var tool = ACPToolCall(id: "call-1", title: "bash", name: "bash", startedAt: .now, updatedAt: .now)
+        XCTAssertEqual(tool.activityTitle, "bash")
+        tool.title = "cd Daily && ls -la"
+        XCTAssertEqual(tool.activityTitle, "bash · cd Daily && ls -la")
+        tool.title = "Bash"
+        XCTAssertEqual(tool.activityTitle, "Bash", "A label that only repeats the name stays compact")
+        XCTAssertEqual(ACPToolCall(id: "call-2", title: "cat notes.md", startedAt: .now, updatedAt: .now).activityTitle,
+                       "cat notes.md")
+    }
+
     func testToolDetailsAndRetriesSurviveReopeningWithoutDuplicatingCalls() async throws {
         let store = try LibraryStore(root: directory)
         let job = try await job(in: store)

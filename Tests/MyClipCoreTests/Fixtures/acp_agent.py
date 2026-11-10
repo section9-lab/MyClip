@@ -203,6 +203,17 @@ for line in sys.stdin:
                     "update":{"sessionUpdate":"usage_update", "used":100, "size":200000,
                               "cost":{"amount":cost[0], "currency":cost[1]}}}})
             finish(request)
+        elif scenario == "bare_tool_label":
+            updates = [
+                {"sessionUpdate":"tool_call", "toolCallId":"cmd-1", "title":"bash",
+                 "kind":"execute", "status":"in_progress"},
+                {"sessionUpdate":"tool_call_update", "toolCallId":"cmd-1", "title":"cd Daily && ls -la",
+                 "status":"completed"},
+            ]
+            for update in updates:
+                send({"jsonrpc":"2.0", "method":"session/update", "params":{"sessionId":"s1", "update":update}})
+            finish(request)
+            continue
         elif scenario in ("tool_details", "execution_details", "execution_failure"):
             updates = [
                 {"sessionUpdate":"tool_call", "toolCallId":"read-1", "name":"shell", "title":"cat Memory/notes.md",

@@ -30,6 +30,13 @@ public struct ACPToolCall: Codable, Sendable, Identifiable, Equatable {
     public var content: [ACPToolContent] = []
     public let startedAt: Date
     public var updatedAt: Date
+
+    /// A tool call first reports a short label (for example “bash”) and later the command it runs.
+    /// Keep both pieces on one line so the live activity does not spend a row on the label alone.
+    public var activityTitle: String {
+        guard let name, !name.isEmpty, name.caseInsensitiveCompare(title) != .orderedSame else { return title }
+        return "\(name) · \(title)"
+    }
 }
 
 public enum ACPExecutionUpdate: Sendable {

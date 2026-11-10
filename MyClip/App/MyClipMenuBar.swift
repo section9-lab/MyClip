@@ -38,13 +38,15 @@ final class MyClipMenuBarController: NSObject, NSPopoverDelegate {
             self?.updateStatusDescription(capturing: capturing, enabled: enabled, hasPermissions: screen && accessibility)
         }
         guard let button = statusItem.button else { return }
-        // The menu bar always shows the application icon; capture state stays in the tooltip and
-        // accessibility description instead of replacing the icon with a runtime symbol.
-        let source = NSApp.applicationIconImage ?? NSImage(named: NSImage.applicationIconName)
-        let image = (source?.copy() as? NSImage) ?? NSImage(systemSymbolName: "app.fill", accessibilityDescription: nil)
-        image?.size = NSSize(width: 18, height: 18)
-        image?.isTemplate = false
+        // Other status items use monochrome template symbols. The full-colour app icon looks like a
+        // bright rounded tile there, so use the paperclip glyph as a template that follows the
+        // menu bar appearance; capture state stays in the tooltip and accessibility description.
+        let configuration = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        let image = NSImage(systemSymbolName: "paperclip", accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration)
+        image?.isTemplate = true
         button.image = image
+        button.imageScaling = .scaleProportionallyDown
         button.imagePosition = .imageOnly
         updateStatusDescription(capturing: model.capturing, enabled: model.preferences.captureEnabled, hasPermissions: !model.showPermissions)
         button.setAccessibilityHelp(String(localized: "显示 MyClip 看板"))

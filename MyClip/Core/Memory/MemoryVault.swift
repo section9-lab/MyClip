@@ -71,12 +71,7 @@ extension LibraryStore {
                 try rebuildMemorySearchTables()
                 try database.run("DELETE FROM vault_meta WHERE key='search_rebuild'")
             }
-            if try !database.run("SELECT value FROM vault_meta WHERE key='source_repair'").isEmpty {
-                try repairCitedSources()
-                try database.run("DELETE FROM vault_meta WHERE key='source_repair'")
-            }
             try flushMemoryFiles()
-            try upgradeLegacyIndexTemplate()
             try importPlainMarkdownFiles()
             try repairDuplicateMemoryIDs()
             let scan = try MemoryLayout.scan(in: root.appendingPathComponent("Memory"), cache: &memoryReadCache)
@@ -217,20 +212,6 @@ extension LibraryStore {
         return corrected
     }
 
-    /// Refresh only the exact seeded overview. Authored overviews and all legacy notes stay untouched.
-    private func upgradeLegacyIndexTemplate() throws {
-        guard let row = try database.run("SELECT e.* FROM entries e JOIN memory_files f ON f.id=e.id WHERE f.path='Memory.md' AND e.revision=1").first else { return }
-        let previous = try entry(row)
-        let stored = try String(contentsOf: root.appendingPathComponent(row["path"]!), encoding: .utf8)
-        guard previous.body == MemoryLayout.legacyIndexBody,
-              let text = try? String(contentsOf: previous.fileURL, encoding: .utf8),
-              text == MemoryDocument.published(stored, path: "Memory.md") else { return }
-        _ = try saveEntry(id: previous.id, kind: .memory, title: previous.title, body: MemoryLayout.initialBody(for: "Memory.md")!,
-                          revision: previous.revision + 1, agent: previous.agent, sourceIDs: previous.sourceIDs,
-                          updatedAt: previous.updatedAt)
-        try flushMemoryFiles()
-    }
-
     private func importPlainMarkdownFiles() throws {
         for (path, url) in try MemoryLayout.markdownFiles(in: root.appendingPathComponent("Memory")) {
             let text = try memoryReadCache.text(at: url)
@@ -259,18 +240,6 @@ extension LibraryStore {
             }
             guard (try? MemoryDocument.accepted(normalized)) != nil else { continue }  // reported by the scan instead
             try normalized.write(to: url, atomically: true, encoding: .utf8)
-        }
-    }
-
-    /// Re-saves pages whose body cites recorded screenshots missing from their source list; saving merges them in.
-    /// The edit time is kept: only the evidence list changes.
-    func repairCitedSources() throws {
-        for row in try database.run("SELECT * FROM entries") {
-            let item = try entry(row)
-            let missing = MemoryPassage.explicitSources(in: item.body).filter { !item.sourceIDs.contains($0) }
-            guard try missing.contains(where: { try !database.run("SELECT id FROM captures WHERE id=?", [$0.uuidString]).isEmpty }) else { continue }
-            _ = try saveEntry(id: item.id, kind: .memory, title: item.title, body: item.body, revision: item.revision + 1, agent: item.agent,
-                              sourceIDs: item.sourceIDs, relativePath: item.relativePath, updatedAt: item.updatedAt)
         }
     }
 

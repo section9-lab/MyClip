@@ -357,7 +357,8 @@ struct BackstageView: View {
                                 .font(.caption).foregroundStyle(.secondary).frame(width: 14)
                                 .accessibilityHidden(true)
                             Text(activity.text.isEmpty ? String(localized: "正在生成回答…") : activity.text)
-                                .font(.callout).lineLimit(3).textSelection(.enabled)
+                                .font(.callout).lineLimit(activity.isResponse ? 3 : 1).truncationMode(.tail)
+                                .help(activity.text).textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }.padding(.horizontal, 14).padding(.vertical, 8)
                     }

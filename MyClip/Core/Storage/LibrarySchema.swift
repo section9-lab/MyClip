@@ -158,12 +158,8 @@ extension LibraryStore {
             try database.script("PRAGMA user_version=14;")
         }
         if version < 15 {
-            // Pages whose source list missed screenshots cited in their text are repaired once on the next synchronization,
-            // and passages are re-read: citations with a time between two IDs used to lose both IDs.
-            if version > 0 {
-                try database.run("INSERT OR REPLACE INTO vault_meta(key,value) VALUES('source_repair','1')")
-                try database.run("INSERT OR REPLACE INTO vault_meta(key,value) VALUES('search_rebuild','1')")
-            }
+            // Passages are re-read: citations with a time between two IDs used to lose both IDs.
+            if version > 0 { try database.run("INSERT OR REPLACE INTO vault_meta(key,value) VALUES('search_rebuild','1')") }
             try database.script("PRAGMA user_version=15;")
         }
         if version < 16 { try Self.migrateAutomaticWorkTasks(database) }

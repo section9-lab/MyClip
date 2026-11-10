@@ -43,7 +43,7 @@ final class MemoryQualityLiveTests: XCTestCase {
         addTeardownBlock { await client.close() }
         let listener = Task {
             for await event in client.events {
-                if case .tool(_, let title, _) = event { print("Memory quality tool: \(title)") }
+                if case .tool(_, _, let title, _) = event { print("Memory quality tool: \(title)") }
                 if case .permission(let request) = event {
                     let allowed = ["memory_search", "memory_get"].contains { request.title.contains($0) }
                     let option = request.options.first { $0.kind == (allowed ? "allow_once" : "reject_once") }
