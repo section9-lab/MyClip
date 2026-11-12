@@ -337,7 +337,6 @@ struct BackstageView: View {
                 }
             }.padding(18)
         }
-        .onAppear { model.refreshAgentAvailability() }
     }
 
     private var runtimeFailure: Bool {
@@ -362,17 +361,12 @@ struct BackstageView: View {
         }
     }
 
-    @ViewBuilder private var runtimeGlyph: some View {
-        if model.currentJob != nil, windowVisible {
-            ProgressView().controlSize(.small).frame(width: 22, height: 22).padding(.top, 2)
-                .accessibilityLabel(Text("正在整理"))
-        } else {
-            Image(systemName: model.currentJob != nil ? "circle.dotted" : runtimeWarning ? "exclamationmark.circle" : "clock")
-                .font(.system(size: 19, weight: .regular))
-                .foregroundStyle(runtimeWarning ? Color.orange : Color.secondary)
-                .frame(width: 22, height: 22).padding(.top, 3)
-                .accessibilityHidden(true)
-        }
+    private var runtimeGlyph: some View {
+        Image(systemName: model.currentJob != nil ? "arrow.triangle.2.circlepath" : runtimeWarning ? "exclamationmark.circle" : "clock")
+            .font(.system(size: 18, weight: .medium))
+            .foregroundStyle(runtimeWarning ? Color.orange : model.currentJob != nil ? Color.accentColor : Color.secondary)
+            .frame(width: 22, height: 22).padding(.top, 3)
+            .accessibilityHidden(true)
     }
 
     private var runtimeIdentity: some View {
@@ -428,8 +422,7 @@ struct BackstageView: View {
                         if agent == model.preferences.enabledAgent { Label(agent.name, systemImage: "checkmark") }
                         else { Text(agent.name) }
                     }
-                    .disabled(agent == model.preferences.enabledAgent || model.preview || model.selectingDefaultAgent != nil
-                              || !(model.localAgents[agent]?.canSelect ?? false))
+                    .disabled(agent == model.preferences.enabledAgent || model.preview || model.selectingDefaultAgent != nil)
                 }
             }
             Divider()
@@ -486,7 +479,7 @@ struct BackstageView: View {
                 }
                 .font(.callout.monospacedDigit()).foregroundStyle(.secondary).fixedSize()
             }
-            FlowProgressBar(running: windowVisible)
+            FlowProgressBar()
             if model.processingPaused {
                 Text("当前批次完成后暂停。").font(.caption).foregroundStyle(.secondary)
             }
@@ -1390,29 +1383,14 @@ private struct BackstageWindowActivity: NSViewRepresentable {
     }
 }
 
-/// A working indicator without a fake percentage: the accent segment keeps moving while the Agent works.
-/// A timeline, not a repeating animation, so it stops as soon as the window is hidden.
+/// A quiet activity rail. It carries no percentage because the Agent does not report per-image progress,
+/// and it stays static so a running batch cannot keep the window cadence busy in the background.
 private struct FlowProgressBar: View {
-    var running = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         GeometryReader { geometry in
-            let width = geometry.size.width
-            let segment = max(56, width * 0.28)
-            let travel = max(0, width - segment)
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.secondary.opacity(0.16))
-                if reduceMotion || !running {
-                    Capsule().fill(Color.accentColor).frame(width: segment)
-                } else {
-                    TimelineView(.animation(minimumInterval: 1.0 / 12.0)) { context in
-                        let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3) / 3
-                        Capsule().fill(Color.accentColor)
-                            .frame(width: segment)
-                            .offset(x: travel * (0.5 - 0.5 * cos(phase * 2 * .pi)))
-                    }
-                }
+                Capsule().fill(Color.accentColor).frame(width: max(56, geometry.size.width * 0.28))
             }
         }
         .frame(height: 6)
