@@ -130,7 +130,12 @@ private final class BackstageChecks: NSObject, NSApplicationDelegate {
         model.handle(.tool(sessionID: "live-session", id: "read-1", title: "读取记忆", status: "in_progress"), agent: .workbuddy)
         model.handle(.message(sessionID: "live-session", text: "已整理"), agent: .workbuddy)
         model.handle(.message(sessionID: "live-session", text: "完成"), agent: .workbuddy)
-        try await settle(650)
+        // The reply is flushed about 0.5 s after the stream goes quiet. Wait for the condition instead of
+        // assuming a fixed margin, so a slower runner does not fail the check while the task is still queued.
+        for _ in 0..<20 {
+            if model.liveActivities.last?.text == "已整理完成" { break }
+            try await settle(100)
+        }
         check(model.liveActivities.last?.text == "已整理完成", "A quiet stream flushes its last throttled reply")
         model.handle(.tool(sessionID: "live-session", id: "write-1", title: "写入记忆", status: "completed"), agent: .workbuddy)
         model.handle(.thinking(sessionID: "live-session"), agent: .workbuddy)
