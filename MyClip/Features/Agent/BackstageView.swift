@@ -16,34 +16,38 @@ struct BackstageView: View {
     @State private var configurationModelAgent: ClipAgent?
     @StateObject private var history = OrganizationHistoryState()
     @State private var windowVisible = false
+    @State private var liveRecords: [ExecutionRecord] = []
+    @State private var liveToolFilter: String?
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Backstage", selection: $model.organizationSection) {
-                ForEach(OrganizationSection.allCases) { section in
-                    Text(section == .status && !model.permissions.isEmpty ? "\(section.title) · \(model.permissions.count)" : section.title).tag(section)
-                }
-            }
-            .pickerStyle(.segmented).labelsHidden()
-            .frame(maxWidth: 400).padding(.horizontal, 24).padding(.vertical, 16)
-            .accessibilityIdentifier("organization.navigation")
-            Divider()
+            header
             // Do not keep hidden charts, history lists or their tasks alive in a TabView/ZStack.
             switch model.organizationSection {
             case .status:
-                ScrollView {
-                    runtimeSection.padding(24).frame(maxWidth: 920).frame(maxWidth: .infinity, alignment: .top)
-                }.accessibilityIdentifier("organization.status")
+                VStack(spacing: 0) {
+                    ScrollView {
+                        runtimeSection.padding(20).frame(maxWidth: 920).frame(maxWidth: .infinity, alignment: .top)
+                    }
+                    .onChange(of: toolNames) { names in
+                        if let filter = liveToolFilter, !names.contains(filter) { liveToolFilter = nil }
+                    }
+                    Divider()
+                    runtimeFooter
+                }
+                .accessibilityIdentifier("organization.status")
+                .task(id: "\(model.currentJob?.id.uuidString ?? "-")|\(windowVisible)") { await watchLiveTools() }
             case .history:
                 OrganizationHistoryView(model: model, state: history, visible: windowVisible) { selectedJob = $0 }
             case .usage:
                 ScrollView {
-                    usageSection.padding(24).frame(maxWidth: 920).frame(maxWidth: .infinity, alignment: .top)
+                    usageSection.padding(20).frame(maxWidth: 920).frame(maxWidth: .infinity, alignment: .top)
                 }
                 .accessibilityIdentifier("organization.usage")
                 .task(id: windowVisible) { if windowVisible { await model.refreshTokenUsageIfNeeded() } }
             }
         }
+        .background(Color(nsColor: .windowBackgroundColor))
         .background(BackstageWindowActivity(active: $windowVisible, requiresActive: false).frame(width: 0, height: 0))
         .onAppear { model.organizationUIVisible = windowVisible }
         .onChange(of: windowVisible) { model.organizationUIVisible = $0 }
@@ -63,6 +67,65 @@ struct BackstageView: View {
             .frame(minWidth: 560, idealWidth: 680, minHeight: 400, idealHeight: 600)
             .onAppear { model.refreshAgentAvailability() }
             .sheet(item: $configurationModelAgent) { AgentModelPickerView(model: model, agent: $0) }
+        }
+    }
+
+    // MARK: - Header
+
+    private var sectionSubtitle: String {
+        switch model.organizationSection {
+        case .status: String(localized: "查看任务队列与 Agent 的最新进展")
+        case .history: String(localized: "每次整理的执行记录与结果")
+        case .usage: String(localized: "只统计 Agent 回传的 Token 用量")
+        }
+    }
+
+    private var header: some View {
+        VStack(spacing: 0) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 16) {
+                    headerTitle
+                    Spacer(minLength: 16)
+                    headerControls
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                    headerTitle
+                    headerControls
+                }
+            }
+            .padding(.horizontal, 24).padding(.top, 18).padding(.bottom, 16)
+            Divider()
+        }
+    }
+
+    private var headerTitle: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(verbatim: "Backstage").font(.system(size: 24, weight: .semibold))
+            Text(sectionSubtitle).font(.callout).foregroundStyle(.secondary)
+        }
+    }
+
+    private var headerControls: some View {
+        HStack(spacing: 10) {
+            Picker("Backstage", selection: $model.organizationSection) {
+                ForEach(OrganizationSection.allCases) { section in
+                    Text(section == .status && !model.permissions.isEmpty ? "\(section.title) · \(model.permissions.count)" : section.title).tag(section)
+                }
+            }
+            .pickerStyle(.segmented).labelsHidden()
+            .frame(minWidth: 260, idealWidth: 300, maxWidth: 340)
+            .accessibilityIdentifier("organization.navigation")
+            if model.organizationSection == .status {
+                Button { showingRules.toggle() } label: {
+                    Image(systemName: "questionmark.circle")
+                }
+                .buttonStyle(.plain).font(.title3).foregroundStyle(.secondary)
+                .accessibilityLabel(Text("整理规则"))
+                .help("查看整理规则")
+                .popover(isPresented: $showingRules, arrowEdge: .bottom) {
+                    rulesPopover
+                }
+            }
         }
     }
 
@@ -246,86 +309,9 @@ struct BackstageView: View {
 
     private var runtimeSection: some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(verbatim: "Backstage").font(.title2.weight(.semibold))
-                    Text("查看队列与 Agent 的最新进展").font(.callout).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button { showingRules.toggle() } label: {
-                    Image(systemName: "questionmark.circle")
-                }
-                .buttonStyle(.plain).font(.title3).foregroundStyle(.secondary)
-                .accessibilityLabel(Text("整理规则"))
-                .help("查看整理规则")
-                .popover(isPresented: $showingRules, arrowEdge: .bottom) {
-                    rulesPopover
-                }
-            }
             ForEach(model.permissions) { permission in PermissionRequestView(model: model, permission: permission) }
             OrganizationFlowView(model: model) { showingAgentConfiguration = true }
-            HStack(spacing: 12) {
-                if let agent = model.preferences.enabledAgent {
-                    AgentBrandIcon(agent: agent, size: 32)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(agent.name).font(.headline)
-                        Button { selectedModelAgent = agent } label: {
-                            Text(model.state(agent).modelSelection.current?.name ?? model.preferences.selectedModel(for: agent) ?? String(localized: "Agent 默认模型"))
-                                .lineLimit(1).truncationMode(.middle)
-                        }.buttonStyle(.link).font(.callout).disabled(!model.canConfigureAgentModel(agent))
-                    }
-                } else {
-                    Label("选择一个 Agent 来整理截图与记忆。", systemImage: "person.crop.circle").foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 12)
-                Button("Agent 与账号…") { showingAgentConfiguration = true }
-                    .accessibilityIdentifier("organization.agent-configuration")
-            }
-            BackstageCard {
-                VStack(alignment: .leading, spacing: 16) {
-                    Label(runtimeTitle, systemImage: runtimeWarning ? "exclamationmark.circle" : model.currentJob == nil ? "circle.dotted" : "arrow.triangle.2.circlepath")
-                        .font(.title3.weight(.semibold)).foregroundStyle(runtimeWarning ? Color.orange : Color.primary)
-                    if let job = model.currentJob {
-                        BackstageClock(running: true) { model.organizationActivity(at: $0) }.font(.callout).foregroundStyle(.secondary)
-                        if model.processingPaused { Text("当前批次完成后暂停。").font(.caption).foregroundStyle(.secondary) }
-                        HStack {
-                            Button("查看本次详情") { selectedJob = job }
-                            Button("停止本次", role: .destructive) { model.cancel(job) }.disabled(model.preview)
-                        }
-                    } else if model.discoveringTasks {
-                        Text(model.taskDiscoveryMessage ?? String(localized: "正在识别工作任务")).font(.callout).foregroundStyle(.secondary)
-                    } else if let reason = model.library.queue.pauseReason {
-                        Text(reason).font(.callout).foregroundStyle(.orange).textSelection(.enabled)
-                    } else if let agent = model.preferences.enabledAgent, model.state(agent).phase == .failed {
-                        Text(model.state(agent).detail).font(.callout).foregroundStyle(.orange).textSelection(.enabled)
-                        if model.agentRetryAt[agent] != nil {
-                            Text("将按退避时间自动重试。").font(.caption).foregroundStyle(.secondary)
-                        } else { Button("重试连接") { model.connect(agent) }.disabled(model.preview) }
-                    } else if model.preferences.enabledAgent == nil {
-                        Button("选择 Agent…") { showingAgentConfiguration = true }.buttonStyle(.borderedProminent)
-                    } else if let agent = model.preferences.enabledAgent,
-                              model.state(agent).phase == .connecting || model.state(agent).phase == .installing {
-                        Text(model.state(agent).detail).font(.callout).foregroundStyle(.secondary)
-                    } else if model.library.queue.pendingCount > 0 || model.processingPaused {
-                        BackstageClock(running: !model.processingPaused && model.library.queue.readyAt != nil) { model.organizationStatus(at: $0) }
-                            .font(.callout).foregroundStyle(.secondary)
-                    }
-                }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
-                executionWindow
-                    .padding(.horizontal, 20).padding(.bottom, 20)
-                Divider()
-                ViewThatFits(in: .horizontal) {
-                    HStack {
-                        queueCount
-                        Spacer(minLength: 12)
-                        if model.preferences.enabledAgent != nil { HStack(spacing: 8) { queueActions } }
-                    }
-                    VStack(alignment: .leading, spacing: 12) {
-                        queueCount
-                        if model.preferences.enabledAgent != nil { HStack(spacing: 8) { queueActions } }
-                    }
-                }.padding(.horizontal, 20).padding(.vertical, 14)
-            }
+            runtimeCard
             if model.taskIngestionSummary.failedCount > 0 {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("部分任务线索仍待补处理。", systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(.orange)
@@ -335,37 +321,286 @@ struct BackstageView: View {
         }
     }
 
+    private var runtimeCard: some View {
+        BackstageCard {
+            VStack(alignment: .leading, spacing: 16) {
+                runtimeSummary
+                if let job = model.currentJob {
+                    runtimeProgress(job)
+                } else {
+                    runtimeIdleDetail
+                }
+                executionWindow
+                if model.currentJob != nil || runtimeFailure {
+                    Divider()
+                    runtimeActions()
+                }
+            }.padding(18)
+        }
+        .onAppear { model.refreshAgentAvailability() }
+    }
+
+    private var runtimeFailure: Bool {
+        model.preferences.enabledAgent.map { model.state($0).phase == .failed } == true
+    }
+
+    private var runtimeSummary: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 12) {
+                runtimeGlyph
+                runtimeIdentity
+                Spacer(minLength: 12)
+                runtimeControls
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    runtimeGlyph
+                    runtimeIdentity
+                }
+                runtimeControls
+            }
+        }
+    }
+
+    @ViewBuilder private var runtimeGlyph: some View {
+        if model.currentJob != nil, windowVisible {
+            ProgressView().controlSize(.small).frame(width: 22, height: 22).padding(.top, 2)
+                .accessibilityLabel(Text("正在整理"))
+        } else {
+            Image(systemName: model.currentJob != nil ? "circle.dotted" : runtimeWarning ? "exclamationmark.circle" : "clock")
+                .font(.system(size: 19, weight: .regular))
+                .foregroundStyle(runtimeWarning ? Color.orange : Color.secondary)
+                .frame(width: 22, height: 22).padding(.top, 3)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var runtimeIdentity: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(runtimeTitle).font(.title3.weight(.semibold)).lineLimit(2)
+            HStack(spacing: 6) {
+                if let agent = model.preferences.enabledAgent {
+                    Text(agent.name)
+                    Text("·")
+                    Text(agentModelName(agent))
+                    if let apps = sourceApps {
+                        Text("·")
+                        Text(apps)
+                    }
+                } else {
+                    Text("还没有选择整理 Agent")
+                }
+            }
+            .font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+        }
+    }
+
+    private func agentModelName(_ agent: ClipAgent) -> String {
+        model.state(agent).modelSelection.current?.name ?? model.preferences.selectedModel(for: agent)
+            ?? String(localized: "Agent 默认模型")
+    }
+
+    /// Apps whose screenshots this batch carries, from the real captures rather than the Agent's reply.
+    private var sourceApps: String? {
+        guard let job = model.currentJob, job.kind == .batch else { return nil }
+        let ids = Set(job.sourceIDs)
+        var seen = Set<String>()
+        let names = model.library.captures.filter { ids.contains($0.id) }.map(\.appName).filter { seen.insert($0).inserted }
+        guard !names.isEmpty else { return nil }
+        return names.prefix(2).joined(separator: "、")
+    }
+
+    private var runtimeControls: some View {
+        HStack(spacing: 8) {
+            Text("Agent").font(.caption).foregroundStyle(.secondary)
+            agentMenu
+            StatusChip(runtimeStatusText, tone: runtimeStatusTone)
+        }
+    }
+
+    private var agentMenu: some View {
+        Menu {
+            Section("Agent") {
+                ForEach(ClipAgent.allCases) { agent in
+                    Button {
+                        Task { await model.selectDefaultAgent(agent) }
+                    } label: {
+                        if agent == model.preferences.enabledAgent { Label(agent.name, systemImage: "checkmark") }
+                        else { Text(agent.name) }
+                    }
+                    .disabled(agent == model.preferences.enabledAgent || model.preview || model.selectingDefaultAgent != nil
+                              || !(model.localAgents[agent]?.canSelect ?? false))
+                }
+            }
+            Divider()
+            if let agent = model.preferences.enabledAgent {
+                Button("选择模型…") { selectedModelAgent = agent }
+                    .disabled(!model.canConfigureAgentModel(agent) || model.preview)
+            }
+            Button("Agent 与账号…") { showingAgentConfiguration = true }
+                .accessibilityIdentifier("organization.agent-configuration")
+        } label: {
+            Text(model.preferences.enabledAgent?.name ?? String(localized: "选择 Agent")).lineLimit(1)
+        }
+        .menuStyle(.borderedButton)
+        .controlSize(.small)
+        .fixedSize()
+        .disabled(model.preview)
+        .accessibilityLabel(Text("整理 Agent"))
+    }
+
+    private var runtimeStatusText: String {
+        if model.currentJob != nil { return String(localized: "进行中") }
+        if model.discoveringTasks { return String(localized: "识别任务") }
+        if !model.permissions.isEmpty { return String(localized: "待确认") }
+        guard let agent = model.preferences.enabledAgent else { return String(localized: "未选择") }
+        if model.library.queue.pauseReason != nil { return String(localized: "需处理") }
+        if model.state(agent).phase == .failed { return String(localized: "出错") }
+        if model.processingPaused { return String(localized: "已暂停") }
+        if model.state(agent).phase == .connecting || model.state(agent).phase == .installing { return String(localized: "准备中") }
+        return model.library.queue.pendingCount > 0 ? String(localized: "等待中") : String(localized: "空闲")
+    }
+
+    private var runtimeStatusTone: StatusChip.Tone {
+        if model.currentJob != nil { return .good }
+        if model.discoveringTasks { return .accent }
+        if !model.permissions.isEmpty || model.library.queue.pauseReason != nil { return .warning }
+        if let agent = model.preferences.enabledAgent, model.state(agent).phase == .failed { return .warning }
+        return .neutral
+    }
+
+    private func runtimeProgress(_ job: ClipJob) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                HStack(spacing: 6) {
+                    Text(job.kind == .dream ? String(localized: "整理已有记忆") : String(localized: "\(job.sourceIDs.count) 张截图"))
+                    Text("·")
+                    Text(model.activityText.isEmpty ? String(localized: "正在准备…") : model.activityText)
+                        .lineLimit(1).truncationMode(.tail)
+                }
+                .font(.callout).foregroundStyle(.secondary)
+                Spacer(minLength: 12)
+                BackstageClock(running: true) { date in
+                    guard let started = model.currentJobStartedAt ?? model.currentJob?.createdAt else { return "" }
+                    return Self.elapsedText(date.timeIntervalSince(started))
+                }
+                .font(.callout.monospacedDigit()).foregroundStyle(.secondary).fixedSize()
+            }
+            FlowProgressBar(running: windowVisible)
+            if model.processingPaused {
+                Text("当前批次完成后暂停。").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private static func elapsedText(_ interval: TimeInterval) -> String {
+        let elapsed = max(0, Int(interval))
+        if elapsed >= 3600 {
+            return String(localized: "已用时 \(elapsed / 3600) 时 \(elapsed % 3600 / 60) 分")
+        }
+        return String(localized: "已用时 \(elapsed / 60) 分 \(elapsed % 60) 秒")
+    }
+
+    @ViewBuilder private var runtimeIdleDetail: some View {
+        if model.discoveringTasks {
+            Text(model.taskDiscoveryMessage ?? String(localized: "正在识别工作任务"))
+                .font(.callout).foregroundStyle(.secondary)
+        } else if let reason = model.library.queue.pauseReason {
+            Text(reason).font(.callout).foregroundStyle(.orange).textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if let agent = model.preferences.enabledAgent, model.state(agent).phase == .failed {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(model.state(agent).detail).font(.callout).foregroundStyle(.orange).textSelection(.enabled)
+                if model.agentRetryAt[agent] != nil {
+                    Text("将按退避时间自动重试。").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        } else if model.preferences.enabledAgent == nil {
+            HStack(spacing: 10) {
+                Label("选择一个 Agent 来整理截图与记忆。", systemImage: "person.crop.circle").foregroundStyle(.secondary)
+                Spacer(minLength: 12)
+                Button("选择 Agent…") { showingAgentConfiguration = true }.buttonStyle(.borderedProminent).controlSize(.small)
+            }
+        } else if let agent = model.preferences.enabledAgent,
+                  model.state(agent).phase == .connecting || model.state(agent).phase == .installing {
+            Text(model.state(agent).detail).font(.callout).foregroundStyle(.secondary)
+        } else if model.library.queue.pendingCount > 0 || model.processingPaused {
+            BackstageClock(running: !model.processingPaused && model.library.queue.readyAt != nil) { model.organizationStatus(at: $0) }
+                .font(.callout).foregroundStyle(.secondary)
+        } else {
+            Text("没有待整理的截图。").font(.callout).foregroundStyle(.secondary)
+        }
+    }
+
+    private func runtimeActions() -> some View {
+        HStack(spacing: 8) {
+            if let job = model.currentJob {
+                Button { selectedJob = job } label: { Label("查看本次详情", systemImage: "list.bullet") }
+                    .buttonStyle(.bordered)
+                Button { model.cancel(job) } label: { Text("停止本次").foregroundStyle(.red) }
+                    .buttonStyle(.bordered)
+                    .disabled(model.preview)
+            } else if let agent = model.preferences.enabledAgent, model.state(agent).phase == .failed {
+                Button("重试连接") { model.connect(agent) }.buttonStyle(.bordered).disabled(model.preview)
+            }
+            Spacer(minLength: 12)
+            if model.currentJob != nil {
+                HStack(spacing: 4) {
+                    Text("最近更新")
+                    Text(model.lastActivityAt, format: .dateTime.hour().minute().second()).monospacedDigit()
+                }.font(.caption).foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private var runtimeFooter: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 16) {
+                queueSummary
+                Spacer(minLength: 12)
+                if model.preferences.enabledAgent != nil { HStack(spacing: 8) { queueActions } }
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                queueSummary
+                if model.preferences.enabledAgent != nil {
+                    HStack(spacing: 8) { Spacer(minLength: 0); queueActions }
+                }
+            }
+        }
+        .padding(.horizontal, 24).padding(.vertical, 12)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var queueSummary: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("待整理 \(model.library.queue.pendingCount.formatted()) 张截图").font(.callout.weight(.semibold))
+            Text(footerDetail).font(.caption).foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var footerDetail: String {
+        var parts: [String] = []
+        if let job = model.currentJob {
+            parts.append(job.kind == .dream ? String(localized: "正在整理已有记忆") : String(localized: "其中 \(job.sourceIDs.count) 张正在整理"))
+        }
+        if let latest = model.library.captures.first {
+            parts.append(String(localized: "最近保存于 \(latest.date.formatted(date: .omitted, time: .shortened))"))
+        }
+        return parts.isEmpty ? String(localized: "还没有截图") : parts.joined(separator: " · ")
+    }
+
     private var executionWindow: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: "terminal").foregroundStyle(.secondary)
-                Text("执行状态").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Spacer()
-                Button("全部执行记录") { model.organizationSection = .history }
-                    .buttonStyle(.link).font(.caption)
-            }
-            .padding(.horizontal, 14).padding(.vertical, 10)
-            .background(Color(nsColor: .controlBackgroundColor))
+            executionHeader
             Divider()
-            if !model.liveActivities.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(model.liveActivities) { activity in
-                        HStack(alignment: .top, spacing: 10) {
-                            Text(activity.date, format: .dateTime.hour().minute().second())
-                                .font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
-                            Image(systemName: activity.isResponse ? "text.bubble" : "chevron.right")
-                                .font(.caption).foregroundStyle(.secondary).frame(width: 14)
-                                .accessibilityHidden(true)
-                            Text(activity.text.isEmpty ? String(localized: "正在生成回答…") : activity.text)
-                                .font(.callout).lineLimit(activity.isResponse ? 3 : 1).truncationMode(.tail)
-                                .help(activity.text).textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }.padding(.horizontal, 14).padding(.vertical, 8)
-                    }
-                }.padding(.vertical, 4)
-            } else if model.currentJob != nil {
-                Text("等待 Agent 的最新动态…").font(.callout).foregroundStyle(.secondary)
-                    .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+            if !visibleToolRows.isEmpty {
+                executionTableHeader
+                Divider()
+                ForEach(Array(visibleToolRows.enumerated()), id: \.element.id) { index, row in
+                    toolRow(row)
+                    if index < visibleToolRows.count - 1 { Divider().padding(.leading, 14) }
+                }
             } else if let completed = model.library.jobs.first(where: { $0.state == .completed }) {
                 HStack(spacing: 10) {
                     Image(systemName: "checkmark.circle").foregroundStyle(.secondary)
@@ -378,19 +613,200 @@ struct BackstageView: View {
                     Button("查看结果") { selectedJob = completed }
                 }.padding(14)
             } else {
-                Text("暂无执行动态").font(.callout).foregroundStyle(.secondary)
+                Text(model.currentJob == nil ? String(localized: "暂无执行动态") : String(localized: "等待 Agent 的最新动态…"))
+                    .font(.callout).foregroundStyle(.secondary)
                     .padding(14).frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .background(Color(nsColor: .textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.12)))
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .contain)
     }
 
-    private var queueCount: some View {
-        Label("待整理 \(model.library.queue.pendingCount) 张截图", systemImage: "photo.stack")
-            .font(.callout).foregroundStyle(.secondary)
+    private var executionHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                executionTitle
+                Spacer(minLength: 12)
+                executionFilters
+                allRecordsButton
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) { executionTitle; Spacer(minLength: 8); allRecordsButton }
+                executionFilters
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(Color.primary.opacity(0.035))
+    }
+
+    private var executionTitle: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "terminal").font(.caption).foregroundStyle(.secondary)
+            Text("执行状态").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Text("\(toolRows.count) 条").font(.caption).foregroundStyle(.tertiary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private var executionFilters: some View {
+        if !toolRows.isEmpty {
+            HStack(spacing: 6) {
+                toolFilterChip(String(localized: "全部"), value: nil)
+                ForEach(toolNames.prefix(5), id: \.self) { name in
+                    toolFilterChip(name, value: name)
+                }
+            }
+        }
+    }
+
+    private func toolFilterChip(_ title: String, value: String?) -> some View {
+        let active = liveToolFilter == value
+        return Button { liveToolFilter = value } label: {
+            Text(title).font(.caption.weight(active ? .semibold : .regular)).lineLimit(1)
+                .foregroundStyle(active ? Color.accentColor : Color.secondary)
+                .padding(.horizontal, 7).padding(.vertical, 3)
+                .background(active ? Color.accentColor.opacity(0.14) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(active ? .isSelected : [])
+    }
+
+    private var allRecordsButton: some View {
+        Button("全部执行记录") { model.organizationSection = .history }
+            .buttonStyle(.link).font(.caption)
+    }
+
+    private var executionTableHeader: some View {
+        HStack(spacing: 10) {
+            Text("时间").frame(width: 54, alignment: .leading)
+            Text("工具").frame(width: 66, alignment: .leading)
+            Text("目标").frame(maxWidth: .infinity, alignment: .leading)
+            Text("耗时").frame(width: 52, alignment: .trailing)
+        }
+        .font(.caption).foregroundStyle(.tertiary)
+        .padding(.horizontal, 14).padding(.vertical, 6)
+        .background(Color.primary.opacity(0.02))
+        .accessibilityHidden(true)
+    }
+
+    private func toolRow(_ row: LiveToolRow) -> some View {
+        HStack(spacing: 10) {
+            Text(row.date, format: .dateTime.hour().minute().second())
+                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                .frame(width: 54, alignment: .leading)
+            Text(row.name)
+                .font(.caption.weight(.medium)).foregroundStyle(toolTint(row.name))
+                .lineLimit(1).minimumScaleFactor(0.75)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(toolTint(row.name).opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
+                .frame(width: 66, alignment: .leading)
+            Text(row.target.isEmpty ? String(localized: "—") : row.target)
+                .font(.system(size: 11.5, design: .monospaced)).foregroundStyle(.primary)
+                .lineLimit(1).truncationMode(.middle)
+                .help(row.target)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(durationText(row.duration))
+                .font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
+                .frame(width: 52, alignment: .trailing)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 7)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func durationText(_ duration: TimeInterval?) -> String {
+        guard let duration else { return "—" }
+        if duration < 1 { return "\(max(1, Int(duration * 1000)))ms" }
+        if duration < 10 { return String(format: "%.1fs", duration) }
+        return "\(Int(duration.rounded()))s"
+    }
+
+    private struct LiveToolRow: Identifiable {
+        let id: String
+        let date: Date
+        let name: String
+        let target: String
+        let duration: TimeInterval?
+    }
+
+    /// Persisted tool calls are richer than the four in-memory activity rows, so they drive the table.
+    private var toolRows: [LiveToolRow] {
+        let records = liveRecords.flatMap(\.tools).sorted { $0.startedAt < $1.startedAt }
+        if records.isEmpty {
+            return model.liveActivities.map { activity in
+                let pieces = activity.text.components(separatedBy: " · ")
+                return LiveToolRow(
+                    id: activity.id.uuidString, date: activity.date,
+                    name: activity.isResponse ? String(localized: "回复") : (pieces.count > 1 ? pieces[0] : String(localized: "进度")),
+                    target: activity.text.isEmpty ? String(localized: "正在生成回答…")
+                        : (pieces.count > 1 ? pieces.dropFirst().joined(separator: " · ") : activity.text),
+                    duration: nil)
+            }
+        }
+        var seen = Set<String>()
+        return records.compactMap { tool in
+            let key = "\(tool.id)-\(tool.startedAt.timeIntervalSince1970)"
+            guard seen.insert(key).inserted else { return nil }
+            let elapsed = tool.updatedAt.timeIntervalSince(tool.startedAt)
+            return LiveToolRow(id: key, date: tool.startedAt, name: toolName(tool), target: toolTarget(tool),
+                               duration: elapsed >= 0.05 ? elapsed : nil)
+        }
+    }
+
+    private var visibleToolRows: [LiveToolRow] {
+        let rows = liveToolFilter.map { filter in toolRows.filter { $0.name == filter } } ?? toolRows
+        return Array(rows.suffix(8))
+    }
+
+    private var toolNames: [String] {
+        var names: [String] = []
+        for row in toolRows where !names.contains(row.name) { names.append(row.name) }
+        return names
+    }
+
+    private func toolName(_ tool: ACPToolCall) -> String {
+        let name = (tool.name ?? tool.kind).trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? String(localized: "工具") : name.lowercased()
+    }
+
+    private func toolTarget(_ tool: ACPToolCall) -> String {
+        if let path = tool.locations.first?.path { return abbreviated(path) }
+        if let path = tool.content.compactMap(\.path).first { return abbreviated(path) }
+        let title = tool.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !title.isEmpty, title.caseInsensitiveCompare(tool.name ?? "") != .orderedSame { return title }
+        return "—"
+    }
+
+    private func abbreviated(_ path: String) -> String {
+        (path as NSString).abbreviatingWithTildeInPath
+    }
+
+    private func toolTint(_ name: String) -> Color {
+        switch name.lowercased() {
+        case "think", "thinking", "thought": return .purple
+        case "read", "view", "open": return .blue
+        case "bash", "execute", "run", "shell", "command": return .orange
+        case "search", "grep", "glob", "find": return .green
+        case "write", "edit", "patch", "apply_patch": return .indigo
+        case "回复", "进度": return .gray
+        default: return .teal
+        }
+    }
+
+    private func watchLiveTools() async {
+        liveRecords = []
+        liveToolFilter = nil
+        guard windowVisible, let id = model.currentJob?.id else { return }
+        while !Task.isCancelled, windowVisible, model.currentJob?.id == id {
+            if let next = try? await model.store.executionRecords(jobID: id),
+               next.flatMap(\.tools) != liveRecords.flatMap(\.tools) {
+                liveRecords = next
+            }
+            do { try await Task.sleep(for: .seconds(2)) } catch { return }
+        }
     }
 
     private var rulesPopover: some View {
@@ -417,20 +833,20 @@ struct BackstageView: View {
         let queue = model.library.queue
         if queue.pauseReason != nil {
             Button(String(localized: "重试并继续"), systemImage: "arrow.clockwise") { model.resumeAfterFailure() }
-                .buttonStyle(.borderedProminent).controlSize(.small).tint(.orange)
+                .buttonStyle(.borderedProminent).tint(.orange)
                 .disabled(model.preview || model.preferences.enabledAgent == nil)
                 .help("用同一个 Agent 重新整理失败的那批，然后继续队列")
         } else if model.processingPaused {
             Button(String(localized: "继续整理"), systemImage: "play.fill") { model.processingPaused = false }
-                .buttonStyle(.borderedProminent).controlSize(.small).disabled(model.preview)
+                .buttonStyle(.borderedProminent).disabled(model.preview)
         } else {
-            Button(String(localized: "整理记忆"), systemImage: "moon.stars", action: model.dreamNow).controlSize(.small).disabled(!model.canDreamNow)
+            Button(String(localized: "整理记忆"), systemImage: "moon.stars", action: model.dreamNow).disabled(!model.canDreamNow)
                 .help(dreamHelp)
-            Button("立即整理", action: model.organizeNow).controlSize(.small).disabled(!model.canOrganizeNow)
-                .help("不等间隔，马上整理下一批")
             Button(String(localized: "暂停"), systemImage: "pause.fill") { model.processingPaused = true }
-                .buttonStyle(.bordered).controlSize(.small).disabled(model.preview || model.preferences.enabledAgent == nil)
+                .buttonStyle(.bordered).disabled(model.preview || model.preferences.enabledAgent == nil)
                 .help("停止分配新批次，当前批次会先完成")
+            Button(String(localized: "立即整理"), systemImage: "play.fill", action: model.organizeNow).disabled(!model.canOrganizeNow)
+                .help("不等间隔，马上整理下一批")
         }
     }
 
@@ -457,10 +873,6 @@ struct BackstageView: View {
 
     private var usageSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Token 用量").font(.title3.weight(.semibold))
-                Text("只统计 Agent 回传的部分").font(.caption).foregroundStyle(.secondary)
-            }
             if let error = model.tokenUsageLoadError {
                 Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.orange)
                 Button("重试") { Task { await model.refreshTokenUsageIfNeeded() } }
@@ -482,22 +894,19 @@ struct BackstageView: View {
 
 }
 
-/// A live overview of the capture-to-memory pipeline. Movement represents real events, not simulated work.
+/// The four stages a capture passes through. Every value comes from the library or the Agent.
 private struct OrganizationFlowView: View {
     @ObservedObject var model: MyClipModel
     let selectAgent: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var captureEvent = 0
-    @State private var consumptionEvent = 0
-    @State private var memoryEvent = 0
-    @State private var captureMoving = false
-    @State private var consumptionMoving = false
-    @State private var memoryMoving = false
-    @State private var lastCompletedID: UUID?
-    @State private var activeJobID: UUID?
 
-    private var latestCompleted: ClipJob? {
-        model.library.jobs.first { $0.state == .completed }
+    private var latestCapture: ClipCapture? { model.library.captures.first }
+
+    /// The newest real movement: a fresh capture, or Agent activity while a batch runs.
+    private var latestFlowDate: Date? {
+        var dates: [Date] = []
+        if let capture = latestCapture { dates.append(capture.date) }
+        if model.currentJob != nil { dates.append(model.lastActivityAt) }
+        return dates.max()
     }
 
     private var agentStatus: String {
@@ -515,116 +924,97 @@ private struct OrganizationFlowView: View {
         return model.currentJob == nil ? .secondary : .green
     }
 
+    private var captureDetail: String {
+        guard model.preferences.captureEnabled else { return String(localized: "采集已暂停") }
+        guard let latestCapture else { return String(localized: "等待第一张截图") }
+        return "\(model.library.captureCount.formatted()) 张 · \(latestCapture.date.formatted(date: .omitted, time: .standard))"
+    }
+
+    private var organizedCount: Int {
+        max(0, model.library.captureCount - model.library.queue.pendingCount)
+    }
+
     var body: some View {
-        BackstageCard {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("整理流程").font(.headline)
-                        Text("从截图到记忆，查看当前流转情况").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("整理流程").font(.headline)
+                    Text("从最近截图到长期记忆，共四个环节").font(.caption).foregroundStyle(.secondary)
                 }
-                HStack(alignment: .top, spacing: 0) {
-                    flowStep(String(localized: "最近截图"), detail: model.preferences.captureEnabled ? model.captureStatus : String(localized: "采集已暂停")) {
-                        if let capture = model.library.captures.first {
-                            CaptureThumbnail(capture: capture)
-                                .frame(width: 46, height: 38).clipShape(RoundedRectangle(cornerRadius: 5))
-                                .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.quaternary))
+                Spacer(minLength: 12)
+                if let latestFlowDate {
+                    HStack(spacing: 4) {
+                        Text("最近流转")
+                        Text(latestFlowDate, format: .dateTime.hour().minute().second()).monospacedDigit()
+                    }
+                    .font(.caption).foregroundStyle(.tertiary)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            BackstageCard {
+                HStack(spacing: 0) {
+                    step(String(localized: "最近截图"), detail: captureDetail, tint: .gray) {
+                        if let capture = latestCapture {
+                            CaptureThumbnail(capture: capture).clipShape(RoundedRectangle(cornerRadius: 7))
                         } else {
-                            Image(systemName: "photo").font(.title2).foregroundStyle(.secondary)
+                            Image(systemName: "photo")
                         }
                     }
-                    connector
-                    flowStep(String(localized: "待整理队列"), detail: String(localized: "\(model.library.queue.pendingCount) 张等待")) {
+                    stepDivider
+                    step(String(localized: "待整理队列"), detail: String(localized: "\(model.library.queue.pendingCount.formatted()) 张等待"),
+                         tint: model.library.queue.pendingCount > 0 ? .accentColor : .gray) {
                         Image(systemName: "square.stack.3d.up")
-                            .font(.title2).foregroundStyle(model.library.queue.pendingCount > 0 ? Color.accentColor : Color.secondary)
                     }
-                    connector
+                    stepDivider
                     Button(action: selectAgent) {
-                        flowStep(model.preferences.enabledAgent?.name ?? String(localized: "Agent"), detail: agentStatus, detailColor: statusColor) {
+                        step(model.preferences.enabledAgent?.name ?? String(localized: "Agent"), detail: agentStatus,
+                             detailColor: statusColor, tint: model.currentJob != nil ? .green : .gray, showsDot: true) {
                             if let agent = model.preferences.enabledAgent {
-                                AgentBrandIcon(agent: agent, size: 32)
+                                AgentBrandIcon(agent: agent, size: 20)
                             } else {
-                                Image(systemName: "person.crop.circle.badge.questionmark").font(.title2).foregroundStyle(.secondary)
+                                Image(systemName: "person.crop.circle.badge.questionmark")
                             }
-                        }.contentShape(Rectangle())
+                        }
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help("Agent 与账号…")
                     .accessibilityLabel(Text("Agent 与账号"))
                     .accessibilityValue(Text("\(model.preferences.enabledAgent?.name ?? String(localized: "未选择")) · \(agentStatus)"))
-                    connector
-                    flowStep(String(localized: "Memory"), detail: String(localized: "Markdown 记忆")) {
-                        Image(systemName: "doc.text").font(.title2).foregroundStyle(.secondary)
+                    stepDivider
+                    step(String(localized: "Memory"), detail: String(localized: "已整理 \(organizedCount.formatted()) 张"), tint: .gray) {
+                        Image(systemName: "doc.text")
                     }
                 }
-                .overlay {
-                    GeometryReader { geometry in
-                        movingSymbol("photo", moving: captureMoving, from: 0.13, to: 0.37, width: geometry.size.width)
-                        movingSymbol("photo", moving: consumptionMoving, from: 0.38, to: 0.62, width: geometry.size.width)
-                        movingSymbol("doc.text", moving: memoryMoving, from: 0.63, to: 0.87, width: geometry.size.width)
-                    }.allowsHitTesting(false).accessibilityHidden(true)
-                }
-            }.padding(20)
-        }
-        .accessibilityElement(children: .contain)
-        .onAppear {
-            lastCompletedID = latestCompleted?.id
-            activeJobID = model.currentJob?.id
-        }
-        .onChange(of: model.library.captureCount) { count in
-            // Changes to the capture count can also be deletions or a library reload.
-            if count > previousCaptureCount { captureEvent += 1 }
-            previousCaptureCount = count
-        }
-        .onChange(of: model.currentJob?.id) { id in
-            if let id {
-                activeJobID = id
-                if model.currentJob?.kind == .batch { consumptionEvent += 1 }
+                .padding(.vertical, 12)
             }
         }
-        .onChange(of: latestCompleted?.id) { id in
-            defer { lastCompletedID = id }
-            if let id, id == activeJobID, id != lastCompletedID, let completed = latestCompleted,
-               !(completed.memoryChanges?.written.isEmpty ?? true) { memoryEvent += 1 }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func step<Icon: View>(_ title: String, detail: String, detailColor: Color = .secondary,
+                                  tint: Color, showsDot: Bool = false, @ViewBuilder icon: () -> Icon) -> some View {
+        HStack(spacing: 10) {
+            icon()
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(width: 32, height: 32)
+                .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.callout.weight(.medium)).lineLimit(1).minimumScaleFactor(0.8)
+                HStack(spacing: 4) {
+                    if showsDot { Circle().fill(detailColor).frame(width: 5, height: 5).accessibilityHidden(true) }
+                    Text(detail).font(.caption).foregroundStyle(detailColor).lineLimit(1).minimumScaleFactor(0.75)
+                }
+            }
+            Spacer(minLength: 0)
         }
-        .onAppear { previousCaptureCount = model.library.captureCount }
-        .task(id: captureEvent) { await animateEvent(captureEvent, moving: $captureMoving) }
-        .task(id: consumptionEvent) { await animateEvent(consumptionEvent, moving: $consumptionMoving) }
-        .task(id: memoryEvent) { await animateEvent(memoryEvent, moving: $memoryMoving) }
+        .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    @State private var previousCaptureCount = 0
-
-    private func flowStep<Icon: View>(_ title: String, detail: String, detailColor: Color = .secondary,
-                                      @ViewBuilder icon: () -> Icon) -> some View {
-        VStack(spacing: 6) {
-            icon().frame(height: 42)
-            Text(title).font(.callout.weight(.medium)).lineLimit(1)
-            Text(detail).font(.caption).foregroundStyle(detailColor).lineLimit(1).minimumScaleFactor(0.8)
-        }.frame(maxWidth: .infinity)
-    }
-
-    private var connector: some View {
-        Image(systemName: "chevron.right").font(.caption.weight(.medium)).foregroundStyle(.quaternary)
-            .frame(width: 16, height: 42).accessibilityHidden(true)
-    }
-
-    private func movingSymbol(_ symbol: String, moving: Bool, from: CGFloat, to: CGFloat, width: CGFloat) -> some View {
-        Image(systemName: symbol).font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
-            .padding(5).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 5))
-            .position(x: width * (moving ? to : from), y: 21)
-            .opacity(moving ? 1 : 0)
-    }
-
-    @MainActor private func animateEvent(_ event: Int, moving: Binding<Bool>) async {
-        moving.wrappedValue = false
-        guard event > 0, !reduceMotion else { return }
-        withAnimation(.easeInOut(duration: 0.9)) { moving.wrappedValue = true }
-        try? await Task.sleep(for: .milliseconds(900))
-        guard !Task.isCancelled else { return }
-        withTransaction(Transaction(animation: nil)) { moving.wrappedValue = false }
+    private var stepDivider: some View {
+        Divider().frame(height: 40).accessibilityHidden(true)
     }
 }
 
@@ -997,6 +1387,37 @@ private struct BackstageWindowActivity: NSViewRepresentable {
             let value = visible && (!requiresActive || NSApp.isActive) && !NSApp.isHidden
             if active.wrappedValue != value { active.wrappedValue = value }
         }
+    }
+}
+
+/// A working indicator without a fake percentage: the accent segment keeps moving while the Agent works.
+/// A timeline, not a repeating animation, so it stops as soon as the window is hidden.
+private struct FlowProgressBar: View {
+    var running = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let segment = max(56, width * 0.28)
+            let travel = max(0, width - segment)
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.secondary.opacity(0.16))
+                if reduceMotion || !running {
+                    Capsule().fill(Color.accentColor).frame(width: segment)
+                } else {
+                    TimelineView(.animation(minimumInterval: 1.0 / 12.0)) { context in
+                        let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3) / 3
+                        Capsule().fill(Color.accentColor)
+                            .frame(width: segment)
+                            .offset(x: travel * (0.5 - 0.5 * cos(phase * 2 * .pi)))
+                    }
+                }
+            }
+        }
+        .frame(height: 6)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("整理进行中"))
     }
 }
 
