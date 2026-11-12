@@ -19,7 +19,7 @@ struct BackstageView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("自动整理", selection: $model.organizationSection) {
+            Picker("Backstage", selection: $model.organizationSection) {
                 ForEach(OrganizationSection.allCases) { section in
                     Text(section == .status && !model.permissions.isEmpty ? "\(section.title) · \(model.permissions.count)" : section.title).tag(section)
                 }
@@ -248,7 +248,7 @@ struct BackstageView: View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("自动整理").font(.title2.weight(.semibold))
+                    Text(verbatim: "Backstage").font(.title2.weight(.semibold))
                     Text("查看队列与 Agent 的最新进展").font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()

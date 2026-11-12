@@ -109,16 +109,6 @@
     "整理 %lld 张截图": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Organize %lld captures" } } } },
     "待整理 %lld 张截图": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "%lld captures pending" } } } },
     "%lld 条已加载": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "%lld records loaded" } } } },
-    "自动整理": {
-      "localizations": {
-        "de": { "stringUnit": { "state": "translated", "value": "Automatisch organisieren" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Auto-organize" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Organización automática" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Organisation automatique" } },
-        "ja": { "stringUnit": { "state": "translated", "value": "自動整理" } },
-        "ko": { "stringUnit": { "state": "translated", "value": "자동 정리" } }
-      }
-    },
     "运行状态": {
       "localizations": {
         "de": { "stringUnit": { "state": "translated", "value": "Status" } },

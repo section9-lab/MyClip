@@ -65,7 +65,7 @@ enum LibraryPage: String, CaseIterable, Identifiable {
         case .dashboard: "Kanban"
         case .memory: "Memory"
         case .captures: "Timeline"
-        case .agents: String(localized: "自动整理")
+        case .agents: "Backstage"
         case .settings: String(localized: "设置")
         }
     }
