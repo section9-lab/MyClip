@@ -7,7 +7,7 @@ public enum MemoryLayout {
     public static func initialBody(for path: String) -> String? {
         let templates: [String: String] = [
             "Memory.md": String(localized: "# Memory\n\n## 关于我\n- [[Profile|个人信息与偏好]]\n- [[Now|当前关注事项]]\n\n## 重要记忆\n主题积累在 Wiki/，每日记录保存在 Daily/。\n"),
-            "Profile.md": String(localized: "# Profile\n\n## 已确认的信息\n尚未填写。只保存你明确表达或确认的信息。\n\n## 沟通偏好\n\n## 工作方式\n\n## 长期目标\n\n## 最近确认\n"),
+            "Profile.md": String(localized: "# Profile\n\n## 个人信息\n尚未填写。MyClip 会从截图和对话里归纳你的偏好、习惯与个人情况。\n\n## 沟通偏好\n\n## 工作方式\n\n## 长期目标\n\n## 最近确认\n"),
             "Now.md": String(localized: "# Now\n\n## 当前项目\n尚未整理。\n\n## 当前问题\n\n## 下一步\n")
         ]
         return templates[path]
@@ -138,7 +138,6 @@ extension LibraryStore {
             for name in MemoryLayout.rootFiles where !FileManager.default.fileExists(atPath: directory.appendingPathComponent(name).path) {
                 let id = UUID()
                 _ = try saveEntry(id: id, kind: .memory, title: String(name.dropLast(3)), body: MemoryLayout.initialBody(for: name)!, revision: 1, agent: .codex, sourceIDs: [], relativePath: name)
-                if name == "Profile.md" { try database.run("INSERT INTO protected_entries VALUES(?)", [id.uuidString]) }
             }
             try database.run("INSERT INTO vault_meta VALUES('layout','1')")
         }

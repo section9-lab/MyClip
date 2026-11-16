@@ -37,6 +37,11 @@ public struct LibrarySnapshot: Sendable, Equatable {
     public var imageCount = 0
     /// Memory files on disk that failed validation and keep their last good index, as "path（reason）".
     public var invalidMemoryFiles: [String] = []
+    /// When the hourly digest last finished with something to read; nil before the first one.
+    public var digestAt: Date?
+    /// What the digest wrote today: board cards created and calendar events scheduled.
+    public var todayBoardCount = 0
+    public var todayCalendarCount = 0
 
     public init() {}
 }

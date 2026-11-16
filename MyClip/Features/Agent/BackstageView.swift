@@ -887,11 +887,14 @@ struct BackstageView: View {
 
 }
 
-/// The four stages a capture passes through. Every value comes from the library or the Agent.
+/// The two pipelines that write Memory: the real-time batch records the day into Daily, the hourly digest turns
+/// those pages into Wiki knowledge, the root files, board items and calendar events. Every value comes from the
+/// library or the Agent; nothing here is a schedule we merely hope for.
 private struct OrganizationFlowView: View {
     @ObservedObject var model: MyClipModel
     let selectAgent: () -> Void
 
+    private var calendar: Calendar { .current }
     private var latestCapture: ClipCapture? { model.library.captures.first }
 
     /// The newest real movement: a fresh capture, or Agent activity while a batch runs.
@@ -923,16 +926,60 @@ private struct OrganizationFlowView: View {
         return "\(model.library.captureCount.formatted()) 张 · \(latestCapture.date.formatted(date: .omitted, time: .standard))"
     }
 
-    private var organizedCount: Int {
-        max(0, model.library.captureCount - model.library.queue.pendingCount)
+    private var dailyEntries: [KnowledgeEntry] {
+        model.library.entries.filter { $0.relativePath.hasPrefix("Daily/") }
+    }
+
+    /// Daily pages written today, the output of the real-time pipeline.
+    private var todayDailyCount: Int {
+        let start = calendar.startOfDay(for: Date())
+        return dailyEntries.filter { $0.updatedAt >= start }.count
+    }
+
+    /// Daily pages the digest has not read yet: everything written after its watermark.
+    private var pendingDailyCount: Int {
+        let since = model.library.digestAt ?? calendar.startOfDay(for: Date())
+        return dailyEntries.filter { $0.updatedAt > since }.count
+    }
+
+    private var wikiCount: Int {
+        model.library.entries.filter { $0.relativePath.hasPrefix("Wiki/") }.count
+    }
+
+    /// A running dream job whose plan carries dailies is the hourly digest, not the nightly review.
+    private var digestJob: ClipJob? {
+        model.library.jobs.first { $0.state == .running && !($0.dreamPlan?.dailies.isEmpty ?? true) }
+    }
+
+    private var digestStatus: String {
+        if digestJob != nil { return String(localized: "整理中") }
+        if pendingDailyCount > 0 { return String(localized: "\(pendingDailyCount) 页待整理") }
+        return String(localized: "已跟上")
+    }
+
+    /// Cadence in words: when the last digest ran and how long until the next one is due.
+    private func digestDetail(at now: Date) -> String {
+        guard let last = model.library.digestAt else { return String(localized: "还没整理过，第一个整点开始") }
+        let time = last.formatted(.dateTime.hour().minute())
+        let remaining = last.addingTimeInterval(MemoryDigest.interval).timeIntervalSince(now)
+        guard remaining > 60 else { return String(localized: "上次 \(time) · 马上整理") }
+        let minutes = Int((remaining / 60).rounded(.up))
+        return String(localized: "上次 \(time) · 还有 \(minutes) 分钟")
+    }
+
+    /// What the digest put on the board and the calendar today, so the last step is not just a label.
+    private var outputDetail: String {
+        let board = model.library.todayBoardCount, calendar = model.library.todayCalendarCount
+        guard board > 0 || calendar > 0 else { return String(localized: "今天还没有新增") }
+        return String(localized: "看板 \(board) · 日历 \(calendar)")
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("整理流程").font(.headline)
-                    Text("从最近截图到长期记忆，共四个环节").font(.caption).foregroundStyle(.secondary)
+                    Text("两条管道：先把截图记进当天的 Daily，再每小时整理成长期记忆").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 12)
                 if let latestFlowDate {
@@ -944,7 +991,12 @@ private struct OrganizationFlowView: View {
                     .accessibilityElement(children: .combine)
                 }
             }
+
             BackstageCard {
+                pipelineHeader(String(localized: "实时记录"),
+                               String(localized: "截图进来就写，每批最多 8 张"),
+                               trailing: String(localized: "只写 Daily"))
+                Divider()
                 HStack(spacing: 0) {
                     step(String(localized: "最近截图"), detail: captureDetail, tint: .gray) {
                         if let capture = latestCapture {
@@ -960,29 +1012,79 @@ private struct OrganizationFlowView: View {
                     }
                     stepDivider
                     Button(action: selectAgent) {
-                        step(model.preferences.enabledAgent?.name ?? String(localized: "Agent"), detail: agentStatus,
-                             detailColor: statusColor, tint: model.currentJob != nil ? .green : .gray, showsDot: true) {
-                            if let agent = model.preferences.enabledAgent {
-                                AgentBrandIcon(agent: agent, size: 20)
-                            } else {
-                                Image(systemName: "person.crop.circle.badge.questionmark")
-                            }
-                        }
-                        .contentShape(Rectangle())
+                        agentStep(detail: agentStatus)
                     }
                     .buttonStyle(.plain)
                     .help("Agent 与账号…")
                     .accessibilityLabel(Text("Agent 与账号"))
                     .accessibilityValue(Text("\(model.preferences.enabledAgent?.name ?? String(localized: "未选择")) · \(agentStatus)"))
                     stepDivider
-                    step(String(localized: "Memory"), detail: String(localized: "已整理 \(organizedCount.formatted()) 张"), tint: .gray) {
-                        Image(systemName: "doc.text")
+                    step(String(localized: "Daily"), detail: String(localized: "今天 \(todayDailyCount) 页"), tint: .gray) {
+                        Image(systemName: "calendar.day.timeline.left")
+                    }
+                }
+                .padding(.vertical, 12)
+            }
+
+            BackstageCard {
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    pipelineHeader(String(localized: "每小时整理"), digestDetail(at: context.date),
+                                   trailing: digestJob == nil ? String(localized: "读 Daily · 写长期记忆") : String(localized: "整理中"))
+                }
+                Divider()
+                HStack(spacing: 0) {
+                    step(String(localized: "待整理 Daily"), detail: digestStatus,
+                         detailColor: digestJob == nil && pendingDailyCount == 0 ? .secondary : .accentColor,
+                         tint: digestJob == nil && pendingDailyCount == 0 ? .gray : .accentColor,
+                         showsDot: digestJob != nil) {
+                        Image(systemName: "doc.text.below.ecg")
+                    }
+                    stepDivider
+                    Button(action: selectAgent) {
+                        agentStep(detail: digestJob == nil ? String(localized: "等待下一个整点") : String(localized: "整理中"), showsDot: digestJob != nil)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Agent 与账号…")
+                    .accessibilityLabel(Text("Agent 与账号"))
+                    stepDivider
+                    step(String(localized: "长期记忆"), detail: String(localized: "Wiki \(wikiCount) 页 · Memory.md · Profile.md"), tint: .gray) {
+                        Image(systemName: "books.vertical")
+                    }
+                    stepDivider
+                    step(String(localized: "看板与日历"), detail: outputDetail, tint: .gray) {
+                        Image(systemName: "rectangle.3.group")
                     }
                 }
                 .padding(.vertical, 12)
             }
         }
         .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private func agentStep(detail: String, showsDot: Bool = true) -> some View {
+        step(model.preferences.enabledAgent?.name ?? String(localized: "Agent"), detail: detail,
+             detailColor: statusColor, tint: model.currentJob != nil ? .green : .gray, showsDot: showsDot) {
+            if let agent = model.preferences.enabledAgent {
+                AgentBrandIcon(agent: agent, size: 20)
+            } else {
+                Image(systemName: "person.crop.circle.badge.questionmark")
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func pipelineHeader(_ title: String, _ detail: String, trailing: String? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(title).font(.callout.weight(.semibold))
+            Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+            Spacer(minLength: 8)
+            if let trailing {
+                Text(trailing).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
     }
 
     private func step<Icon: View>(_ title: String, detail: String, detailColor: Color = .secondary,

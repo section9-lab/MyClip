@@ -5,6 +5,9 @@ public enum MemoryPrompt {
     /// inside a Chinese prompt.
     public static var outputLanguage: String { AppLanguage.current.nativeName }
 
+    /// Legacy single-turn pipeline: one call writes Daily, Wiki and the root files at once. The app now runs the two
+    /// pipelines in `DayPrompt` (batch → Daily, hourly digest → Wiki/root/board/calendar); this stays for the live
+    /// harness and for libraries whose prompts are still being compared.
     public static func filePrompt(captures: [ClipCapture], handoff: String? = nil, previousAttempt: String? = nil) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.timeZone = .current
@@ -48,12 +51,24 @@ public enum MemoryPrompt {
     }
 
     /// A dream's turns in order, each titled for the queue: last week's summary when due, today's pages, then the patrol.
-    public static func dreamTurns(plan: ConsolidationPlan, handoff: String?) -> [(title: String, text: String)] {
+    /// An hourly digest owns its plan's `dailies` instead and runs a single turn.
+    public static func dreamTurns(plan: ConsolidationPlan, handoff: String?, board: [WorkTask] = [],
+                                  calendar: [CalendarEvent] = []) -> [(title: String, text: String)] {
+        if !plan.dailies.isEmpty {
+            return [(String(localized: "整理当天的 Daily"),
+                     digestPrompt(dailies: plan.dailies, handoff: handoff, board: board, calendar: calendar))]
+        }
         var turns: [(title: String, text: String)] = []
         if let weekly = plan.weekly { turns.append((String(localized: "回顾上周"), weeklyPrompt(path: weekly.path, dailies: weekly.dailies))) }
         if plan.reviewsPages { turns.append((String(localized: "整理今天"), consolidationPrompt(plan: plan, handoff: handoff))) }
         if !plan.patrol.isEmpty { turns.append((String(localized: "巡检旧记忆"), patrolPrompt(pages: plan.patrol))) }
         return turns
+    }
+
+    /// The hourly digest: today's Daily pages become Wiki knowledge, root files and board/calendar entries.
+    public static func digestPrompt(dailies: [String], handoff: String? = nil, previousAttempt: String? = nil,
+                                    board: [WorkTask] = [], calendar: [CalendarEvent] = []) -> String {
+        DayPrompt.digest(dailies: dailies, handoff: handoff, previousAttempt: previousAttempt, board: board, calendar: calendar)
     }
 
     /// The dream's review of today: no new material, only misfiled pages, pages changed since the last dream and their neighbours.
@@ -70,7 +85,7 @@ public enum MemoryPrompt {
         3. 处理交接记录里的整理提示，尤其是已过期的当前状态和疑似验证码、密钥。
         4. 补实体页：整理提示里“多处提到但没有页面的名词”确有含义时，建 Wiki/Topics 或 Wiki/People 页，按事实行写法从各处回填相关事实并互相链接。
         5. 压缩与拆分：过长页面按页面结构只留当前结论、已确认决定和关键背景，经过移入对应 Daily 并互链；整理提示列出的枢纽页按工作线拆成子页，超长的行拆成每行一件事。
-        6. 保护个人信息：重复出现不等于用户确认，不推断个人偏好或身份，不直接写入 Profile.md。
+        6. 更新 Profile.md：把已有页面里出现的个人情况、偏好、沟通习惯、工作方式与性格倾向归纳进去，每行标注依据来源；与已有内容冲突时保留双方并标注待确认，不写入密码或密钥。
         7. 补别名：范围内的 Topics、Projects、People 页缺少 aliases 时补上。
         \(reviewRules)
         上一次整理的交接记录（仅供定位，以磁盘现状为准）：

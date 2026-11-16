@@ -2,8 +2,14 @@ import AppKit
 import MyClipCore
 
 extension MyClipModel {
+    /// Installed into other clients (Claude Code, Codex, OpenCode) and read-only on purpose.
     var memoryCommand: ACPCommand {
         ACPCommand(executable: Bundle.main.executableURL!, arguments: ["--mcp", "--library", store.root.path])
+    }
+
+    /// The session MyClip runs itself: the hourly digest writes the board and the calendar through these tools.
+    var agentMemoryCommand: ACPCommand {
+        ACPCommand(executable: Bundle.main.executableURL!, arguments: ["--mcp", "--library", store.root.path, "--write-tools"])
     }
 
     func setMCPEnabled(_ enabled: Bool) {

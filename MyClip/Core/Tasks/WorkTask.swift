@@ -241,6 +241,28 @@ extension LibraryStore {
         }
     }
 
+    /// An edit from the hourly digest. Renaming and moving a card are recorded as AI changes, so the history keeps
+    /// who did what and a later digest can still correct itself.
+    public func updateWorkTaskFromAgent(_ id: UUID, title: String? = nil, project: String? = nil,
+                                        status: WorkTaskStatus? = nil, at date: Date = Date()) throws {
+        guard let row = try database.run("SELECT title,project,status FROM work_tasks WHERE id=?", [id.uuidString]).first else {
+            throw LibraryError.invalidResult(String(localized: "任务不存在。"))
+        }
+        if title != nil || project != nil {
+            try updateWorkTask(id, title: title ?? row["title"] ?? "", project: project ?? row["project"] ?? "")
+        }
+        if let status {
+            guard status.isOnBoard || status == .ignored else { throw LibraryError.invalidResult(String(localized: "任务状态无效。")) }
+            try changeWorkTaskStatus(id, status: status, at: date, actor: .ai)
+        }
+    }
+
+    /// Removing a card from the agent's side keeps it out of the board without losing its evidence: the row moves to
+    /// `ignored`, which the board shows collapsed and a later ingestion will not silently revive.
+    public func removeWorkTaskFromAgent(_ id: UUID, at date: Date = Date()) throws {
+        try updateWorkTaskFromAgent(id, status: .ignored, at: date)
+    }
+
     private func changeWorkTaskStatus(_ id: UUID, status: WorkTaskStatus, at date: Date, actor: WorkTaskActor, observedAt: Date? = nil) throws {
         guard let row = try database.run("SELECT status FROM work_tasks WHERE id=?", [id.uuidString]).first,
               let previous = row["status"].flatMap(WorkTaskStatus.init(rawValue:)) else { throw LibraryError.invalidResult(String(localized: "任务不存在。")) }

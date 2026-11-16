@@ -124,7 +124,11 @@ extension LibraryStore {
                     let current = try old.map(entry)
                     let path = try draftPath(draft, current: current)
                     let revision = Int(old?["revision"] ?? "0") ?? 0
-                    let protected = try !database.run("SELECT id FROM protected_entries WHERE id=?", [id.uuidString]).isEmpty
+                    // Profile.md is the user's own page and stays writable: an agent draft may update it from evidence
+                    // without waiting for a review. Every other entry a person edited stays behind the conflict check so
+                    // a stale draft cannot overwrite it.
+                    let editedByPerson = try !database.run("SELECT id FROM protected_entries WHERE id=?", [id.uuidString]).isEmpty
+                    let protected = path != "Profile.md" && editedByPerson
                     if draft.entryID != nil && (old == nil || draft.expectedRevision != revision || protected) {
                         throw LibraryError.conflict
                     }

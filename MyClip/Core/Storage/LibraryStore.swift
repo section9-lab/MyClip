@@ -43,6 +43,11 @@ public actor LibraryStore {
         let invalid = try synchronizeMemoryFiles()
         var result = LibrarySnapshot()
         result.invalidMemoryFiles = invalid.map(\.description)
+        result.digestAt = try database.run("SELECT value FROM vault_meta WHERE key=?", [Self.digestAtKey]).first?["value"]
+            .flatMap(Double.init).map(Date.init(timeIntervalSince1970:))
+        let dayStart = String(calendar.startOfDay(for: Date()).timeIntervalSince1970)
+        result.todayBoardCount = Int(try database.run("SELECT count(*) AS n FROM work_tasks WHERE created_at>=? AND status!='ignored'", [dayStart]).first?["n"] ?? "0") ?? 0
+        result.todayCalendarCount = Int(try database.run("SELECT count(*) AS n FROM calendar_events WHERE created_at>=? AND state='scheduled'", [dayStart]).first?["n"] ?? "0") ?? 0
         result.memoryFolders = try MemoryLayout.folderPaths(in: root.appendingPathComponent("Memory"))
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let words = Self.tokens(term).split(separator: " ").map { "\"\($0.replacingOccurrences(of: "\"", with: "\"\""))\"" }.joined(separator: " AND ")

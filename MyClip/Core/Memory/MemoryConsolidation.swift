@@ -17,6 +17,9 @@ public struct ConsolidationPlan: Sendable, Equatable, Codable {
     public var weekly: WeeklySummary?
     /// Untouched pages reviewed longest ago, so every page is looked at again every few days.
     public var patrol: [String] = []
+    /// Set by an hourly digest: the Daily pages it turns into Wiki knowledge. A plan with dailies never runs the
+    /// review turns, so the two pipelines cannot both edit the same page in one job.
+    public var dailies: [String] = []
 
     public var reviewsPages: Bool { !(misfiled.isEmpty && changed.isEmpty && neighbours.isEmpty) }
     public var pages: [String] { misfiled + changed + neighbours + patrol }
@@ -213,6 +216,78 @@ extension LibraryStore {
                     try database.run("INSERT INTO memory_reviews VALUES(?,?) ON CONFLICT(entry_id) DO UPDATE SET reviewed_at=excluded.reviewed_at",
                                      [id, String(date.timeIntervalSince1970)])
                 }
+            }
+            try database.run("UPDATE jobs SET state=?,error=?,retry_at=NULL WHERE id=?", [error == nil ? "completed" : "failed", error, jobID.uuidString])
+            try database.run("UPDATE job_times SET finished_at=? WHERE id=?", [String(date.timeIntervalSince1970), jobID.uuidString])
+        }
+        return changed
+    }
+}
+
+/// The second pipeline: once an hour, the Daily pages written since the last digest become Wiki knowledge, root
+/// files, board items and calendar events. It takes the dream's queue slot, so it never competes with a batch for
+/// the single running job, and it keeps its own watermark so the nightly dream keeps its own baseline.
+public enum MemoryDigest {
+    /// One digest per hour. It runs whether or not the user is away: the day's records are what it eats.
+    public static let interval: TimeInterval = 3600
+    /// Daily pages per digest, newest first; a backlog catches up over the next hours.
+    public static let scopeLimit = 8
+    public static let maxAttempts = 2
+    public static let retryDelay: TimeInterval = 900
+}
+
+extension LibraryStore {
+    /// Last time a digest finished with something to read; the window for the next one starts here.
+    static let digestAtKey = "digest_at"
+
+    /// Queues the next digest when an hour has passed since the last one and a Daily page changed after it.
+    /// Nothing to read is recorded as done, so an idle hour does not rescan on every tick.
+    @discardableResult
+    public func enqueueDigestIfDue(agent: ClipAgent, at date: Date = Date(), calendar: Calendar = .current) throws -> ClipJob? {
+        guard try database.run("SELECT id FROM jobs WHERE state IN ('queued','running') LIMIT 1").isEmpty else { return nil }
+        let last = try database.run("SELECT value FROM vault_meta WHERE key=?", [Self.digestAtKey]).first?["value"]
+            .flatMap(Double.init).map(Date.init(timeIntervalSince1970:))
+        if let last, date.timeIntervalSince(last) < MemoryDigest.interval { return nil }
+        guard let dailies = try digestDailies(since: last, at: date, calendar: calendar) else {
+            try recordDigest(at: date)
+            return nil
+        }
+        let plan = ConsolidationPlan(changed: [], neighbours: [], weekly: nil, dailies: dailies)
+        return try queueDream(plan, agent: agent, at: date)
+    }
+
+    /// Daily pages changed after the last digest, newest first. A library with no digest yet starts at today's
+    /// midnight so the first run of the day has something to read.
+    public func digestDailies(since: Date?, at date: Date = Date(), calendar: Calendar = .current) throws -> [String]? {
+        try synchronizeMemoryFiles()
+        let start = since ?? calendar.startOfDay(for: date)
+        let entries = try database.run("SELECT * FROM entries").map(entry)
+            .filter { $0.relativePath.hasPrefix("Daily/") && $0.updatedAt > start }
+            .sorted { $0.updatedAt > $1.updatedAt }
+        let paths = entries.prefix(MemoryDigest.scopeLimit).map(\.relativePath)
+        return paths.isEmpty ? nil : paths
+    }
+
+    @discardableResult
+    public func recordDigest(at date: Date = Date()) throws -> Date {
+        try database.run("INSERT INTO vault_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                         [Self.digestAtKey, String(date.timeIntervalSince1970)])
+        return date
+    }
+
+    /// Ends a digest: whatever it left on disk is settled like a batch, and the watermark moves to the moment the run
+    /// started so pages written while it ran are read next hour.
+    @discardableResult
+    public func finishDigest(jobID: UUID, previousRevisions: [UUID: Int], error: String? = nil, at date: Date = Date()) throws -> Int {
+        guard try database.run("SELECT id FROM jobs WHERE id=? AND kind='dream' AND state IN ('running','queued')", [jobID.uuidString]).first != nil else {
+            throw LibraryError.invalidResult(String(localized: "整理任务未在执行。"))
+        }
+        let changed = try settleConsolidation(previousRevisions: previousRevisions, jobID: jobID)
+        try database.transaction {
+            if error == nil {
+                let started = try database.run("SELECT started_at FROM job_times WHERE id=?", [jobID.uuidString]).first?["started_at"]
+                    .flatMap(Double.init).map(Date.init(timeIntervalSince1970:))
+                try recordDigest(at: started ?? date)
             }
             try database.run("UPDATE jobs SET state=?,error=?,retry_at=NULL WHERE id=?", [error == nil ? "completed" : "failed", error, jobID.uuidString])
             try database.run("UPDATE job_times SET finished_at=? WHERE id=?", [String(date.timeIntervalSince1970), jobID.uuidString])

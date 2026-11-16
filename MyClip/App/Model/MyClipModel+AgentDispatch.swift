@@ -397,7 +397,7 @@ extension MyClipModel {
     private func session(for agent: ClipAgent, using client: ACPClient, applyingSavedModel: Bool = true) async throws -> String {
         // A connection may prepare a blank session before activation. It is consumed by one batch only.
         if let id = state(agent).sessionID { return id }
-        let id = try await client.newSession(directory: try workspaceDirectory(), memoryServer: memoryCommand, ephemeralFor: agent)
+        let id = try await client.newSession(directory: try workspaceDirectory(), memoryServer: agentMemoryCommand, ephemeralFor: agent)
         try await client.setMode(sessionID: id, modeID: agent.fullAccessModeID)
         agents[agent]?.sessionID = id
         agents[agent]?.sessionIsEphemeral = true
@@ -581,9 +581,11 @@ extension MyClipModel {
                 queue = try await store.organizationQueue()
             }
             try Task.checkCancellation()
-            // Once a day, when nothing is waiting and the user has been away, the queue gets a dream.
+            // Once a day, when nothing is waiting and the user has been away, the queue gets a dream; every hour
+            // with new Daily pages, it gets a digest that turns them into knowledge, board items and events.
             if jobID == nil, BackgroundWorkBudget.allowsMaintenance {
                 try await store.enqueueDreamIfDue(agent: enabled)
+                try await store.enqueueDigestIfDue(agent: enabled)
                 queue = try await store.organizationQueue()
             }
             guard let target = agent ?? queue.nextAgent, target == preferences.enabledAgent,
@@ -625,27 +627,16 @@ extension MyClipModel {
                         try captures.map { try Data(contentsOf: $0.imageURL) }
                     }.value
                     activityText = String(localized: "正在准备 \(job.agent.name) 会话…")
-                    let existingTasks = try await store.workTasks()
-                    let taskMemories = Array(try await store.snapshot().entries.prefix(200))
                     let handoff = try await store.organizationHandoff()
                     activityText = String(localized: "已提交 \(data.count) 张图片，等待 \(job.agent.name) 回复…")
+                    // The real-time pipeline only records the day into Daily; the hourly digest turns it into knowledge.
                     let result = try await trackedPrompt(client, agent: job.agent, session: session,
-                        text: MemoryPrompt.organizeBatchPrompt(captures: captures, handoff: handoff, previousAttempt: job.attempts > 1 ? job.error : nil,
-                                                              tasks: existingTasks, memories: taskMemories),
+                        text: DayPrompt.daily(captures: captures, handoff: handoff, previousAttempt: job.attempts > 1 ? job.error : nil),
                         images: data, jobID: job.id)
                     if cancelledJobs.contains(job.id) || interruptedJobs.contains(job.id) || result.stopReason == "cancelled" { throw CancellationError() }
                     guard result.stopReason == "end_turn" else { throw LibraryError.agentStopped }
                     activityText = String(localized: "正在同步 Memory 文件…")
-                    let changedCount = try await store.finishMemoryEditing(jobID: job.id, previousRevisions: previousRevisions,
-                        taskResponse: result.text, taskMemoryIDs: Set(taskMemories.map(\.id)))
-                    do {
-                        let stage = try await store.applyTaskIngestion(job.id)
-                        if stage.state != .completed { showTaskIngestionFailure(stage, memorySaved: true) }
-                    } catch {
-                        // The outbox already exists even if indexing or storage failed; do not discard its reply.
-                        try await store.failTaskIngestion(job.id, error: error.localizedDescription)
-                        showTaskIngestionFailure(try await store.taskIngestion(job.id), memorySaved: true)
-                    }
+                    let changedCount = try await store.finishMemoryEditing(jobID: job.id, previousRevisions: previousRevisions)
                     agents[job.agent]?.phase = .ready
                     agents[job.agent]?.detail = changedCount == 0 ? String(localized: "已整理，Memory 无需更新") : String(localized: "已更新 \(changedCount) 个 Memory 文件")
                     agents[job.agent]?.lastCompleted = Date()
@@ -750,17 +741,31 @@ extension MyClipModel {
 
     /// Runs a dream turn by turn. It never pauses the queue or marks the Agent failed: a dropped connection gets one
     /// more try later, anything else ends the dream with what it managed, and tomorrow brings another.
+    /// A plan that carries `dailies` is the hourly digest instead: one turn over those Daily pages, and its own
+    /// watermark and retry delays.
     private func dream(_ job: ClipJob) async {
         var before: [UUID: Int] = [:]
+        let digest = !(job.dreamPlan?.dailies.isEmpty ?? true)
+        let retryLimit = digest ? MemoryDigest.maxAttempts : MemoryDream.maxAttempts
+        let retryDelay = digest ? MemoryDigest.retryDelay : MemoryDream.retryDelay
         do {
             guard let plan = job.dreamPlan else { throw LibraryError.invalidResult(String(localized: "做梦计划缺失。")) }
-            let turns = MemoryPrompt.dreamTurns(plan: plan, handoff: try await store.organizationHandoff())
+            // The digest gets today's board and upcoming events in its prompt, so it never spends a tool call reading
+            // them; the nightly dream has no such context and does not touch either surface.
+            let board = digest ? try await store.workTasks() : []
+            // Upcoming events only: a digest never needs yesterday's meeting to decide what to write.
+            let today = Calendar.current.startOfDay(for: Date())
+            let calendar = digest ? try await store.calendarEvents().filter { $0.end >= today } : []
+            let turns = MemoryPrompt.dreamTurns(plan: plan, handoff: try await store.organizationHandoff(),
+                                                board: board, calendar: calendar)
             before = try await store.beginConsolidation()
             try await withAgentSession(job.agent) { client, session in
                 agents[job.agent]?.phase = .working
                 for (index, turn) in turns.enumerated() {
                     if cancelledJobs.contains(job.id) || interruptedJobs.contains(job.id) { throw CancellationError() }
-                    activityText = String(localized: "做梦中 · \(turn.title)（\(index + 1)/\(turns.count)）")
+                    activityText = digest
+                        ? String(localized: "整理中 · \(turn.title)（\(index + 1)/\(turns.count)）")
+                        : String(localized: "做梦中 · \(turn.title)（\(index + 1)/\(turns.count)）")
                     agents[job.agent]?.detail = activityText
                     let result = try await trackedPrompt(client, agent: job.agent, session: session, text: turn.text, images: [],
                                                          jobID: job.id, maximumDuration: MemoryDream.turnLimit)
@@ -768,9 +773,15 @@ extension MyClipModel {
                     guard result.stopReason == "end_turn" else { throw LibraryError.agentStopped }
                 }
             }
-            let changed = try await store.finishDream(jobID: job.id, previousRevisions: before)
+            let changed = digest
+                ? try await store.finishDigest(jobID: job.id, previousRevisions: before)
+                : try await store.finishDream(jobID: job.id, previousRevisions: before)
+            // Dated facts the digest just wrote become calendar events without another agent call.
+            try await store.synchronizeCalendarEvents()
             agents[job.agent]?.phase = .ready
-            agents[job.agent]?.detail = String(localized: "做梦完成，更新了 \(changed) 个 Memory 文件")
+            agents[job.agent]?.detail = digest
+                ? String(localized: "整理完成，更新了 \(changed) 个 Memory 文件")
+                : String(localized: "做梦完成，更新了 \(changed) 个 Memory 文件")
             agents[job.agent]?.lastCompleted = Date()
         } catch {
             do {
@@ -780,15 +791,17 @@ extension MyClipModel {
                 } else if cancelledJobs.contains(job.id) || error is CancellationError {
                     try await store.settleConsolidation(previousRevisions: before, jobID: job.id)
                     try await store.finishJob(id: job.id, state: .cancelled)
-                } else if RetryPolicy.classify(error) == .transient, job.attempts < MemoryDream.maxAttempts {
+                } else if RetryPolicy.classify(error) == .transient, job.attempts < retryLimit {
                     try await store.settleConsolidation(previousRevisions: before, jobID: job.id)
-                    try await store.scheduleRetry(id: job.id, error: error.localizedDescription, at: Date().addingTimeInterval(MemoryDream.retryDelay))
+                    try await store.scheduleRetry(id: job.id, error: error.localizedDescription, at: Date().addingTimeInterval(retryDelay))
+                } else if digest {
+                    try await store.finishDigest(jobID: job.id, previousRevisions: before, error: String(localized: "\(firstLine(error))。下一个小时会再做。"))
                 } else {
                     try await store.finishDream(jobID: job.id, previousRevisions: before, error: String(localized: "\(firstLine(error))。明天会再做。"))
                 }
             } catch { notice = error.localizedDescription }
             agents[job.agent]?.phase = .ready
-            agents[job.agent]?.detail = String(localized: "做梦未完成，稍后再试")
+            agents[job.agent]?.detail = digest ? String(localized: "整理未完成，下一个小时再试") : String(localized: "做梦未完成，稍后再试")
         }
     }
 

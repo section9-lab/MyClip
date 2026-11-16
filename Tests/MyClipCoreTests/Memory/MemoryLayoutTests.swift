@@ -150,20 +150,17 @@ final class MemoryLayoutTests: XCTestCase {
         XCTAssertEqual(notes.map(\.id), [note.id])
     }
 
-    func testProfileIsProtectedBeforeFirstManualEdit() async throws {
+    func testProfileAcceptsAgentDrafts() async throws {
         let store = try LibraryStore(root: root)
         let note = try await seed(store)
         let profile = try await store.readMemory(path: "Profile.md")
         try await store.enqueue(sourceIDs: note.sourceIDs, agent: .codex)
         let job = try await store.claimNextJob(immediately: true)
-        do {
-            try await store.commit(jobID: XCTUnwrap(job).id, drafts: [KnowledgeDraft(entryID: profile.id, expectedRevision: profile.revision, kind: .memory, title: profile.title, body: "未经确认的身份", sourceIDs: note.sourceIDs, path: "Profile.md")])
-            XCTFail("Profile changes need review")
-        } catch LibraryError.conflict { }
-        let unchanged = try await store.readMemory(path: "Profile.md")
-        XCTAssertEqual(unchanged.body, profile.body)
-        let proposals = try await store.proposals()
-        XCTAssertEqual(proposals.count, 1)
+        let body = "## 个人信息\n- 偏好简短回复。来源：截图 `\(try XCTUnwrap(note.sourceIDs.first).uuidString)`\n"
+        try await store.commit(jobID: XCTUnwrap(job).id, drafts: [KnowledgeDraft(entryID: profile.id, expectedRevision: profile.revision, kind: .memory, title: profile.title, body: body, sourceIDs: note.sourceIDs, path: "Profile.md")])
+        let updated = try await store.readMemory(path: "Profile.md")
+        XCTAssertTrue(updated.body.contains("偏好简短回复"), "Profile is the user's own page and agents maintain it from evidence")
+        XCTAssertEqual(updated.revision, profile.revision + 1)
     }
 
     func testExternalRenameRepairsPathLinksAndBacklinksButNotCode() async throws {

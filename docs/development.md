@@ -28,9 +28,23 @@
 
 ## Memory 与看板的边界
 
-Memory 仅保存有来源依据的上下文：`Daily/` 记录经过，`Wiki/` 积累项目与专题知识，`Profile.md` 只接受用户明确表达或确认的信息。待办、待确认事项和任务状态由独立看板逻辑管理，不通过记忆目录维护另一套清单，也不自动收集个人偏好候选。
+Memory 仅保存有来源依据的上下文：`Daily/` 记录经过，`Wiki/` 积累项目与专题知识，`Profile.md` 保存用户的个人信息、偏好、工作方式与性格倾向，可以从截图和对话中归纳，每条标注依据。待办、待确认事项和任务状态由独立看板逻辑管理，不通过记忆目录维护另一套清单。
 
 记忆目录只有 `Memory.md`、`Profile.md`、`Now.md`、`Wiki/` 和 `Daily/`，新建和移动记忆的目标仅允许 `Wiki/` 或 `Daily/`。
+
+## 两条记忆管道
+
+截图进来以后分两步写，**职责不重叠**，Agent 一次只做一件事：
+
+| 管道 | 触发 | 写入范围 | 代码入口 |
+|---|---|---|---|
+| 实时（batch） | 每 5 分钟，一批 ≤8 张截图 | 只写 `Daily/YYYY/MM/YYYY-MM-DD.md` 与 `Daily/YYYY/MM/YYYY-MM-DD/主题.md`；不改 Wiki、根文件，不调工具，不返回任务 JSON | `DayPrompt.daily`，`MemoryRules.dailyWriting` |
+| 定期整理（digest） | 每小时一次，且上次整理后有 Daily 页面变化 | 读水位线之后的 Daily，归纳进 `Wiki/`、`Memory.md`、`Now.md`、`Profile.md`；调用看板工具（`board_list` / `board_add` / `board_update` / `board_delete`）与日历工具（`calendar_list` / `calendar_add` / `calendar_update` / `calendar_delete`）分别维护两个独立功能 | `DayPrompt.digest`，`MemoryDigest`，`MemoryRules.reviewWriting` |
+
+- 水位线是 `vault_meta.digest_at`，取上次 digest 的开始时间，所以整理期间新写的页面下一轮会读到；每次最多 8 个 Daily 页（`MemoryDigest.scopeLimit`），积压小时数会在之后几轮补齐。
+- digest 复用 dream 的排队位置（`jobs.kind='dream'` 且 `dream_plans.dailies` 非空），所以它不会和 batch 抢同一次运行；夜间 dream（巡检、周汇总）用 `consolidated_at` 自己的基准，两者互不覆盖。
+- 日历有两条写入口，都必须幂等：Memory 里带 `<!-- myclip-event -->` 的段落自动投影（`synchronizeCalendarEvents`），以及 digest 的 `calendar_add`（按“页面 + 原文行”upsert）。所以 prompt 要求：用工具写日程的那一行**不要**再加事件标注。
+- 写工具只在 MyClip 自己启动的会话里可用（`--write-tools`）；安装到 Claude Code / Codex / OpenCode 的那份 MCP 仍然只读。
 
 ## 提示词
 

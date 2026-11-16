@@ -17,7 +17,7 @@ final class MemoryPromptTests: XCTestCase {
         XCTAssertTrue(prompt.contains("- Wiki/Projects/MyClip.md（今天改动）"))
         XCTAssertTrue(prompt.contains("- Wiki/Topics/ACP.md（相邻页面）"))
         XCTAssertTrue(prompt.contains("不新增事实"))
-        XCTAssertTrue(prompt.contains("不直接写入 Profile.md"))
+        XCTAssertTrue(prompt.contains("更新 Profile.md"), "Profile is maintained from existing pages without a review step")
         XCTAssertTrue(prompt.contains("整理提示：……"))
         XCTAssertFalse(prompt.contains("周汇总"))
         XCTAssertFalse(prompt.contains("{\"tasks\""), "The review returns no task JSON")
@@ -31,7 +31,7 @@ final class MemoryPromptTests: XCTestCase {
         XCTAssertTrue(MemoryPrompt.coldStartPrompt(files: []).contains("人物放 Wiki/People"))
     }
 
-    func testMemoryPromptsDoNotCreateAPendingInboxOrProfileCandidates() {
+    func testMemoryPromptsKeepProfileWritableAndOutOfTheInbox() {
         let plan = ConsolidationPlan(changed: ["Wiki/Projects/MyClip.md"], neighbours: [], weekly: nil)
         let prompts = [MemoryPrompt.filePrompt(captures: []),
                        MemoryPrompt.organizeBatchPrompt(captures: [], tasks: []),
@@ -43,8 +43,10 @@ final class MemoryPromptTests: XCTestCase {
             XCTAssertFalse(prompt.contains("Inbox"))
             XCTAssertFalse(prompt.contains("Profile候选"))
             XCTAssertTrue(prompt.contains("看板独立管理待办、待确认事项和任务状态"))
-            XCTAssertTrue(prompt.contains("不收集推测的个人偏好或身份候选"))
+            XCTAssertFalse(prompt.contains("不推断个人偏好"), "Profile is the user's own page and stays writable")
+            XCTAssertFalse(prompt.contains("不直接写入 Profile.md"))
         }
+        XCTAssertTrue(prompts[0].contains("Profile.md：记录用户的个人信息"))
         var lint = MemoryLintReport()
         lint.candidateEntities = ["ACP"]
         XCTAssertFalse(lint.lines.joined().contains("Inbox"))

@@ -296,7 +296,6 @@ private struct KnowledgeDetailView: View {
     let entry: KnowledgeEntry
     @State private var sources: [ClipCapture] = []
     @State private var source: ClipCapture?
-    @State private var editing = false
     @State private var deleting = false
     @State private var moving = false
     @State private var showingInfo = false
@@ -328,7 +327,7 @@ private struct KnowledgeDetailView: View {
                 } label: {
                     Label(String(localized: "更多"), systemImage: "ellipsis.circle")
                 }
-                .help("编辑、导出、移动或删除这篇记忆")
+                .help("导出、移动或删除这篇记忆")
                 .accessibilityLabel("记忆操作")
             }
         }
@@ -337,7 +336,6 @@ private struct KnowledgeDetailView: View {
             catch { model.notice = error.localizedDescription }
         }
         .sheet(item: $source) { CaptureDetailView(model: model, capture: $0) }
-        .sheet(isPresented: $editing) { EntryEditor(model: model, entry: entry) }
         .sheet(isPresented: $moving) { MemoryMoveSheet(model: model, entry: entry) }
         .sheet(isPresented: $showingInfo) {
             VStack(spacing: 0) {
@@ -357,7 +355,6 @@ private struct KnowledgeDetailView: View {
                 model.selectedEntry = nil
                 model.memoryFolder = entry.relativePath.split(separator: "/").dropLast().joined(separator: "/")
             }
-            Button(String(localized: "编辑 Markdown"), systemImage: "square.and.pencil") { editing = true }
             ShareLink(item: entry.fileURL) { Label(String(localized: "导出 Markdown"), systemImage: "square.and.arrow.up") }
             Button(String(localized: "文件信息"), systemImage: "info.circle") { showingInfo = true }
             Divider()
@@ -446,102 +443,5 @@ private struct MemoryMoveSheet: View {
             }
         }.padding(24).frame(width: 510)
         .onAppear { path = entry.relativePath }
-    }
-}
-
-private struct EntryEditor: View {
-    @ObservedObject var model: MyClipModel
-    let entry: KnowledgeEntry
-    @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
-    @State private var bodyText = ""
-    @State private var expectedRevision = 0
-    @State private var latestConflict: KnowledgeEntry?
-    @State private var saving = false
-    @State private var previewing = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Label(entry.fileURL.lastPathComponent, systemImage: "doc.text").font(.headline)
-                Spacer()
-                Picker("显示模式", selection: $previewing) {
-                    Text("编辑").tag(false)
-                    Text("预览").tag(true)
-                }.pickerStyle(.segmented).frame(width: 160)
-            }
-            if !entry.isRootDocument { TextField("标题", text: $title).textFieldStyle(.roundedBorder).font(.title3) }
-            Group {
-                if previewing {
-                    ScrollView {
-                        MemoryMarkdownView(markdown: bodyText, baseURL: entry.fileURL.deletingLastPathComponent())
-                            .padding(24)
-                    }
-                } else {
-                    TextEditor(text: $bodyText).font(.system(size: 14, design: .monospaced))
-                        .autocorrectionDisabled().padding(12)
-                        .accessibilityLabel("Markdown 源码")
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.quaternary, lineWidth: 0.5))
-            HStack {
-                Text("Markdown · 保存时保留来源与历史版本").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button("取消") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("保存", action: save)
-                    .keyboardShortcut("s", modifiers: .command)
-                    .disabled(saving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || bodyText.isEmpty)
-            }
-        }.padding(24).frame(width: 760, height: 600)
-        .onAppear {
-            title = entry.title
-            bodyText = entry.body
-            expectedRevision = entry.revision
-        }
-        .alert("知识已更新", isPresented: Binding(
-            get: { latestConflict != nil },
-            set: { if !$0 { latestConflict = nil } }
-        )) {
-            Button("载入最新版本") { loadLatestVersion() }
-            Button("将我的修改保存为新版") {
-                guard let latestConflict else { return }
-                self.latestConflict = nil
-                save(expectedRevision: latestConflict.revision)
-            }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("这条知识在你编辑期间发生了变化。你的草稿仍然保留；你可以载入最新内容，或把当前草稿保存为新版本。")
-        }
-    }
-
-    private func save() { save(expectedRevision: expectedRevision) }
-
-    private func save(expectedRevision: Int) {
-        guard !saving else { return }
-        saving = true
-        let draftTitle = title
-        let draftBody = bodyText
-        Task { @MainActor in
-            switch await model.saveMemory(id: entry.id, title: draftTitle, body: draftBody, expectedRevision: expectedRevision) {
-            case .saved:
-                dismiss()
-            case .conflict(let latest):
-                self.expectedRevision = latest.revision
-                latestConflict = latest
-            case .failed:
-                break
-            }
-            saving = false
-        }
-    }
-
-    private func loadLatestVersion() {
-        guard let latestConflict else { return }
-        title = latestConflict.title
-        bodyText = latestConflict.body
-        expectedRevision = latestConflict.revision
-        self.latestConflict = nil
     }
 }
