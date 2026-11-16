@@ -3,7 +3,7 @@ import Foundation
 extension LibraryStore {
     static func prepareDatabase(_ database: SQLiteConnection) throws {
         let version = Int(try database.run("PRAGMA user_version").first?["user_version"] ?? "0") ?? 0
-        guard version <= 16 else { throw LibraryError.database(String(localized: "资料库由更新的 MyClip 创建，请升级应用。")) }
+        guard version <= 17 else { throw LibraryError.database(String(localized: "资料库由更新的 MyClip 创建，请升级应用。")) }
         if version > 0 && version < 10 {
             // Search tables gain anchor text, stemming and resolved link edges; they are rebuilt from entry files below.
             try database.script("DROP TABLE IF EXISTS entry_search; DROP TABLE IF EXISTS memory_passage_search; DROP TABLE IF EXISTS memory_links;")
@@ -104,6 +104,21 @@ extension LibraryStore {
                 to_status TEXT NOT NULL, created_at REAL NOT NULL
             );
             CREATE INDEX IF NOT EXISTS work_task_events_time ON work_task_events(created_at);
+            CREATE TABLE IF NOT EXISTS calendar_events (
+                id TEXT PRIMARY KEY, title TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '', location TEXT NOT NULL DEFAULT '',
+                project TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL DEFAULT 'other',
+                start_at REAL NOT NULL, end_at REAL NOT NULL, is_all_day INTEGER NOT NULL DEFAULT 0,
+                state TEXT NOT NULL DEFAULT 'scheduled', origin TEXT NOT NULL DEFAULT 'user',
+                evidence TEXT NOT NULL DEFAULT '', memory_id TEXT REFERENCES entries(id) ON DELETE SET NULL,
+                task_id TEXT REFERENCES work_tasks(id) ON DELETE SET NULL, edited_at REAL,
+                created_at REAL NOT NULL, updated_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS calendar_events_start ON calendar_events(start_at);
+            CREATE INDEX IF NOT EXISTS calendar_events_memory ON calendar_events(memory_id,title);
+            CREATE TABLE IF NOT EXISTS calendar_event_sources (
+                event_id TEXT NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
+                capture_id TEXT NOT NULL REFERENCES captures(id), PRIMARY KEY(event_id, capture_id)
+            );
             UPDATE entries SET kind='memory' WHERE kind='wiki';
             """)
         try Self.migrateOrganizationQueue(database, version: version)
@@ -163,6 +178,11 @@ extension LibraryStore {
             try database.script("PRAGMA user_version=15;")
         }
         if version < 16 { try Self.migrateAutomaticWorkTasks(database) }
+        if version < 17 {
+            // Calendar events project dated Memory passages and add manual scheduling on top of them.
+            // The tables are part of the base script, so this only advances the marker for older libraries.
+            try database.script("PRAGMA user_version=17;")
+        }
         try Self.prepareTaskIngestions(database)
         // Edge text shares the link's rowid, so removing a link (directly or by cascade) removes its searchable text.
         try database.script("""

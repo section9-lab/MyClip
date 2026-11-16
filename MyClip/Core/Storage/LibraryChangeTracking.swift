@@ -45,6 +45,7 @@ public struct LibraryChangeStamp: Equatable, Sendable {
 public struct LibraryRefreshVersions: Sendable {
     public let library: String
     public let tasks: String
+    public let calendar: String
     public let statistics: String
     public let tokens: String
 }
@@ -58,6 +59,7 @@ extension LibraryStore {
         return LibraryRefreshVersions(
             library: token(["captures", "images", "image_text", "entries", "memory_files", "jobs", "job_sources", "job_memory_changes", "dream_plans", "pending_captures", "organization_queue"]) + ":\(memoryMonitor.generation):\(imageMonitor.generation)",
             tasks: token(["work_tasks", "work_task_events", "work_task_evidence", "task_ingestions"]),
+            calendar: token(["calendar_events", "calendar_event_sources"]),
             statistics: token(["captures", "images", "entries", "jobs", "job_times", "mcp_reads"]) + ":\(imageMonitor.generation)",
             tokens: token(["token_usage"]))
     }

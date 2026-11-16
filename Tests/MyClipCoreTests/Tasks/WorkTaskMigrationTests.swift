@@ -48,7 +48,7 @@ final class WorkTaskMigrationTests: XCTestCase {
             XCTAssertEqual(events.last?.actor, .ai)
         }
         XCTAssertEqual(try database.run("SELECT * FROM work_task_evidence ORDER BY id"), evidence)
-        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "16")
+        XCTAssertEqual(try database.run("PRAGMA user_version").first?["user_version"], "17")
         let history = try await upgraded.workTaskEvents()
         let reopened = try LibraryStore(root: root)
         let repeatedHistory = try await reopened.workTaskEvents()

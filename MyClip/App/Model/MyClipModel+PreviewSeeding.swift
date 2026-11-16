@@ -19,10 +19,19 @@ extension MyClipModel {
         let context = CaptureContext(appName: String(localized: "预览示例"), bundleID: "myclip.preview", windowTitle: String(localized: "聚焦窗口的截图整理"), windowID: 1, reason: .pointerIdle)
         try await store.record(image: captured, context: context, agent: .codex, organize: true)
         guard let job = try await store.claimNextJob(immediately: true) else { return }
+        let calendar = Calendar.current
+        let eventDay = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date())) ?? Date()
+        let eventStart = calendar.date(bySettingHour: 10, minute: 0, second: 0, of: eventDay) ?? eventDay
+        let eventEnd = eventStart.addingTimeInterval(3_600)
+        let formatter = ISO8601DateFormatter()
+        let annotation = "<!-- myclip-event {\"start\":\"\(formatter.string(from: eventStart))\",\"end\":\"\(formatter.string(from: eventEnd))\",\"precision\":\"range\",\"evidence\":\"明天上午10点\"} -->"
         try await store.commit(jobID: job.id, drafts: [
             KnowledgeDraft(kind: .memory, title: String(localized: "让工作中的上下文，成为可以找回的知识"), body: String(localized: "MyClip 将应用窗口中的信息，整理为有来源的本地知识。\n\n## 从一张截图开始\n\n鼠标移动后五秒内点击或双击；向下滚动后静止五秒；或按下回车，记录当前应用的焦点窗口。重复画面共享一份图片，每次出现的时间仍被保留。\n\n## 从记录到理解\n\nCodex 或 Claude 通过 ACP 读取截图，整理 Memory。点击下方来源，可以回到知识产生的那一刻。\n\n这是用于验证界面的示例内容。"), sourceIDs: [context.id]),
             KnowledgeDraft(kind: .memory, title: String(localized: "截图只来自当前焦点窗口"), body: String(localized: "MyClip 记录前台应用的焦点窗口。无法确认焦点时跳过该帧，不截取整个桌面。"), sourceIDs: [context.id]),
-            KnowledgeDraft(kind: .memory, title: String(localized: "重复画面，保留每一次出现"), body: String(localized: "相同像素的截图共用一个图片文件，时间、应用和来源记录仍分别保存。"), sourceIDs: [context.id])
+            KnowledgeDraft(kind: .memory, title: String(localized: "重复画面，保留每一次出现"), body: String(localized: "相同像素的截图共用一个图片文件，时间、应用和来源记录仍分别保存。"), sourceIDs: [context.id]),
+            KnowledgeDraft(kind: .memory, title: String(localized: "客户电话确认导出字段"),
+                           body: annotation + "\n- 客户电话确认导出字段。明天上午10点。来源：截图 `\(context.id.uuidString)`",
+                           sourceIDs: [context.id])
         ])
         try await store.ingestTaskSuggestions([
             WorkTaskDraft(title: String(localized: "补充客户提到的导出格式"), project: String(localized: "客户协作"), evidence: String(localized: "示例线索：导出时是否可以保留来源？"), sourceIDs: [context.id]),
@@ -47,6 +56,28 @@ extension MyClipModel {
             let date = Calendar.current.date(byAdding: .day, value: -days, to: Date())!
             let id = try await store.createWorkTask(title: title, project: project, waitingReason: title == String(localized: "确认导出字段与交付范围") ? String(localized: "客户确认字段") : "", at: date)
             if status != .todo { try await store.setWorkTaskStatus(id, status: status, at: date.addingTimeInterval(60)) }
+        }
+        try await seedPreviewCalendar()
+    }
+
+    /// Dated Memory plus manual entries exercise both calendar sources in interface previews.
+    private func seedPreviewCalendar() async throws {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        func at(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+            let date = calendar.date(byAdding: .day, value: day, to: today) ?? today
+            return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: date) ?? date
+        }
+        let events: [(String, String, CalendarEventKind, Date, Date, Bool)] = [
+            (String(localized: "产品评审"), "MyClip", .meeting, at(0, 9, 30), at(0, 10, 15), false),
+            (String(localized: "设计走查"), "MyClip", .meeting, at(0, 9, 45), at(0, 10, 30), false),
+            (String(localized: "客户电话"), String(localized: "客户协作"), .meeting, at(0, 15), at(0, 16), false),
+            (String(localized: "上海出差"), String(localized: "客户协作"), .travel, today, calendar.date(byAdding: .day, value: 2, to: today) ?? today, true),
+            (String(localized: "提交 0.7 版本"), "MyClip", .deadline, at(3, 18), at(3, 18, 30), false)
+        ]
+        for (title, project, kind, start, end, allDay) in events {
+            _ = try await store.createCalendarEvent(CalendarEventDraft(title: title, project: project, kind: kind,
+                                                                      start: start, end: end, isAllDay: allDay))
         }
     }
 

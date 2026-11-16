@@ -58,13 +58,14 @@ final class ClipPreferences: ObservableObject {
 }
 
 enum LibraryPage: String, CaseIterable, Identifiable {
-    case memory, captures, dashboard, agents, settings
+    case memory, captures, dashboard, calendar, agents, settings
     var id: String { rawValue }
     var title: String {
         switch self {
         case .dashboard: "Kanban"
         case .memory: "Memory"
         case .captures: "Timeline"
+        case .calendar: "Calendar"
         case .agents: "Backstage"
         case .settings: String(localized: "设置")
         }
@@ -75,6 +76,7 @@ enum LibraryPage: String, CaseIterable, Identifiable {
         case .memory: String(localized: "搜索记忆")
         case .captures: String(localized: "搜索截图")
         case .dashboard: String(localized: "搜索任务")
+        case .calendar: ""
         case .agents, .settings: ""
         }
     }
@@ -83,6 +85,7 @@ enum LibraryPage: String, CaseIterable, Identifiable {
         case .dashboard: "rectangle.split.3x1"
         case .memory: "folder"
         case .captures: "rectangle.on.rectangle"
+        case .calendar: "calendar"
         case .agents: "square.stack.3d.up"
         case .settings: "gearshape"
         }
@@ -158,6 +161,9 @@ final class MyClipModel: ObservableObject {
     @Published private(set) var tokenUsageLoaded = false
     @Published private(set) var tokenUsageLoadError: String?
     @Published var workTaskEvents: [WorkTaskEvent] = []
+    @Published var calendarEvents: [CalendarEvent] = []
+    @Published var calendarLoaded = false
+    @Published var calendarLoadError: String?
     @Published var showingTaskReports = false
     @Published var discoveringTasks = false
     @Published var taskDiscoveryMessage: String?
@@ -288,6 +294,9 @@ final class MyClipModel: ObservableObject {
     private var forceReconcileRequested = false
     private var lastLibraryVersion: String?
     private var lastTaskVersion: String?
+    var lastCalendarVersion: String?
+    var lastCalendarLibraryVersion: String?
+    var lastCalendarSync = Date.distantPast
     private var lastStatisticsVersion: String?
     private var lastTokenVersion: String?
     private var lastTokenRefresh = Date.distantPast
@@ -535,6 +544,9 @@ final class MyClipModel: ObservableObject {
             // The independent board must remain readable even when a Memory file fails validation.
             if reconcile || lastTaskVersion != versions.tasks || !workTasksLoaded || workTasksLoadError != nil {
                 if await refreshWorkTasks() { lastTaskVersion = versions.tasks }
+            }
+            if page == .calendar {
+                await refreshCalendar()
             }
             if libraryChanged {
                 let snapshot = try await store.snapshot()

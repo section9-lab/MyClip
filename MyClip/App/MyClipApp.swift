@@ -65,7 +65,7 @@ final class MyClipAppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValida
     private func showWindow() {
         guard let model else { return }
         if window == nil {
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1120, height: 760),
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1240, height: 820),
                                   styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
             window.title = "MyClip"
             window.titlebarAppearsTransparent = true

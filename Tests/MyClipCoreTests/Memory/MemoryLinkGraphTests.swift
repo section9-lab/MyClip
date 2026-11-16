@@ -303,7 +303,7 @@ final class MemoryLinkGraphTests: XCTestCase {
         let found = try await migrated.searchMemories(query: "记忆项目")
         XCTAssertTrue(found.map(\.id).contains(target))
         let version = try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite")).run("PRAGMA user_version").first?["user_version"]
-        XCTAssertEqual(version, "16")
+        XCTAssertEqual(version, "17")
         XCTAssertTrue(try SQLiteConnection(url: root.appendingPathComponent("Library.sqlite")).run("SELECT value FROM vault_meta WHERE key='search_rebuild'").isEmpty)
     }
 }

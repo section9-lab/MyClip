@@ -97,6 +97,7 @@ struct MyClipRootView: View {
                         sidebarRow(.memory)
                         sidebarRow(.captures)
                         sidebarRow(.dashboard)
+                        sidebarRow(.calendar)
                         sidebarRow(.agents)
                     }
                 }
@@ -127,6 +128,7 @@ struct MyClipRootView: View {
                 Group {
                     switch model.page ?? .captures {
                     case .dashboard: AnalyticsView(model: model)
+                    case .calendar: CalendarPageView(model: model)
                     case .memory: KnowledgeLibraryView(model: model)
                     case .captures: CaptureLibraryView(model: model)
                     case .agents: BackstageView(model: model)

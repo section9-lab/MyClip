@@ -1,6 +1,25 @@
 {
   "sourceLanguage": "zh-Hans",
   "strings": {
+    "还没整理过，第一个整点开始": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Not run yet; the first digest starts on the hour"}}}},
+    "上次 %@ · 马上整理": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Last %@ · starting now"}}}},
+    "上次 %@ · 还有 %lld 分钟": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Last %@ · in %lld min"}}}},
+    "今天还没有新增": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Nothing new yet today"}}}},
+    "看板 %lld · 日历 %lld": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Board %lld · Calendar %lld"}}}},
+    "两条管道：先把截图记进当天的 Daily，再每小时整理成长期记忆": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Two pipelines: screenshots land in the day's Daily first, then an hourly digest turns them into long-term memory"}}}},
+    "实时记录": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Live recording"}}}},
+    "截图进来就写，每批最多 8 张": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Written as screenshots arrive, up to 8 per batch"}}}},
+    "只写 Daily": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Daily only"}}}},
+    "今天 %lld 页": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "%lld today"}}}},
+    "每小时整理": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Hourly digest"}}}},
+    "读 Daily · 写长期记忆": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Reads Daily, writes long-term memory"}}}},
+    "待整理 Daily": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Daily waiting"}}}},
+    "%lld 页待整理": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "%lld pages waiting"}}}},
+    "已跟上": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Up to date"}}}},
+    "等待下一个整点": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Waiting for the next hour"}}}},
+    "长期记忆": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Long-term memory"}}}},
+    "Wiki %lld 页 · Memory.md · Profile.md": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "%lld Wiki pages · Memory.md · Profile.md"}}}},
+    "看板与日历": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Board & calendar"}}}},
     "查看": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "View" } } } },
     "在 Finder 中显示": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Show in Finder" } } } },
     "未索引的 Memory 文件": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Unindexed Memory files" } } } },
@@ -63,9 +82,6 @@
     "这段时间的请求没有回传 Token 用量。": { "localizations": { "de": { "stringUnit": { "state": "translated", "value": "Die Anfragen in diesem Zeitraum haben keine Token-Nutzung gemeldet." } }, "en": { "stringUnit": { "state": "translated", "value": "Requests in this period did not report token usage." } }, "es": { "stringUnit": { "state": "translated", "value": "Las solicitudes de este periodo no informaron del uso de tokens." } }, "fr": { "stringUnit": { "state": "translated", "value": "Les requêtes de cette période n’ont pas signalé d’utilisation de jetons." } }, "ja": { "stringUnit": { "state": "translated", "value": "この期間のリクエストからトークン使用量が返されませんでした。" } }, "ko": { "stringUnit": { "state": "translated", "value": "이 기간의 요청에서 토큰 사용량을 반환하지 않았습니다." } } } },
     "请求仍保留在执行记录中，图表不会推测缺失数据。": { "localizations": { "de": { "stringUnit": { "state": "translated", "value": "Die Anfragen bleiben im Ausführungsverlauf; das Diagramm schätzt fehlende Daten nicht." } }, "en": { "stringUnit": { "state": "translated", "value": "The requests remain in execution history; the chart doesn’t estimate missing data." } }, "es": { "stringUnit": { "state": "translated", "value": "Las solicitudes permanecen en el historial de ejecución; el gráfico no estima los datos que faltan." } }, "fr": { "stringUnit": { "state": "translated", "value": "Les requêtes restent dans l’historique d’exécution ; le graphique n’estime pas les données manquantes." } }, "ja": { "stringUnit": { "state": "translated", "value": "リクエストは実行履歴に残り、グラフは欠損データを推測しません。" } }, "ko": { "stringUnit": { "state": "translated", "value": "요청은 실행 기록에 남으며 차트는 누락된 데이터를 추정하지 않습니다." } } } },
     "知识已更新": { "localizations": { "de": { "stringUnit": { "state": "translated", "value": "Eintrag aktualisiert" } }, "en": { "stringUnit": { "state": "translated", "value": "Knowledge Updated" } }, "es": { "stringUnit": { "state": "translated", "value": "Conocimiento actualizado" } }, "fr": { "stringUnit": { "state": "translated", "value": "Connaissance mise à jour" } }, "ja": { "stringUnit": { "state": "translated", "value": "ナレッジが更新されました" } }, "ko": { "stringUnit": { "state": "translated", "value": "지식이 업데이트됨" } } } },
-    "载入最新版本": { "localizations": { "de": { "stringUnit": { "state": "translated", "value": "Neueste Version laden" } }, "en": { "stringUnit": { "state": "translated", "value": "Load Latest Version" } }, "es": { "stringUnit": { "state": "translated", "value": "Cargar la última versión" } }, "fr": { "stringUnit": { "state": "translated", "value": "Charger la dernière version" } }, "ja": { "stringUnit": { "state": "translated", "value": "最新バージョンを読み込む" } }, "ko": { "stringUnit": { "state": "translated", "value": "최신 버전 불러오기" } } } },
-    "将我的修改保存为新版": { "localizations": { "de": { "stringUnit": { "state": "translated", "value": "Meine Änderungen als neue Version sichern" } }, "en": { "stringUnit": { "state": "translated", "value": "Save My Changes as a New Version" } }, "es": { "stringUnit": { "state": "translated", "value": "Guardar mis cambios como una versión nueva" } }, "fr": { "stringUnit": { "state": "translated", "value": "Enregistrer mes modifications comme nouvelle version" } }, "ja": { "stringUnit": { "state": "translated", "value": "自分の変更を新しいバージョンとして保存" } }, "ko": { "stringUnit": { "state": "translated", "value": "내 변경 사항을 새 버전으로 저장" } } } },
-    "这条知识在你编辑期间发生了变化。你的草稿仍然保留；你可以载入最新内容，或把当前草稿保存为新版本。": { "localizations": { "de": { "stringUnit": { "state": "translated", "value": "Dieser Eintrag wurde während der Bearbeitung geändert. Ihr Entwurf bleibt erhalten. Sie können den neuesten Inhalt laden oder Ihren aktuellen Entwurf als neue Version sichern." } }, "en": { "stringUnit": { "state": "translated", "value": "This knowledge changed while you were editing. Your draft is preserved. You can load the latest content or save your current draft as a new version." } }, "es": { "stringUnit": { "state": "translated", "value": "Este conocimiento cambió mientras lo editabas. Tu borrador se conserva. Puedes cargar el contenido más reciente o guardar el borrador actual como una versión nueva." } }, "fr": { "stringUnit": { "state": "translated", "value": "Cette connaissance a changé pendant votre modification. Votre brouillon est conservé. Vous pouvez charger le contenu le plus récent ou enregistrer le brouillon actuel comme nouvelle version." } }, "ja": { "stringUnit": { "state": "translated", "value": "編集中にこのナレッジが変更されました。下書きは保持されています。最新の内容を読み込むか、現在の下書きを新しいバージョンとして保存できます。" } }, "ko": { "stringUnit": { "state": "translated", "value": "편집하는 동안 이 지식이 변경되었습니다. 초안은 보존됩니다. 최신 내용을 불러오거나 현재 초안을 새 버전으로 저장할 수 있습니다." } } } },
     "Agent 默认模型": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Agent default model" } } } },
     "今天": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Today" } } } },
     "停止本次": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Stop this run" } } } },
@@ -389,42 +405,42 @@
         }
       }
     },
-    "# Profile\n\n## 已确认的信息\n尚未填写。只保存你明确表达或确认的信息。\n\n## 沟通偏好\n\n## 工作方式\n\n## 长期目标\n\n## 最近确认\n": {
+    "# Profile\n\n## 个人信息\n尚未填写。MyClip 会从截图和对话里归纳你的偏好、习惯与个人情况。\n\n## 沟通偏好\n\n## 工作方式\n\n## 长期目标\n\n## 最近确认\n": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "# Profile\n\n## Bestätigte Informationen\nNoch nicht ausgefüllt. Hier werden nur Informationen gespeichert, die du ausdrücklich geäußert oder bestätigt hast.\n\n## Kommunikationsvorlieben\n\n## Arbeitsweise\n\n## Langfristige Ziele\n\n## Zuletzt bestätigt\n"
+            "value": "# Profile\n\n## Persönliche Informationen\nNoch nicht ausgefüllt. MyClip leitet deine Vorlieben, Gewohnheiten und persönlichen Angaben aus Screenshots und Gesprächen ab.\n\n## Kommunikationsvorlieben\n\n## Arbeitsweise\n\n## Langfristige Ziele\n\n## Zuletzt bestätigt\n"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "# Profile\n\n## Confirmed Information\nNot filled in yet. Only information you have explicitly stated or confirmed is kept here.\n\n## Communication Preferences\n\n## Working Style\n\n## Long-Term Goals\n\n## Recently Confirmed\n"
+            "value": "# Profile\n\n## Personal Information\nNot filled in yet. MyClip summarizes your preferences, habits and personal details from screenshots and conversations.\n\n## Communication Preferences\n\n## Working Style\n\n## Long-Term Goals\n\n## Recently Confirmed\n"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "# Profile\n\n## Información confirmada\nAún sin completar. Solo se guarda la información que hayas expresado o confirmado de forma explícita.\n\n## Preferencias de comunicación\n\n## Forma de trabajar\n\n## Objetivos a largo plazo\n\n## Confirmado recientemente\n"
+            "value": "# Profile\n\n## Información personal\nAún sin completar. MyClip resume tus preferencias, hábitos y datos personales a partir de capturas y conversaciones.\n\n## Preferencias de comunicación\n\n## Forma de trabajar\n\n## Objetivos a largo plazo\n\n## Confirmado recientemente\n"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "# Profile\n\n## Informations confirmées\nPas encore renseigné. Seules les informations que vous avez explicitement exprimées ou confirmées sont conservées.\n\n## Préférences de communication\n\n## Façon de travailler\n\n## Objectifs à long terme\n\n## Confirmé récemment\n"
+            "value": "# Profile\n\n## Informations personnelles\nPas encore renseigné. MyClip déduit vos préférences, habitudes et informations personnelles à partir des captures et des conversations.\n\n## Préférences de communication\n\n## Façon de travailler\n\n## Objectifs à long terme\n\n## Confirmé récemment\n"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "# Profile\n\n## 確認済みの情報\nまだ記入されていません。あなたが明示的に述べた、または確認した情報のみを保存します。\n\n## コミュニケーションの好み\n\n## 仕事の進め方\n\n## 長期目標\n\n## 最近の確認\n"
+            "value": "# Profile\n\n## 個人情報\nまだ記入されていません。MyClip がスクリーンショットと会話から、あなたの好み・習慣・個人情報をまとめます。\n\n## コミュニケーションの好み\n\n## 仕事の進め方\n\n## 長期目標\n\n## 最近の確認\n"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "# Profile\n\n## 확인된 정보\n아직 작성되지 않았습니다. 사용자가 명확히 표현하거나 확인한 정보만 저장합니다.\n\n## 소통 선호\n\n## 작업 방식\n\n## 장기 목표\n\n## 최근 확인\n"
+            "value": "# Profile\n\n## 개인 정보\n아직 작성되지 않았습니다. MyClip이 스크린샷과 대화에서 사용자의 선호, 습관, 개인 정보를 정리합니다.\n\n## 소통 선호\n\n## 작업 방식\n\n## 장기 목표\n\n## 최근 확인\n"
           }
         }
       }
@@ -3459,46 +3475,6 @@
         }
       }
     },
-    "Markdown · 保存时保留来源与历史版本": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown · Quellen und frühere Versionen bleiben beim Sichern erhalten"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown · sources and previous versions are kept when saving"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown · al guardar se conservan las fuentes y las versiones anteriores"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown · les sources et les versions précédentes sont conservées à l'enregistrement"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown · 保存時にソースと履歴バージョンを保持"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown · 저장 시 출처와 이전 버전 보존"
-          }
-        }
-      }
-    },
     "Markdown 文件路径": {
       "localizations": {
         "de": {
@@ -3535,46 +3511,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Markdown 파일 경로"
-          }
-        }
-      }
-    },
-    "Markdown 源码": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown-Quelltext"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown Source"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Código Markdown"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Source Markdown"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown ソース"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown 소스"
           }
         }
       }
@@ -12445,7 +12381,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "week"
+            "value": "Week"
           }
         },
         "es": {
@@ -22354,46 +22290,6 @@
         }
       }
     },
-    "显示模式": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ansicht"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "View Mode"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modo de visualización"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mode d'affichage"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "表示モード"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "표시 모드"
-          }
-        }
-      }
-    },
     "暂停": {
       "localizations": {
         "de": {
@@ -31594,46 +31490,6 @@
         }
       }
     },
-    "编辑 Markdown": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown bearbeiten"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Edit Markdown"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Editar el Markdown"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modifier le Markdown"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown を編集"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Markdown 편집"
-          }
-        }
-      }
-    },
     "编辑%@": {
       "localizations": {
         "de": {
@@ -39205,7 +39061,67 @@
           }
         }
       }
-    }
+    },
+    "%@ · 全天": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "%@ · All day"}}}},
+    "%@，%lld 项日程": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "%@, %lld events"}}}},
+    "AI 整理 Memory 时会自动加入会议和出行；也可以手动新建。": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "AI adds meetings and travel from Memory automatically; you can also create events yourself."}}}},
+    "今天没有定时日程": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "No timed events today"}}}},
+    "今天没有日程": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "No events today"}}}},
+    "会议": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Meeting"}}}},
+    "修改后仍保留 Memory 来源，但后续整理不会再覆盖这条日程。": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "The Memory source is kept, but later organization won't overwrite this event."}}}},
+    "全天": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "All day"}}}},
+    "出行": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Travel"}}}},
+    "创建日程": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Create Event"}}}},
+    "原文依据": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Evidence"}}}},
+    "回到今天": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Go to Today"}}}},
+    "地点": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Location"}}}},
+    "地点最多 200 字。": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Location can be at most 200 characters."}}}},
+    "地点（可选）": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Location (optional)"}}}},
+    "备注": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Notes"}}}},
+    "备注最多 2000 字。": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Notes can be at most 2,000 characters."}}}},
+    "它不会再出现在日历中。": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "It will no longer appear on the calendar."}}}},
+    "开始": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Start"}}}},
+    "截止": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Deadline"}}}},
+    "打开日程详情": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Open event details"}}}},
+    "新建日程": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "New Event"}}}},
+    "日程": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Event"}}}},
+    "日程不存在。": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "This event no longer exists."}}}},
+    "日程名称": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Event name"}}}},
+    "日程名称不能为空且最多 240 字。": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Event name is required and can be at most 240 characters."}}}},
+    "日程最长 366 天。": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Events can span at most 366 days."}}}},
+    "月历": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Month calendar"}}}},
+    "正在读取日程…": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Reading calendar…"}}}},
+    "移除日程": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Remove Event"}}}},
+    "类型": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Type"}}}},
+    "结束": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "End"}}}},
+    "结束（含）": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Ends (incl.)"}}}},
+    "编辑日程": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Edit Event"}}}},
+    "这一天没有日程": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "No events on this day"}}}},
+    "这个月还没有日程": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "No events this month"}}}},
+    "这条日程已被移除": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "This event was removed"}}}},
+    "选择日期": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Choose date"}}}},
+    "项目": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Project"}}}},
+    "项目名称最多 120 字。": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Project can be at most 120 characters."}}}},
+    "，来自 AI 整理的 Memory": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": ", from AI-organized Memory"}}}},
+    "日": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Day"}}}},
+    "月": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Month"}}}},
+    "视图": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "View"}}}},
+    "上一天": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Previous Day"}}}},
+    "上一周": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Previous Week"}}}},
+    "上个月": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Previous Month"}}}},
+    "下一天": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Next Day"}}}},
+    "下一周": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Next Week"}}}},
+    "下个月": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Next Month"}}}},
+    "没有日程": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "No events"}}}},
+    "选择这一天": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Select This Day"}}}},
+    "还有 %lld 项": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "%lld more"}}}},
+    "%lld 项日程": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "%lld events"}}}},
+    "%@，今天，%@": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "%@, today, %@"}}}},
+    "在 Memory 中显示": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Show in Memory"}}}},
+    "来自 AI 整理的 Memory": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "From AI-organized Memory"}}}},
+    "移除这条日程？": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Remove this event?"}}}},
+    "移除": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Remove"}}}},
+    "移除后不会再出现在日历中；AI 也不会自动加回来。": {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "It will no longer appear on the calendar, and AI won't add it back."}}}}
   },
   "version": "1.0"
 }
