@@ -12,6 +12,7 @@ struct TaskDashboardView: View {
     @State private var editing: TaskEditRequest?
     @State private var savedTaskID: UUID?
     @State private var showingDiscoveryDetails = false
+    @State private var showingIngestionDetails = false
     private let columns: [WorkTaskStatus] = [.todo, .doing, .done]
     private let taskCardHeight: CGFloat = 110
     private let taskCardSpacing: CGFloat = 8
@@ -75,10 +76,7 @@ struct TaskDashboardView: View {
                 HStack { taskCount; Spacer(minLength: 20); actions }
                 VStack(alignment: .leading, spacing: 12) { taskCount; actions }
             }
-            ingestionStatus
-            if let message = model.taskDiscoveryMessage {
-                discoveryNotice(message)
-            }
+            boardStatus
             if tasks.filter({ $0.status != .ignored }).isEmpty {
                 LibraryUnavailableView(model.search.isEmpty ? String(localized: "从一项待办开始") : String(localized: "没有匹配的任务"), systemImage: "checklist",
                     description: Text(model.search.isEmpty ? String(localized: "新建待办，或让 AI 从 Memory 发现工作。之后 AI 会根据截图与记忆更新进展。") : String(localized: "尝试搜索任务名称、项目或来源依据。")))
@@ -104,33 +102,89 @@ struct TaskDashboardView: View {
         }
     }
 
-    private var ingestionStatus: some View {
+    /// One compact line for work that needs attention, instead of a status panel above the board.
+    /// Long reasons and timestamps stay behind a popover so the columns remain visible.
+    @ViewBuilder private var boardStatus: some View {
         let summary = model.taskIngestionSummary
-        return VStack(alignment: .leading, spacing: 6) {
-            if summary.pendingCount > 0 || summary.failedCount > 0 {
-                ViewThatFits(in: .horizontal) {
-                    HStack {
-                        Text("任务补处理：\(summary.pendingCount) 批等待 · \(summary.failedCount) 批需重试")
-                        if summary.failedCount > 0 { retryIngestionButton }
+        if summary.pendingCount > 0 || summary.failedCount > 0 || model.taskDiscoveryMessage != nil {
+            VStack(alignment: .leading, spacing: 4) {
+                if summary.failedCount > 0 {
+                    HStack(spacing: 8) {
+                        Label("\(summary.failedCount) 批任务补处理失败", systemImage: "exclamationmark.circle")
+                            .foregroundStyle(.orange)
+                        Button("重试") { model.retryTaskIngestionFailures() }
+                            .buttonStyle(.bordered).controlSize(.small)
+                            .disabled(!model.canStartOrganization)
+                        Button("详情") { showingIngestionDetails.toggle() }
+                            .buttonStyle(.link)
+                            .popover(isPresented: $showingIngestionDetails, arrowEdge: .bottom) {
+                                ingestionDetails(summary)
+                            }
+                        Spacer(minLength: 0)
                     }
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("任务补处理：\(summary.pendingCount) 批等待 · \(summary.failedCount) 批需重试")
-                        if summary.failedCount > 0 { retryIngestionButton }
-                    }
+                } else if summary.pendingCount > 0 {
+                    Label("\(summary.pendingCount) 批任务补处理中", systemImage: "clock")
+                        .foregroundStyle(.secondary)
                 }
-                if let error = summary.lastError {
-                    DisclosureGroup("补处理原因") { Text(error).textSelection(.enabled) }
+                if let message = model.taskDiscoveryMessage {
+                    discoveryStatus(message)
                 }
             }
-            if let date = summary.observedThrough {
-                Text("最近成功识别的截图：\(date.formatted(date: .abbreviated, time: .shortened)) · \(model.library.queue.pendingCount) 条截图待整理")
-            }
-        }.font(.caption).foregroundStyle(.secondary)
+            .font(.caption)
+        }
     }
 
-    private var retryIngestionButton: some View {
-        Button("重试补处理") { model.retryTaskIngestionFailures() }
-            .disabled(!model.canStartOrganization).controlSize(.small)
+    private func ingestionDetails(_ summary: TaskIngestionSummary) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("任务补处理").font(.headline)
+            if let date = summary.observedThrough {
+                Text("最近成功识别的截图：\(date.formatted(date: .abbreviated, time: .shortened)) · \(model.library.queue.pendingCount) 条截图待整理")
+                    .foregroundStyle(.secondary)
+            }
+            if let error = summary.lastError {
+                Text(error).textSelection(.enabled).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if summary.pendingCount > 0 {
+                Text("\(summary.pendingCount) 批仍在等待处理。").foregroundStyle(.secondary)
+            }
+            HStack {
+                Spacer()
+                Button("重试补处理") {
+                    model.retryTaskIngestionFailures()
+                    showingIngestionDetails = false
+                }
+                .disabled(!model.canStartOrganization)
+            }
+        }
+        .font(.callout).padding(16).frame(width: 380, alignment: .leading)
+    }
+
+    private func discoveryStatus(_ message: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: model.taskDiscoveryFailed ? "exclamationmark.circle" : "sparkles")
+                .foregroundStyle(model.taskDiscoveryFailed ? Color.orange : Color.secondary)
+            Text(model.taskDiscoveryFailed ? (model.taskDiscoveryMemorySaved ? String(localized: "任务识别未完成，Memory 已保存") : String(localized: "任务识别未完成")) : message)
+                .foregroundStyle(.secondary)
+                .lineLimit(1).truncationMode(.tail)
+                .help(message)
+            if model.taskDiscoveryFailed {
+                Button("查看原因") { showingDiscoveryDetails.toggle() }
+                    .buttonStyle(.link)
+                    .popover(isPresented: $showingDiscoveryDetails, arrowEdge: .bottom) {
+                        Text(message).textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(16).frame(width: 380, alignment: .leading)
+                    }
+            }
+            Spacer(minLength: 8)
+            if !model.discoveringTasks {
+                Button { model.taskDiscoveryMessage = nil } label: { Image(systemName: "xmark") }
+                    .buttonStyle(.plain).foregroundStyle(.tertiary)
+                    .accessibilityLabel(Text("关闭提示"))
+                    .help("关闭提示")
+            }
+        }
     }
 
     private var taskCount: some View {
@@ -152,30 +206,6 @@ struct TaskDashboardView: View {
             Button(String(localized: "新建待办"), systemImage: "plus") { editing = TaskEditRequest(task: nil) }
                 .buttonStyle(.borderedProminent)
         }.controlSize(.small).fixedSize(horizontal: true, vertical: false)
-    }
-
-    private func discoveryNotice(_ message: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: model.taskDiscoveryFailed ? "exclamationmark.circle" : "sparkles")
-                    .foregroundStyle(model.taskDiscoveryFailed ? Color.orange : Color.secondary)
-                Text(model.taskDiscoveryFailed ? (model.taskDiscoveryMemorySaved ? String(localized: "任务识别未完成，Memory 已保存") : String(localized: "任务识别未完成")) : message)
-                    .foregroundStyle(.secondary)
-                if model.taskDiscoveryFailed {
-                    Button(showingDiscoveryDetails ? String(localized: "收起原因") : String(localized: "查看原因")) { showingDiscoveryDetails.toggle() }.buttonStyle(.bordered)
-                }
-                Spacer(minLength: 0)
-                if !model.discoveringTasks {
-                    Button(String(localized: "关闭提示"), systemImage: "xmark") { model.taskDiscoveryMessage = nil }
-                        .labelStyle(.iconOnly).buttonStyle(.bordered).foregroundStyle(.secondary)
-                }
-            }
-            if showingDiscoveryDetails {
-                Text(message).textSelection(.enabled).foregroundStyle(.secondary)
-                    .padding(10).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.orange.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
-            }
-        }.font(.caption)
     }
 
     private func statusLabel(_ status: WorkTaskStatus) -> some View {
