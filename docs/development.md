@@ -46,6 +46,37 @@ Memory 仅保存有来源依据的上下文：`Daily/` 记录经过，`Wiki/` �
 - 日历有两条写入口，都必须幂等：Memory 里带 `<!-- myclip-event -->` 的段落自动投影（`synchronizeCalendarEvents`），以及 digest 的 `calendar_add`（按“页面 + 原文行”upsert）。所以 prompt 要求：用工具写日程的那一行**不要**再加事件标注。
 - 写工具只在 MyClip 自己启动的会话里可用（`--write-tools`）；安装到 Claude Code / Codex / OpenCode 的那份 MCP 仍然只读。
 
+### 两条管道的形状
+
+```mermaid
+flowchart TB
+    S["截图 + OCR"] --> Q["pending_captures"]
+    Q --> B["① batch<br/>DayPrompt.daily"]
+    B -->|"只写"| D["Daily/年/月/日.md<br/>Daily/…/主题.md"]
+    B -.->|"不写"| NO["Wiki / Memory.md / Profile.md / Now.md"]
+    B -.->|"不调"| NO2["看板 / 日历工具"]
+    D --> G{"水位线之后有新 Daily？"}
+    G -->|"是，且距上次 ≥1 小时"| H["② digest<br/>DayPrompt.digest"]
+    H --> W["Wiki / Memory.md<br/>Now.md / Profile.md"]
+    H --> K["看板工具<br/>board_list · add · update · delete"]
+    H --> C["日历工具<br/>calendar_list · add · update · delete"]
+    W --> DB1[(entries / memory_files)]
+    K --> DB2[(work_tasks)]
+    C --> DB3[(calendar_events)]
+```
+
+看板与日历是 digest 的**两条并行分支**：没有先后依赖，各自按内容判断要不要写，各自落库，一次调用失败不影响另一条；看板用 `work_tasks.id`，日历用 `calendar_events.id`，`calendar_events.task_id` 只是可选弱关联，不互相复制内容。
+
+日历还有第三条**工具之外的**写入路径，发生在 digest 结算之后，不要和工具调用混在一起看：
+
+```mermaid
+flowchart LR
+    M["Memory 里带 myclip-event 标注的段落"] -.->|"digest 完成后<br/>synchronizeCalendarEvents"| CE[(calendar_events)]
+    T["calendar_add<br/>path + evidence"] -->|"同一 evidence 命中则更新同一条"| CE
+```
+
+两条路径靠「页面 + 原文行」幂等，所以写工具的 prompt 要求：用 `calendar_add` 写的那一行，正文里不要再加 `myclip-event` 标注。
+
 ## 提示词
 
 提示词使用 Swift 多行字符串，可以直接插入语言、时间、任务、来源和限制值，无需额外的模板加载器。
