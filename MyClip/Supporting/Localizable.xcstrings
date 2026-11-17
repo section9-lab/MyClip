@@ -114,8 +114,6 @@
     "调整筛选条件，或等待第一次整理完成。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Adjust the filters, or wait for the first run to finish." } } } },
     "选择 Agent…": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Choose Agent…" } } } },
     "选择一个 Agent 来整理截图与记忆。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Choose an Agent to organize captures and memory." } } } },
-    "部分任务线索仍待补处理。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Some task leads still need processing." } } } },
-    "重试任务识别": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Retry task identification" } } } },
     "执行过程": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Execution process" } } } },
     "本次只整理已有记忆，没有新截图。": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "This run organized existing memory without new captures." } } } },
     "来源截图": { "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Source captures" } } } },
@@ -7766,46 +7764,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "작업에 유효한 근거가 없거나 이번 분석 범위 밖의 출처를 참조했습니다."
-          }
-        }
-      }
-    },
-    "任务补处理：%lld 批等待 · %lld 批需重试": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aufgabenwiederherstellung: %lld Stapel warten · %lld erneut versuchen"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Task recovery: %lld batches waiting · %lld need retry"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recuperación: %lld lotes en espera · %lld por reintentar"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Récupération : %lld lots en attente · %lld à réessayer"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "タスク再処理：%lld バッチ待機 · %lld バッチ要再試行"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "작업 복구: %lld개 배치 대기 · %lld개 재시도 필요"
           }
         }
       }
@@ -22730,46 +22688,6 @@
         }
       }
     },
-    "最近成功识别的截图：%@ · %lld 条截图待整理": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zuletzt analysierte Aufnahme: %@ · %lld Aufnahmen warten"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Latest successfully analyzed capture: %@ · %lld captures waiting"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Última captura analizada: %@ · %lld capturas en espera"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dernière capture analysée : %@ · %lld captures en attente"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最後に解析できたスクリーンショット：%@ · %lld 件待機"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "최근 분석한 스크린샷: %@ · %lld개 대기"
-          }
-        }
-      }
-    },
     "月报": {
       "localizations": {
         "de": {
@@ -36966,46 +36884,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "다시 시도하고 계속"
-          }
-        }
-      }
-    },
-    "重试补处理": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wiederherstellung erneut versuchen"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Retry recovery"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reintentar recuperación"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Réessayer la récupération"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "再処理を再試行"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "복구 재시도"
           }
         }
       }

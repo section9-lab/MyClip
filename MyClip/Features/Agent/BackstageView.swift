@@ -312,12 +312,6 @@ struct BackstageView: View {
             ForEach(model.permissions) { permission in PermissionRequestView(model: model, permission: permission) }
             OrganizationFlowView(model: model) { showingAgentConfiguration = true }
             runtimeCard
-            if model.taskIngestionSummary.failedCount > 0 {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("部分任务线索仍待补处理。", systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(.orange)
-                    Button("重试任务识别") { model.retryTaskIngestionFailures() }.disabled(!model.canStartOrganization)
-                }
-            }
         }
     }
 

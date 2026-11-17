@@ -12,7 +12,6 @@ struct TaskDashboardView: View {
     @State private var editing: TaskEditRequest?
     @State private var savedTaskID: UUID?
     @State private var showingDiscoveryDetails = false
-    @State private var showingIngestionDetails = false
     private let columns: [WorkTaskStatus] = [.todo, .doing, .done]
     private let taskCardHeight: CGFloat = 110
     private let taskCardSpacing: CGFloat = 8
@@ -102,62 +101,12 @@ struct TaskDashboardView: View {
         }
     }
 
-    /// One compact line for work that needs attention, instead of a status panel above the board.
-    /// Long reasons and timestamps stay behind a popover so the columns remain visible.
+    /// Only the agent-driven discovery message: task ingestion is retired, so failed ingestion batches no longer
+    /// surface on the board.
     @ViewBuilder private var boardStatus: some View {
-        let summary = model.taskIngestionSummary
-        if summary.pendingCount > 0 || summary.failedCount > 0 || model.taskDiscoveryMessage != nil {
-            VStack(alignment: .leading, spacing: 4) {
-                if summary.failedCount > 0 {
-                    HStack(spacing: 8) {
-                        Label("\(summary.failedCount) 批任务补处理失败", systemImage: "exclamationmark.circle")
-                            .foregroundStyle(.orange)
-                        Button("重试") { model.retryTaskIngestionFailures() }
-                            .buttonStyle(.bordered).controlSize(.small)
-                            .disabled(!model.canStartOrganization)
-                        Button("详情") { showingIngestionDetails.toggle() }
-                            .buttonStyle(.link)
-                            .popover(isPresented: $showingIngestionDetails, arrowEdge: .bottom) {
-                                ingestionDetails(summary)
-                            }
-                        Spacer(minLength: 0)
-                    }
-                } else if summary.pendingCount > 0 {
-                    Label("\(summary.pendingCount) 批任务补处理中", systemImage: "clock")
-                        .foregroundStyle(.secondary)
-                }
-                if let message = model.taskDiscoveryMessage {
-                    discoveryStatus(message)
-                }
-            }
-            .font(.caption)
+        if let message = model.taskDiscoveryMessage {
+            discoveryStatus(message).font(.caption)
         }
-    }
-
-    private func ingestionDetails(_ summary: TaskIngestionSummary) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("任务补处理").font(.headline)
-            if let date = summary.observedThrough {
-                Text("最近成功识别的截图：\(date.formatted(date: .abbreviated, time: .shortened)) · \(model.library.queue.pendingCount) 条截图待整理")
-                    .foregroundStyle(.secondary)
-            }
-            if let error = summary.lastError {
-                Text(error).textSelection(.enabled).foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if summary.pendingCount > 0 {
-                Text("\(summary.pendingCount) 批仍在等待处理。").foregroundStyle(.secondary)
-            }
-            HStack {
-                Spacer()
-                Button("重试补处理") {
-                    model.retryTaskIngestionFailures()
-                    showingIngestionDetails = false
-                }
-                .disabled(!model.canStartOrganization)
-            }
-        }
-        .font(.callout).padding(16).frame(width: 380, alignment: .leading)
     }
 
     private func discoveryStatus(_ message: String) -> some View {
