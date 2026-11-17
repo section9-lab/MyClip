@@ -166,6 +166,9 @@ extension LibraryStore {
             WHERE j.state='completed' AND j.kind='batch' AND e.stop_reason='end_turn' AND e.response IS NOT NULL
                 AND e.id=(SELECT id FROM execution_records WHERE job_id=j.id AND stop_reason='end_turn' ORDER BY started_at DESC,rowid DESC LIMIT 1)
                 AND NOT EXISTS(SELECT 1 FROM task_ingestions t WHERE t.job_id=j.id)
+                -- A batch that only recorded the day returns prose, not a tasks envelope: nothing to repair, and
+                -- replaying it would spend a second Agent call for every batch.
+                AND instr(e.response, '"tasks"') > 0
             ORDER BY e.started_at,e.rowid
             """)
         let memories = Set(try database.run("SELECT id FROM entries").compactMap { $0["id"].flatMap(UUID.init(uuidString:)) })

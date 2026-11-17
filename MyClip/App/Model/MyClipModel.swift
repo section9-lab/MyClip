@@ -345,10 +345,16 @@ final class MyClipModel: ObservableObject {
         refreshPermissions()
     }
 
+    /// Background catch-up (the nightly dream and the hourly digest) waits a minute after launch, so opening the
+    /// window never reaches out to an Agent on its own. Batches and manual work are not delayed.
+    static let maintenanceGrace: TimeInterval = 60
+    private(set) var maintenanceReadyAt = Date.distantPast
+
     func start() {
         guard worker == nil else { return }
         textRecognitionFailures.removeAll()
         backgroundSuspended = false
+        maintenanceReadyAt = Date().addingTimeInterval(Self.maintenanceGrace)
         cloudSync.start()
         let center = NSWorkspace.shared.notificationCenter
         let sleepNames = [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification, NSWorkspace.sessionDidResignActiveNotification]

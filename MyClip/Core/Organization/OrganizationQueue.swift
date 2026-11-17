@@ -66,6 +66,11 @@ extension LibraryStore {
         return result
     }
 
+    /// A dream or a digest is queued: background work that must not connect an Agent the moment the app opens.
+    public func hasQueuedMaintenanceJob() throws -> Bool {
+        try !database.run("SELECT id FROM jobs WHERE state='queued' AND kind='dream' LIMIT 1").isEmpty
+    }
+
     public func setOrganizationPaused(_ paused: Bool, reason: String? = nil) throws {
         try database.run("UPDATE organization_queue SET paused=?,pause_reason=? WHERE id=1", [paused ? "1" : "0", paused ? reason : nil])
     }

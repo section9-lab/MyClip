@@ -127,6 +127,16 @@ import AppKit
         try database.run("DELETE FROM task_ingestions WHERE id=?", [legacyJob.id.uuidString])
         check(try await atomicStore.recoverHistoricalTaskIngestions() == 1, "A missing metadata row can be rebuilt")
         check(try await atomicStore.taskIngestion(legacyJob.id).state == .completed, "Already-imported legacy evidence skips correction and new writes")
+        // A batch that only recorded the day returns prose, not a tasks envelope: there is no task stage to replay,
+        // and replaying it would spend a second Agent call for every batch.
+        let proseSource = try await source(atomicStore, 500, organize: true)
+        let proseJob = try await atomicStore.claimNextJob(immediately: true)!
+        let proseRevisions = try await atomicStore.beginMemoryEditing(jobID: proseJob.id)
+        _ = try await atomicStore.finishMemoryEditing(jobID: proseJob.id, previousRevisions: proseRevisions)
+        try database.run("INSERT INTO execution_records(id,job_id,session_id,started_at,finished_at,stop_reason,response) VALUES(?,?,'prose',12,13,'end_turn',?)",
+                         [UUID().uuidString, proseJob.id.uuidString, "今天写了三个小节，没有任务。"])
+        check(try await atomicStore.recoverHistoricalTaskIngestions() == 0, "A batch that only wrote Daily has no task stage to repair")
+
         let summary = try await atomicStore.taskIngestionSummary()
         check(summary.pendingCount == 0 && summary.failedCount == 0 && summary.observedThrough == legacySource.date, "Persistent summary reports settled work and actual screenshot time")
         let catalogID = try await atomicStore.enqueueTaskIngestion(response: "bad", sourceIDs: [legacySource.id], memoryIDs: [])

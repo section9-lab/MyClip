@@ -583,7 +583,7 @@ extension MyClipModel {
             try Task.checkCancellation()
             // Once a day, when nothing is waiting and the user has been away, the queue gets a dream; every hour
             // with new Daily pages, it gets a digest that turns them into knowledge, board items and events.
-            if jobID == nil, BackgroundWorkBudget.allowsMaintenance {
+            if jobID == nil, BackgroundWorkBudget.allowsMaintenance, Date() >= maintenanceReadyAt {
                 try await store.enqueueDreamIfDue(agent: enabled)
                 try await store.enqueueDigestIfDue(agent: enabled)
                 queue = try await store.organizationQueue()
@@ -593,6 +593,9 @@ extension MyClipModel {
             if !immediately {
                 guard !queue.paused, let readyAt = queue.readyAt, Date() >= readyAt else { return }
             }
+            // A maintenance job left over from the last session also waits for the grace period, so neither a dream
+            // nor a digest turns launch into an Agent connection.
+            if jobID == nil, Date() < maintenanceReadyAt, try await store.hasQueuedMaintenanceJob() { return }
             guard target == preferences.enabledAgent, !state(target).busy, state(target).phase != .failed,
                   let job = try await store.claimNextJob(immediately: immediately, jobID: jobID) else { return }
             dispatching = true
