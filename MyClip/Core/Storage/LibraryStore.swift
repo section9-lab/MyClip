@@ -10,6 +10,9 @@ public actor LibraryStore {
     var lastMemoryCacheReset = Date.distantPast
     var imageStorageCache: (bytes: Int64, generation: UInt64, checkedAt: Date)?
     var lintPageCache: [UUID: MemoryLintPage] = [:]
+    /// In-memory throttle for the digest check; it is deliberately not persisted, since writing it would be an
+    /// idle library change that every reader would see.
+    var lastDigestScan = Date.distantPast
     var lintMentionCache: [String: (revision: Int, found: Bool)] = [:]
 
     public init(root: URL) throws {

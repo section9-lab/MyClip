@@ -234,6 +234,9 @@ public enum MemoryDigest {
     public static let scopeLimit = 8
     public static let maxAttempts = 2
     public static let retryDelay: TimeInterval = 900
+    /// How often an idle check may rescan Daily pages. The check writes nothing when there is nothing to read, so an
+    /// idle app publishes no library change; the in-memory clock keeps it from rescanning on every worker tick.
+    public static let scanInterval: TimeInterval = 300
 }
 
 extension LibraryStore {
@@ -248,10 +251,9 @@ extension LibraryStore {
         let last = try database.run("SELECT value FROM vault_meta WHERE key=?", [Self.digestAtKey]).first?["value"]
             .flatMap(Double.init).map(Date.init(timeIntervalSince1970:))
         if let last, date.timeIntervalSince(last) < MemoryDigest.interval { return nil }
-        guard let dailies = try digestDailies(since: last, at: date, calendar: calendar) else {
-            try recordDigest(at: date)
-            return nil
-        }
+        guard date.timeIntervalSince(lastDigestScan) >= MemoryDigest.scanInterval else { return nil }
+        lastDigestScan = date
+        guard let dailies = try digestDailies(since: last, at: date, calendar: calendar) else { return nil }
         let plan = ConsolidationPlan(changed: [], neighbours: [], weekly: nil, dailies: dailies)
         return try queueDream(plan, agent: agent, at: date)
     }
