@@ -118,8 +118,11 @@ extension LibraryStore {
             formatter.timeZone = iso.timeZone
             formatter.dateFormat = "yyyy-MM-dd"
             let days = Set(stride(from: interval.start, to: interval.end, by: 86_400).map { formatter.string(from: $0) })
+            // A day's pages: one file per event under Daily/YYYY/MM/DD, named YYYY-MM-DD-HH-topic.md.
             let dailies = entries.map(\.relativePath).filter { path in
-                path.hasPrefix("Daily/") && days.contains { path.hasSuffix("/\($0).md") || path.contains("/\($0)/") }
+                guard path.hasPrefix("Daily/") else { return false }
+                let name = (path as NSString).lastPathComponent
+                return days.contains { name == "\($0).md" || name.hasPrefix("\($0)-") || path.contains("/\($0)/") }
             }.sorted()
             if !dailies.isEmpty, !entries.contains(where: { $0.relativePath == path }) { weekly = WeeklySummary(path: path, dailies: dailies) }
         }

@@ -162,19 +162,19 @@ final class MemoryConsolidationTests: XCTestCase {
         var iso = Calendar(identifier: .iso8601)
         iso.timeZone = TimeZone(identifier: "Asia/Shanghai")!
         let monday = local("2026-09-21T02:00:00Z")  // 10:00 local, week 39
-        for day in ["2026-09-14", "2026-09-16"] {
-            try write("Daily/2026/09/\(day).md", title: day, body: "\(day) 的记录。")
+        for day in ["14", "16"] {
+            try write("Daily/2026/09/\(day)/2026-09-\(day)-10-记录.md", title: "2026-09-\(day) 记录", body: "\(day) 的记录。")
         }
-        try write("Daily/2026/09/2026-09-21.md", title: "2026-09-21", body: "本周。")
+        try write("Daily/2026/09/21/2026-09-21-10-本周.md", title: "2026-09-21 本周", body: "本周。")
         let store = try LibraryStore(root: root)
         _ = try await store.snapshot()
         let planned = try await store.dreamPlan(at: monday, calendar: iso)
         let plan = try XCTUnwrap(planned)
-        XCTAssertEqual(plan.weekly, WeeklySummary(path: "Daily/2026/Weekly/2026-W38.md", dailies: ["Daily/2026/09/2026-09-14.md", "Daily/2026/09/2026-09-16.md"]))
+        XCTAssertEqual(plan.weekly, WeeklySummary(path: "Daily/2026/Weekly/2026-W38.md", dailies: ["Daily/2026/09/14/2026-09-14-10-记录.md", "Daily/2026/09/16/2026-09-16-10-记录.md"]))
         let turns = MemoryPrompt.dreamTurns(plan: plan, handoff: nil)
         XCTAssertEqual(turns.first?.title, "回顾上周")
         XCTAssertTrue(turns[0].text.contains("新建 Daily/2026/Weekly/2026-W38.md"))
-        XCTAssertTrue(turns[0].text.contains("[[Daily/2026/09/2026-09-14]]"))
+        XCTAssertTrue(turns[0].text.contains("[[Daily/2026/09/14/2026-09-14-10-记录]]"))
         XCTAssertFalse(turns.dropFirst().contains { $0.text.contains("Weekly") }, "The summary has its own turn")
 
         try write("Daily/2026/Weekly/2026-W38.md", title: "2026-W38", body: "上周汇总。")

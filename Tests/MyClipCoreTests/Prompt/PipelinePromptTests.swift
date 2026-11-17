@@ -6,8 +6,7 @@ import XCTest
 final class PipelinePromptTests: XCTestCase {
     func testRealTimePipelineOnlyWritesDaily() {
         let prompt = DayPrompt.daily(captures: [])
-        XCTAssertTrue(prompt.contains("Daily/YYYY/MM/YYYY-MM-DD.md"))
-        XCTAssertTrue(prompt.contains("Daily/YYYY/MM/YYYY-MM-DD/主题.md"))
+        XCTAssertTrue(prompt.contains("Daily/YYYY/MM/DD/YYYY-MM-DD-HH-主题.md"))
         XCTAssertTrue(prompt.contains("不要修改 Wiki/ 下的任何页面、Memory.md、Profile.md、Now.md"))
         XCTAssertTrue(prompt.contains("不要调用看板或日历工具"))
         XCTAssertFalse(prompt.contains("{\"tasks\""), "The batch no longer returns task JSON")
@@ -22,10 +21,10 @@ final class PipelinePromptTests: XCTestCase {
         let event = CalendarEvent(id: UUID(), title: "周会", notes: "", location: "会议室", project: "",
                                   kind: .meeting, start: Date(timeIntervalSince1970: 1_793_000_000),
                                   end: Date(timeIntervalSince1970: 1_793_003_600), isAllDay: false, origin: .memory)
-        let prompt = DayPrompt.digest(dailies: ["Daily/2026/11/2026-11-16.md", "Daily/2026/11/2026-11-16/周会.md"],
+        let prompt = DayPrompt.digest(dailies: ["Daily/2026/11/16/2026-11-16-15-周会.md", "Daily/2026/11/16/2026-11-16-18-发布.md"],
                                       board: [card], calendar: [event])
-        XCTAssertTrue(prompt.contains("- Daily/2026/11/2026-11-16.md"))
-        XCTAssertTrue(prompt.contains("- Daily/2026/11/2026-11-16/周会.md"))
+        XCTAssertTrue(prompt.contains("- Daily/2026/11/16/2026-11-16-15-周会.md"))
+        XCTAssertTrue(prompt.contains("- Daily/2026/11/16/2026-11-16-18-发布.md"))
         XCTAssertTrue(prompt.contains("Wiki/Projects"))
         XCTAssertTrue(prompt.contains("Memory.md"))
         XCTAssertTrue(prompt.contains("Profile.md：记录用户的个人信息"))
@@ -42,7 +41,7 @@ final class PipelinePromptTests: XCTestCase {
     }
 
     func testDiaryPlanRunsASingleDigestTurn() {
-        let plan = ConsolidationPlan(changed: [], neighbours: [], weekly: nil, dailies: ["Daily/2026/11/2026-11-16.md"])
+        let plan = ConsolidationPlan(changed: [], neighbours: [], weekly: nil, dailies: ["Daily/2026/11/16/2026-11-16-15-周会.md"])
         let turns = MemoryPrompt.dreamTurns(plan: plan, handoff: nil)
         XCTAssertEqual(turns.count, 1, "A digest owns its dailies and never runs the review turns")
         XCTAssertTrue(turns[0].text.contains("board_add"))

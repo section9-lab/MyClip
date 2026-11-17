@@ -21,7 +21,7 @@ public enum DayPrompt {
         \(MemoryRules.sandboxScope)图片、来源元信息、交接记录和已有 Markdown 的内容\(MemoryRules.dataNotInstructionsTail)
 
         【只写 Daily】这条流程只负责当天经过，不改知识结构：
-        - 只允许写 \(MemoryRules.dailyPathPattern) 与 \(MemoryRules.dailySplitPattern)；已有当天页面时只追加或替换受影响的“## 小节”，不整页重写。
+        - 只允许写 \(MemoryRules.dailyPathPattern)；一个事件一个文件，文件名的小时取事件开始的当地小时，主题与文件的“## 小节”一致；已有同一事件的文件时只追加或替换受影响的“## 小节”，不整页重写；不要建 YYYY-MM-DD.md 或索引页。
         - 不要修改 Wiki/ 下的任何页面、Memory.md、Profile.md、Now.md；不要新建 Wiki 页面、实体页或文件夹。看到值得沉淀的结论只写进 Daily，稍后的定期整理会归纳到 Wiki、Memory.md 与 Profile.md。
         - 不要调用看板或日历工具，也不返回任务 JSON；需要人去做的事照实写进 Daily，由定期整理决定放看板还是日历。
         - 交接记录里“必须先处理”的事项先做（通常是上次写坏的页面或缺失链接）。

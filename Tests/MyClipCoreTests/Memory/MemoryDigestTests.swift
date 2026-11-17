@@ -9,7 +9,7 @@ final class MemoryDigestTests: XCTestCase {
     override func tearDown() async throws { try? FileManager.default.removeItem(at: root) }
 
     private func writeDaily(_ store: LibraryStore, day: String, text: String) async throws {
-        let file = root.appendingPathComponent("Memory/Daily/2026/11/\(day).md")
+        let file = root.appendingPathComponent("Memory/Daily/2026/11/\(day.suffix(2))/\(day)-15-记录.md")
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try text.write(to: file, atomically: true, encoding: .utf8)
         _ = try await store.snapshot()
@@ -23,7 +23,7 @@ final class MemoryDigestTests: XCTestCase {
         let queued = try await store.enqueueDigestIfDue(agent: .codex)
         let job = try XCTUnwrap(queued)
         XCTAssertEqual(job.kind, .dream, "The digest takes the dream's queue slot so it never competes with a batch")
-        XCTAssertEqual(job.dreamPlan?.dailies, ["Daily/2026/11/2026-11-16.md"])
+        XCTAssertEqual(job.dreamPlan?.dailies, ["Daily/2026/11/16/2026-11-16-15-记录.md"])
         XCTAssertTrue(job.dreamPlan?.changed.isEmpty == true, "A digest does not claim knowledge pages")
         let second = try await store.enqueueDigestIfDue(agent: .codex)
         XCTAssertNil(second, "One digest at a time")

@@ -6,7 +6,7 @@
 
 | 项 | 做法 | 位置 |
 |---|---|---|
-| 目录 | 新增 `Wiki/People`（有实际往来的人）、`Wiki/Reading`（外部文章、帖子、视频、产品页）；Topics 只放实体并用实体名命名；Inbox 只放需要用户确认的事项；Daily 超限按主题拆到 `Daily/YYYY/MM/YYYY-MM-DD/主题.md`，原文件留作当天索引 | `MemoryLayout.swift`、`KnowledgeComposer.swift` |
+| 目录 | 新增 `Wiki/People`（有实际往来的人）、`Wiki/Reading`（外部文章、帖子、视频、产品页）；Topics 只放实体并用实体名命名；Inbox 只放需要用户确认的事项；Daily 一个事件一个文件，路径 `Daily/YYYY/MM/DD/YYYY-MM-DD-HH-主题.md`，不建当天索引页 | `MemoryLayout.swift`、`KnowledgeComposer.swift` |
 | 旧库补目录 | `vault_meta.layout` 升到 2，已有资料库只补建一次新目录，用户删掉的目录不再恢复 | `MemoryLayout.prepareMemoryLayout` |
 | `type` | 由路径推导，补 `person`、`reading`、`archive` | `MemoryDocument.kind(for:)` |
 | `aliases` | frontmatter 里一行 `aliases: [...]`（也接受块列表），最多 12 个，原样保留在文件中；进入 `entry_search.aliases` 列，BM25 权重 4；别名完全匹配排在标题完全匹配之后；CJK 按子串匹配 | `MemoryVault.swift`、`LibraryStore.swift`、`MemorySearch.swift` |

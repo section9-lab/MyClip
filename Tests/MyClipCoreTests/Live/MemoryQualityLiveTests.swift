@@ -84,8 +84,8 @@ final class MemoryQualityLiveTests: XCTestCase {
             let calendarDate = DateFormatter()
             calendarDate.locale = Locale(identifier: "en_US_POSIX")
             calendarDate.timeZone = .current
-            calendarDate.dateFormat = "'Daily/'yyyy/MM/yyyy-MM-dd'.md'"
-            XCTAssertTrue(paths.contains(calendarDate.string(from: Date(timeIntervalSince1970: inputs[0].capturedAt))), "Daily belongs to the local capture date")
+            calendarDate.dateFormat = "'Daily/'yyyy/MM/dd/'yyyy-MM-dd-"
+            XCTAssertTrue(paths.contains { $0.hasPrefix(calendarDate.string(from: Date(timeIntervalSince1970: inputs[0].capturedAt))) }, "Daily belongs to the local capture date")
             if turn == 1 { firstPaths = paths }
             else { XCTAssertEqual(paths, firstPaths, "Reprocessing the same screenshots must not create duplicate notes") }
             print("Memory quality turn \(turn) finished: \(paths.sorted())")

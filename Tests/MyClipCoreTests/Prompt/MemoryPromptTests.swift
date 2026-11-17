@@ -25,7 +25,7 @@ final class MemoryPromptTests: XCTestCase {
 
     func testOrganizingPromptNamesNewFoldersAliasesAndDailySplit() {
         let prompt = MemoryPrompt.filePrompt(captures: [])
-        for phrase in ["Wiki/People 只放与用户有实际往来的人", "- Wiki/Reading：外部文章", "aliases: [名称一, 名称二]", "Daily/YYYY/MM/YYYY-MM-DD/主题.md", "不自动变成需要用户处理的事项"] {
+        for phrase in ["Wiki/People 只放与用户有实际往来的人", "- Wiki/Reading：外部文章", "aliases: [名称一, 名称二]", "Daily/YYYY/MM/DD/YYYY-MM-DD-HH-主题.md", "不自动变成需要用户处理的事项"] {
             XCTAssertTrue(prompt.contains(phrase), phrase)
         }
         XCTAssertTrue(MemoryPrompt.coldStartPrompt(files: []).contains("人物放 Wiki/People"))
@@ -72,7 +72,7 @@ final class MemoryPromptTests: XCTestCase {
 
     func testEntityPagesUseDatedFactLinesAndEditsStayLocal() {
         let prompt = MemoryPrompt.filePrompt(captures: [])
-        XCTAssertTrue(prompt.contains("[[Daily/2026/09/2026-09-20#路由超时排查|9/20]]"), "Fact lines link the Daily section that holds the details")
+        XCTAssertTrue(prompt.contains("[[Daily/2026/09/20/2026-09-20-14-路由超时排查#路由超时排查|9/20]]"), "Fact lines link the Daily section that holds the details")
         XCTAssertTrue(prompt.contains("约 120 字以内") && prompt.contains("约 \(GraphConstants.excerptLimit * GraphConstants.passagesPerHit) 字"), "One fact per line, sized for snippets")
         XCTAssertTrue(prompt.contains("Wiki/Projects/项目名/主题.md"), "Work streams get their own pages instead of one hub")
         XCTAssertTrue(prompt.contains("只替换受影响的 ## 小节"), "Edits replace sections, not whole pages")
