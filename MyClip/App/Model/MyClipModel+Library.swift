@@ -13,24 +13,6 @@ extension MyClipModel {
         open(.memory)
     }
 
-    func delete(_ entry: KnowledgeEntry) {
-        Task {
-            do {
-                try await store.deleteEntry(id: entry.id)
-                if selectedEntry == entry.id { selectedEntry = nil }
-                await refresh()
-            } catch { notice = error.localizedDescription }
-        }
-    }
-
-    func move(_ entry: KnowledgeEntry, to path: String) async -> Bool {
-        do {
-            try await store.moveMemory(entry.id, to: path, expectedRevision: entry.revision)
-            await refresh()
-            return true
-        } catch { notice = error.localizedDescription; return false }
-    }
-
     func openMemoryLink(_ url: URL) {
         guard url.scheme == "myclip-memory" else { return }
         let target = String(url.path(percentEncoded: false).dropFirst())

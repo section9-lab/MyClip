@@ -296,8 +296,6 @@ private struct KnowledgeDetailView: View {
     let entry: KnowledgeEntry
     @State private var sources: [ClipCapture] = []
     @State private var source: ClipCapture?
-    @State private var deleting = false
-    @State private var moving = false
     @State private var showingInfo = false
     @State private var relations: MemoryRelations?
 
@@ -327,7 +325,7 @@ private struct KnowledgeDetailView: View {
                 } label: {
                     Label(String(localized: "更多"), systemImage: "ellipsis.circle")
                 }
-                .help("导出、移动或删除这篇记忆")
+                .help("导出或查看这篇记忆的文件信息")
                 .accessibilityLabel("记忆操作")
             }
         }
@@ -336,16 +334,12 @@ private struct KnowledgeDetailView: View {
             catch { model.notice = error.localizedDescription }
         }
         .sheet(item: $source) { CaptureDetailView(model: model, capture: $0) }
-        .sheet(isPresented: $moving) { MemoryMoveSheet(model: model, entry: entry) }
         .sheet(isPresented: $showingInfo) {
             VStack(spacing: 0) {
                 information.environment(\.locale, locale)
                 Button("完成") { showingInfo = false }.keyboardShortcut(.cancelAction).padding(.bottom, 20)
             }
         }
-        .confirmationDialog("删除“\(entry.title)”？", isPresented: $deleting, titleVisibility: .visible) {
-            Button("删除条目及其版本", role: .destructive) { model.delete(entry) }
-        } message: { Text("来源截图会保留。") }
     }
 
     private var actions: some View {
@@ -360,9 +354,6 @@ private struct KnowledgeDetailView: View {
             Divider()
             Button(String(localized: "显示 Markdown 文件"), systemImage: "doc.text") { NSWorkspace.shared.activateFileViewerSelecting([entry.fileURL]) }
             Button(String(localized: "打开 Memory 文件夹"), systemImage: "folder") { NSWorkspace.shared.open(model.store.root.appendingPathComponent("Memory")) }
-            Divider()
-            Button(String(localized: "移动或重命名…"), systemImage: "folder") { moving = true }.disabled(entry.isRootDocument)
-            Button(String(localized: "删除条目"), systemImage: "trash", role: .destructive) { deleting = true }.disabled(entry.isRootDocument)
         }
     }
 
@@ -418,30 +409,5 @@ private struct KnowledgeDetailView: View {
                 }.padding(.top, 12)
             }.font(.callout).foregroundStyle(.secondary)
         }
-    }
-}
-
-private struct MemoryMoveSheet: View {
-    @ObservedObject var model: MyClipModel
-    let entry: KnowledgeEntry
-    @Environment(\.dismiss) private var dismiss
-    @State private var path = ""
-    @State private var saving = false
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("移动或重命名").font(.title2.bold())
-            Text("输入相对于 Memory 的文件路径，已有链接会自动更新。").foregroundStyle(.secondary)
-            TextField("例如 Wiki/Projects/MyClip.md", text: $path).textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Markdown 文件路径")
-            HStack {
-                Spacer()
-                Button("取消") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("保存") {
-                    saving = true
-                    Task { if await model.move(entry, to: path) { dismiss() }; saving = false }
-                }.keyboardShortcut(.defaultAction).disabled(saving || path.isEmpty || path == entry.relativePath)
-            }
-        }.padding(24).frame(width: 510)
-        .onAppear { path = entry.relativePath }
     }
 }
