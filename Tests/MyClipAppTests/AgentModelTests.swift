@@ -194,7 +194,9 @@ private actor FixtureAccountStorage: AgentAccountStorage {
         await model.refresh()
         await model.processNext(immediately: true)
         check(try requests(.opencode, "session/prompt").isEmpty, "Known text-only models never receive screenshot prompts")
-        check(try await model.store.snapshot().jobs.first?.state == .failed, "A blocked image batch is failed instead of marked completed")
+        let blocked = try await model.store.snapshot().jobs.first
+        check(blocked?.state == .queued && blocked?.error != nil,
+              "A blocked image batch is requeued for another try instead of marked completed")
         let providerError = root.appendingPathComponent("provider-error-adapter")
         try "#!/bin/sh\nexport MYCLIP_ACP_SCENARIO=terminal_provider_error\nexec /usr/bin/python3 \(quote(fixture.path))\n"
             .write(to: providerError, atomically: true, encoding: .utf8)
@@ -208,8 +210,9 @@ private actor FixtureAccountStorage: AgentAccountStorage {
         await model.processNext(immediately: true, jobID: failedJob, agent: .qwenwork)
         let providerSnapshot = try await model.store.snapshot()
         let providerRecords = try await model.store.executionRecords(jobID: failedJob)
-        check(providerSnapshot.jobs.first(where: { $0.id == failedJob })?.state == .failed,
-              "A provider failure cannot mark an image organization job completed with no Memory changes")
+        let providerJob = providerSnapshot.jobs.first(where: { $0.id == failedJob })
+        check(providerJob?.state == .queued && providerJob?.error != nil,
+              "A provider failure requeues the batch instead of marking it completed")
         check(providerRecords.last?.error?.contains("model_not_found") == true && providerRecords.last?.stopReason == nil,
               "The execution record preserves the provider error instead of a successful stop reason")
         let slow = root.appendingPathComponent("slow-adapter")
