@@ -1,0 +1,123 @@
+[
+  {
+    "name": "board_list",
+    "description": "读取看板卡片，可只看一列。整理提示已经带上当前卡片；只有列表看起来过期或要看其他列时才调用。",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {"type": "string", "enum": ["todo", "doing", "done", "ignored"], "description": "只看这一列；省略则返回看板上所有卡片。"}
+      }
+    },
+    "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+  },
+  {
+    "name": "board_add",
+    "description": "把一条工作放到用户的看板，或把匹配的卡片移到另一列。必须引用 Memory 页面（path）和支持它的确切行（evidence）；页面是唯一允许的来源。卡片按标题和项目匹配，所以同一工作会更新而不是重复创建。",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "path", "evidence"],
+      "properties": {
+        "title": {"type": "string", "description": "用户需要做的、具体且可判断完成的工作。"},
+        "project": {"type": "string", "description": "项目名；Memory 没有时为空。"},
+        "status": {"type": "string", "enum": ["todo", "doing", "done"], "default": "todo", "description": "只有执行证据才能把卡片移出 todo。"},
+        "path": {"type": "string", "description": "持有该事实的 Memory 路径，例如 Wiki/Projects/MyClip.md。"},
+        "evidence": {"type": "string", "description": "该页面中的原文行。"}
+      }
+    },
+    "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+  },
+  {
+    "name": "calendar_add",
+    "description": "安排用户在某个日期必须出席的事：会议、外出办事、截止日。按 Memory 页面和支持行做 upsert，重复引用同一行会更新时间而不是新增日程。用户的手动修改或取消不会被覆盖。",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "evidence", "start"],
+      "properties": {
+        "path": {"type": "string", "description": "持有该事实的 Memory 路径。"},
+        "evidence": {"type": "string", "description": "该页面中的原文行。"},
+        "title": {"type": "string", "description": "日程名称；默认取 evidence 的第一句。"},
+        "start": {"type": "string", "description": "ISO 8601 开始时间，带本地时区偏移。"},
+        "end": {"type": "string", "description": "ISO 8601 结束时间；默认开始后 30 分钟，全天事件默认次日。"},
+        "allDay": {"type": "boolean", "default": false, "description": "以天为单位，忽略时刻。"},
+        "kind": {"type": "string", "enum": ["meeting", "travel", "deadline", "other"], "default": "other"},
+        "location": {"type": "string"},
+        "project": {"type": "string"}
+      }
+    },
+    "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+  },
+  {
+    "name": "calendar_list",
+    "description": "读取已安排的日程，可按时间窗口筛选。整理提示已经带上即将到来的日程；只有列表看起来过期或需要其他窗口时才调用。",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from": {"type": "string", "description": "日程结束时间的 ISO 8601 下界，含该时刻。"},
+        "to": {"type": "string", "description": "日程开始时间的 ISO 8601 上界，不含该时刻。"}
+      }
+    },
+    "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+  },
+  {
+    "name": "board_update",
+    "description": "重命名卡片、换项目，或在 todo、doing、done 之间移动。需要 board_list 返回的 id。改动记录为 AI，历史里保留是谁移动的。",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "description": "board_list 或 board_add 返回的卡片 id。"},
+        "title": {"type": "string"},
+        "project": {"type": "string"},
+        "status": {"type": "string", "enum": ["todo", "doing", "done"]}
+      }
+    },
+    "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+  },
+  {
+    "name": "board_delete",
+    "description": "把卡片移出看板：它进入 ignored 列，保留依据，之后的整理不会悄悄把它带回来。",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {"id": {"type": "string", "description": "board_list 返回的卡片 id。"}}
+    },
+    "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+  },
+  {
+    "name": "calendar_update",
+    "description": "修改已有日程：改期、改名，或更正类型和地点。需要 calendar_list 或 calendar_add 返回的 id；只改传入的字段。修改会被固定，Memory 投影不会把它改回去。",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "description": "calendar_list 或 calendar_add 返回的日程 id。"},
+        "title": {"type": "string"},
+        "start": {"type": "string", "description": "ISO 8601 开始时间，带本地时区偏移。"},
+        "end": {"type": "string", "description": "ISO 8601 结束时间。"},
+        "allDay": {"type": "boolean"},
+        "kind": {"type": "string", "enum": ["meeting", "travel", "deadline", "other"]},
+        "location": {"type": "string"},
+        "project": {"type": "string"}
+      }
+    },
+    "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+  },
+  {
+    "name": "calendar_delete",
+    "description": "取消用户不再需要出席的日程。它会被隐藏并记住，Memory 投影和之后的整理都不会把它带回来。",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {"id": {"type": "string", "description": "calendar_list 返回的日程 id。"}}
+    },
+    "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+  }
+]

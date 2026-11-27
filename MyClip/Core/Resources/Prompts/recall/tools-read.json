@@ -1,0 +1,34 @@
+[
+  {
+    "name": "memory_search",
+    "description": "用问题或关键词搜索个人记忆。返回按相关度排序的结果，每条包含简短片段、path、time（标注的事件，否则最新引用的截图）、sourceIDs（所展示片段引用的截图）和 source apps。片段把 Wikilink 显示为链接文字并省略 citation ID；links 列出这些行指向的页面，可直接作为 memory_get 的 path 或 path#heading。通过 Wikilink 到达的结果会带 via：一到两行事实，说明是哪个页面链接到它以及为什么。query 为空时列出最近编辑的记忆。",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query"],
+      "properties": {
+        "query": {"type": "string", "description": "问题或关键词，用用户的语言。不是全文检索语法。"},
+        "since": {"type": "string", "description": "内容发生时间的 ISO 8601 下界，含该时刻。"},
+        "until": {"type": "string", "description": "内容发生时间的 ISO 8601 上界，不含该时刻。"},
+        "app": {"type": "string", "description": "只返回引用了该应用名称或 bundle ID 截图的记忆。"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10}
+      }
+    },
+    "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+  },
+  {
+    "name": "memory_get",
+    "description": "按 memory_search 返回的 path 读取一页记忆，或用 path#heading 只读一节。返回 Markdown 行、按标题分组的链接与反链（每条带持有链接的事实行和日期），以及该页截图来源摘要。需要多跳时继续跟链接或反链。",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": {"type": "string", "description": "相对于 Memory 的 Markdown 路径，例如 Now.md 或 Wiki/Projects/MyClip.md#当前状态。"},
+        "from": {"type": "integer", "minimum": 1, "default": 1, "description": "返回的起始行（从 1 开始）。"},
+        "lines": {"type": "integer", "minimum": 1, "maximum": 2000, "default": 200, "description": "返回行数；其余内容用 nextFrom 继续。"}
+      }
+    },
+    "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+  }
+]

@@ -275,7 +275,7 @@ final class MemoryLinkGraphTests: XCTestCase {
         try writeMemory(path: "Wiki/Archives/snapshot.md", title: "snapshot", body: "旧目录 [[Wiki/Projects/chat-bridge]]。")
         let store = try LibraryStore(root: root)
         let (service, initialize) = await service(store)
-        XCTAssertTrue(initialize.contains("Start with memory_search"), initialize)
+        XCTAssertTrue(initialize.contains("先用 memory_search"), initialize)
         let section = try await call(service, ["path": target + "#路由"], name: "memory_get")
         XCTAssertEqual(section["content"] as? String, "## 路由\n\n细节一。\n细节二。\n")
         let lines = try await call(service, ["path": target, "from": 5, "lines": 2], name: "memory_get")

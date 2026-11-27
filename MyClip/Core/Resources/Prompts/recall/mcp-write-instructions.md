@@ -1,0 +1,1 @@
+本会话还可以在整理 Memory 时维护两个独立界面。看板保存能判断是否完成的工作：board_list、board_add、board_update、board_delete。日历保存用户在某个日期必须出席的事：calendar_list、calendar_add、calendar_update、calendar_delete。整理提示里已经列出当前卡片和日程，只有当列表看起来过期时才调用 board_list 或 calendar_list；新增按 Memory 页面和确切依据行做 upsert。删除是归档：卡片移到 ignored，日程隐藏，两者都可由用户恢复，且不会被自动复活。不要编造任务或日程；每一条都必须对应 Memory 里已经写下的事实。
