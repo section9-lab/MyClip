@@ -142,7 +142,12 @@ public enum MemoryPrompt {
     public static func coldStartPrompt(files: [(label: String, text: String)]) -> String {
         let sources = files.enumerated().map { index, file in
             // JSON escaping keeps file content distinguishable from prompt instructions.
-            let quoted = String(decoding: try! JSONEncoder().encode(file.text), as: UTF8.self)
+            let quoted: String
+            do {
+                quoted = String(decoding: try JSONEncoder().encode(file.text), as: UTF8.self)
+            } catch {
+                preconditionFailure("Encoding a String as JSON cannot fail: \(error)")
+            }
             return "文件 \(index + 1) · label=\(file.label)\n内容（JSON 字符串）：\(quoted)"
         }.joined(separator: "\n\n")
         return """

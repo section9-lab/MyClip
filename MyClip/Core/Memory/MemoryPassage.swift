@@ -102,17 +102,17 @@ public struct MemoryPassage: Sendable {
     static func explicitSources(in text: String) -> [UUID] {
         var content = text
         for pattern in ["(?ms)^ {0,3}(`{3,}|~{3,})[^\\n]*\\n.*?(?:^ {0,3}\\1[ \\t]*(?:\\n|$)|\\z)", #"\[\[[^\]\n]+\]\]"#] {
-            let code = try! NSRegularExpression(pattern: pattern)
+            let code = NSRegularExpression.staticPattern(pattern)
             content = code.stringByReplacingMatches(in: content, range: NSRange(content.startIndex..., in: content), withTemplate: "")
         }
         // Inline code holding a colon is a field or command, not a citation. Spans pair up from the left, so the text between
         // two quoted IDs, such as a time in brackets, is never mistaken for one.
-        let spans = try! NSRegularExpression(pattern: #"(`+)[^`\n]*?\1"#)
+        let spans = NSRegularExpression.staticPattern(#"(`+)[^`\n]*?\1"#)
         for match in spans.matches(in: content, range: NSRange(content.startIndex..., in: content)).reversed() {
             guard let range = Range(match.range, in: content), content[range].contains(where: { $0 == ":" || $0 == "：" }) else { continue }
             content.replaceSubrange(range, with: "")
         }
-        let expression = try! NSRegularExpression(pattern: #"(?i)(?:来源(?:截图)?|截图来源|sources?|sourceIDs?)\s*[:：][^\n。；;]*"#)
+        let expression = NSRegularExpression.staticPattern(#"(?i)(?:来源(?:截图)?|截图来源|sources?|sourceIDs?)\s*[:：][^\n。；;]*"#)
         let ids = expression.matches(in: content, range: NSRange(content.startIndex..., in: content)).flatMap { match -> [UUID] in
             guard let range = Range(match.range, in: content) else { return [] }
             return (try? MemoryDocument.citedSourceIDs(in: String(content[range]))) ?? []

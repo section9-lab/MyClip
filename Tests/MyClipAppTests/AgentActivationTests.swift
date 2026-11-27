@@ -228,7 +228,7 @@ struct AgentActivationTests {
             let log = root.appendingPathComponent("\(agent.rawValue).json.requests")
             guard FileManager.default.fileExists(atPath: log.path) else { return [] }
             return try String(contentsOf: log, encoding: .utf8).split(separator: "\n")
-                .map { try JSONSerialization.jsonObject(with: Data($0.utf8)) as! [String: Any] }
+                .map { try JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] ?? [:] }
                 .filter { $0["method"] as? String == method }
         }
         let model = try MyClipModel(root: root.appendingPathComponent("Library"), preview: false)

@@ -345,8 +345,8 @@ public struct MemoryDocument {
     /// Reader view of a body: citation lines keep their evidence but show 8-character IDs without repeated timestamps.
     /// The file on disk is untouched; full IDs stay there for source resolution and the MCP tools.
     public static func displayMarkdown(_ body: String) -> String {
-        let marker = try! NSRegularExpression(pattern: #"(?:来源(?:截图)?|截图来源)\s*[:：]"#)
-        let citation = try! NSRegularExpression(pattern: #"`?([0-9A-Fa-f]{8})-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}`?\s*(?:（[^）\n]*）|\([^)\n]*\))?"#)
+        let marker = NSRegularExpression.staticPattern(#"(?:来源(?:截图)?|截图来源)\s*[:：]"#)
+        let citation = NSRegularExpression.staticPattern(#"`?([0-9A-Fa-f]{8})-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}`?\s*(?:（[^）\n]*）|\([^)\n]*\))?"#)
         var inFence = false
         return body.split(separator: "\n", omittingEmptySubsequences: false).map { slice -> String in
             let line = String(slice)
@@ -406,6 +406,8 @@ public struct MemoryDocument {
         let kind = Self.kind(for: path)
         let observation = observedAt.map { "observed_at: \($0.ISO8601Format())\n" } ?? ""
         let context = contextSourceIDs.isEmpty ? "" : "context_source_ids: [\(contextSourceIDs.map(\.uuidString).joined(separator: ", "))]\n"
-        return "---\nid: \(id.uuidString)\nkind: memory\ntype: \(kind)\ntitle: \(encodedTitle)\nrevision: \(revision)\nagent: \(agent.rawValue)\nupdated_at: \(updatedAt.ISO8601Format())\n\(observation)source_ids: [\(sourceIDs.map(\.uuidString).joined(separator: ", "))]\n\(context)\(extraMetadata)---\n\(body)"
+        return "---\nid: \(id.uuidString)\nkind: memory\ntype: \(kind)\ntitle: \(encodedTitle)\nrevision: \(revision)\n"
+            + "agent: \(agent.rawValue)\nupdated_at: \(updatedAt.ISO8601Format())\n\(observation)"
+            + "source_ids: [\(sourceIDs.map(\.uuidString).joined(separator: ", "))]\n\(context)\(extraMetadata)---\n\(body)"
     }
 }

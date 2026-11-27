@@ -81,9 +81,19 @@ public enum MemoryLint {
         return count
     }
     static let minimumEntityFiles = 3
-    static let stopWords: Set<String> = ["github", "readme", "api", "mcp", "json", "macos", "ios", "codex", "chatgpt", "claude", "ocr", "uuid", "url", "http", "https", "png", "markdown", "wiki", "daily", "memory", "profile", "now", "projects", "topics", "workflows", "archives", "imessage", "wechat", "utc", "iso", "cli", "sdk", "gif", "pdf", "html", "css", "swift", "python", "bash", "true", "false", "null", "todo", "doing", "done", "agent", "agents", "id", "ids", "md", "arm", "intel", "action", "actions", "key", "keys", "openrouter",
-                                                  // Halves of product names (“Claude Code”, “Chat Bridge”) and generic interface words.
-                                                  "code", "app", "apple", "chat", "bridge", "logo", "mac", "demo", "ui"]
+    static let stopWords: Set<String> = [
+        "github", "readme", "api", "mcp", "json", "macos",
+        "ios", "codex", "chatgpt", "claude", "ocr", "uuid",
+        "url", "http", "https", "png", "markdown", "wiki",
+        "daily", "memory", "profile", "now", "projects", "topics",
+        "workflows", "archives", "imessage", "wechat", "utc", "iso",
+        "cli", "sdk", "gif", "pdf", "html", "css",
+        "swift", "python", "bash", "true", "false", "null",
+        "todo", "doing", "done", "agent", "agents", "id",
+        "ids", "md", "arm", "intel", "action", "actions",
+        "key", "keys", "openrouter", "code", "app", "apple",
+        "chat", "bridge", "logo", "mac", "demo", "ui"
+    ]
 
     static func isNameLike(_ title: String) -> Bool {
         let latin = title.range(of: #"^[A-Za-z][A-Za-z0-9_.-]{2,}$"#, options: .regularExpression) != nil
@@ -112,7 +122,7 @@ public enum MemoryLint {
         for pattern in ["(?ms)^ {0,3}(`{3,}|~{3,})[^\\n]*\\n.*?(?:^ {0,3}\\1[ \\t]*(?:\\n|$)|\\z)", "`+[^`\\n]*`+", #"\[\[[^\]\n]+\]\]"#, #"https?://\S+"#] {
             text = (try? NSRegularExpression(pattern: pattern))?.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: " ") ?? text
         }
-        let expression = try! NSRegularExpression(pattern: #"(?<![A-Za-z0-9_-])[A-Za-z][A-Za-z0-9_-]{2,}(?![A-Za-z0-9_-])"#)
+        let expression = NSRegularExpression.staticPattern(#"(?<![A-Za-z0-9_-])[A-Za-z][A-Za-z0-9_-]{2,}(?![A-Za-z0-9_-])"#)
         var result = Set<String>()
         for match in expression.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
             guard let range = Range(match.range, in: text) else { continue }

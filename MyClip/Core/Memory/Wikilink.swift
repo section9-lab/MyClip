@@ -18,7 +18,7 @@ public struct Wikilink: Sendable, Hashable {
         // Mask code without changing UTF-16 offsets used for replacements.
         let masked = NSMutableString(string: text)
         for pattern in ["(?ms)^ {0,3}(`{3,}|~{3,})[^\\n]*\\n.*?(?:^ {0,3}\\1[ \\t]*(?:\\n|$)|\\z)", "`+[^`\\n]*`+"] {
-            let expression = try! NSRegularExpression(pattern: pattern)
+            let expression = NSRegularExpression.staticPattern(pattern)
             for match in expression.matches(in: masked as String, range: NSRange(location: 0, length: masked.length)).reversed() {
                 masked.replaceCharacters(in: match.range, with: String(repeating: " ", count: match.range.length))
             }
@@ -28,7 +28,7 @@ public struct Wikilink: Sendable, Hashable {
 
     public static func parse(_ text: String) -> [Wikilink] {
         let masked = maskingCode(text)
-        let expression = try! NSRegularExpression(pattern: #"(?<!\\)\[\[([^\]\n|]+)(?:\|([^\]\n]+))?\]\]"#)
+        let expression = NSRegularExpression.staticPattern(#"(?<!\\)\[\[([^\]\n|]+)(?:\|([^\]\n]+))?\]\]"#)
         return expression.matches(in: masked as String, range: NSRange(location: 0, length: masked.length)).compactMap { match in
             let raw = masked.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespaces)
             var target = raw, fragment = ""
@@ -53,7 +53,7 @@ public struct Wikilink: Sendable, Hashable {
             result.replaceCharacters(in: link.range, with: "[\(label)](myclip-memory:///\(target)\(fragment))")
         }
         let masked = maskingCode(result as String)
-        let annotations = try! NSRegularExpression(pattern: #"(?m)^<!-- myclip-event [^\r\n]* -->[ \t]*(?:\r?\n|$)"#)
+        let annotations = NSRegularExpression.staticPattern(#"(?m)^<!-- myclip-event [^\r\n]* -->[ \t]*(?:\r?\n|$)"#)
         for match in annotations.matches(in: result as String, range: NSRange(location: 0, length: result.length)).reversed()
             where masked.substring(with: match.range).hasPrefix("<!-- myclip-event ") {
             result.replaceCharacters(in: match.range, with: "")

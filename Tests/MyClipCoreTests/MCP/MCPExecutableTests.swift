@@ -30,7 +30,7 @@ final class MCPExecutableTests: XCTestCase {
         let data = output.fileHandleForReading.readDataToEndOfFile()
         proc.waitUntilExit()
         XCTAssertEqual(proc.terminationStatus, 0)
-        let replies = try String(decoding: data, as: UTF8.self).split(separator: "\n").map { try JSONSerialization.jsonObject(with: Data($0.utf8)) as! [String: Any] }
+        let replies = try String(decoding: data, as: UTF8.self).split(separator: "\n").map { try JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] ?? [:] }
         XCTAssertEqual(replies.count, 4, "Notifications must not produce responses")
         XCTAssertEqual((replies[1]["result"] as? [String: Any])?["tools"] as? [[String: Any]] != nil, true)
         XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("上海出差"))

@@ -27,7 +27,7 @@ final class ACPConversationTests: XCTestCase {
 
     func requests(_ method: String) throws -> [[String: Any]] {
         try String(contentsOf: URL(fileURLWithPath: agentFile.path + ".requests"), encoding: .utf8)
-            .split(separator: "\n").map { try JSONSerialization.jsonObject(with: Data($0.utf8)) as! [String: Any] }
+            .split(separator: "\n").map { try JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] ?? [:] }
             .filter { $0["method"] as? String == method }
     }
 

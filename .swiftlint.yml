@@ -35,6 +35,10 @@ only_rules:
   - duplicate_conditions
   - yoda_condition
   - untyped_error_in_catch
+  - force_cast
+  - force_try
+  - identifier_name
+  - file_length
   - shorthand_operator
   - toggle_bool
   - syntactic_sugar
@@ -65,6 +69,19 @@ only_rules:
   - no_force_try_outside_core
   - no_force_cast_outside_capture
   - no_raw_sql_outside_core
+  - no_fatal_error
+  - no_static_mutable
+  - no_nonisolated_unsafe
+  - no_very_long_line
+
+identifier_name:
+  min_length: 1
+  max_length: 60
+
+# BackstageView is the largest file today; this catches a future file that grows far beyond it.
+file_length:
+  warning: 2200
+  error: 2600
 
 # `swiftlint analyze --compiler-log-path <xcodebuild log>` only.
 analyzer_rules:
@@ -161,4 +178,38 @@ custom_rules:
     match_kinds:
       - string
     message: "SQL 只能放在 Core/Storage 或 Core/Memory；界面和 App 通过 LibraryStore 访问。"
+    severity: error
+
+  no_fatal_error:
+    name: "No fatalError outside init(coder:)"
+    regex: 'fatalError\((?!\s*"init\(coder:)'
+    message: "避免 fatalError；可恢复的失败用 throws/optional。init(coder:) 的固定写法是唯一例外。"
+    severity: error
+
+  no_static_mutable:
+    name: "No mutable static state"
+    excluded:
+      - 'Tests/.*'
+      - '.*/Tests/.*'
+    regex: '(?m)^\s*(?:public |internal |private |fileprivate )?static var \w+\s*(?::\s*[^={\n]+)?='
+    message: "不要在类型上保存可变的 static 状态；用 actor、@MainActor 或实例状态。"
+    severity: error
+
+  no_nonisolated_unsafe:
+    name: "No nonisolated(unsafe)"
+    regex: 'nonisolated\(\s*unsafe\s*\)'
+    message: "不用 nonisolated(unsafe)；用 actor、Sendable 或显式锁，并说明理由。"
+    severity: error
+
+  no_very_long_line:
+    name: "Line too long"
+    regex: '(?-s)(?m)^.{301,}$'
+    excluded:
+      - 'MyClip/Core/Prompt/.*'
+      - '.*/Core/Prompt/.*'
+      - 'MyClip/App/Model/MyClipModel\+PreviewSeeding\.swift'
+      - '.*/MyClipModel\+PreviewSeeding\.swift'
+      - 'Tests/.*'
+      - '.*/Tests/.*'
+    message: "单行超过 300 字符；拆成多行。提示词、测试和必须保持单一本地化键的示例文案不在此规则内。"
     severity: error

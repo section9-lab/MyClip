@@ -263,6 +263,8 @@ final class FocusedCaptureService {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXFocusedWindowAttribute as CFString, &value) == .success,
               let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        // CFGetTypeID checked above; Swift 6 rejects conditional downcasts to CoreFoundation types.
+        // swiftlint:disable:next force_cast
         let window = value as! AXUIElement
         var positionValue: CFTypeRef?, sizeValue: CFTypeRef?, titleValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionValue) == .success,
@@ -270,7 +272,10 @@ final class FocusedCaptureService {
               let positionValue, let sizeValue,
               CFGetTypeID(positionValue) == AXValueGetTypeID(), CFGetTypeID(sizeValue) == AXValueGetTypeID() else { return nil }
         var point = CGPoint.zero, size = CGSize.zero
+        // CFGetTypeID checked above; Swift 6 rejects conditional downcasts to CoreFoundation types.
+        // swiftlint:disable:next force_cast
         guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &point),
+              // swiftlint:disable:next force_cast
               AXValueGetValue(sizeValue as! AXValue, .cgSize, &size), size.width > 1, size.height > 1 else { return nil }
         AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue)
         return Focus(app: app, window: window, frame: CGRect(origin: point, size: size), title: titleValue as? String ?? "")

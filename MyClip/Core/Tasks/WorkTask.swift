@@ -230,7 +230,11 @@ extension LibraryStore {
             guard try database.run("SELECT id FROM work_tasks WHERE id=?", [id.uuidString]).first != nil else { throw LibraryError.invalidResult(String(localized: "任务不存在。")) }
             guard try database.run("SELECT id FROM work_tasks WHERE identity=? AND id<>?", [fields.identity, id.uuidString]).isEmpty else { throw LibraryError.invalidResult(String(localized: "同项目下已有同名任务。")) }
             let time = String(Date().timeIntervalSince1970)
-            try database.run("UPDATE work_tasks SET title=?,project=?,identity=?,updated_at=?,waiting_reason=coalesce(?,waiting_reason),status_observed_at=? WHERE id=?", [fields.title, fields.project, fields.identity, time, waitingReason?.trimmingCharacters(in: .whitespacesAndNewlines), time, id.uuidString])
+            try database.run(
+                "UPDATE work_tasks SET title=?,project=?,identity=?,updated_at=?,waiting_reason=coalesce(?,waiting_reason),status_observed_at=? WHERE id=?",
+                [fields.title, fields.project, fields.identity, time,
+                 waitingReason?.trimmingCharacters(in: .whitespacesAndNewlines), time, id.uuidString]
+            )
         }
     }
 
