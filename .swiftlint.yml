@@ -1,0 +1,164 @@
+# SwiftLint configuration for MyClip.
+#
+# The set is deliberately explicit: `only_rules` keeps the result stable across
+# SwiftLint updates, and every rule below reports zero violations today. Add a
+# rule together with the cleanup that makes the tree pass it.
+included:
+  - MyClip
+  - Sources
+  - Tests
+excluded:
+  - .build
+  - build
+  - Legacy
+  - website
+  - docs
+  - benchmark
+
+only_rules:
+  # Safety and correctness.
+  - blanket_disable_command
+  - superfluous_disable_command
+  - todo
+  - weak_delegate
+  - duplicate_imports
+  - trailing_whitespace
+  - private_over_fileprivate
+  - empty_parameters
+  - empty_enum_arguments
+  - empty_collection_literal
+  - unused_closure_parameter
+  - unused_enumerated
+  - redundant_discardable_let
+  - redundant_string_enum_value
+  - identical_operands
+  - duplicate_conditions
+  - yoda_condition
+  - untyped_error_in_catch
+  - shorthand_operator
+  - toggle_bool
+  - syntactic_sugar
+  - legacy_constructor
+  - legacy_hashing
+  - object_literal
+  - override_in_extension
+  - protocol_property_accessors_order
+  # Idiomatic collection handling.
+  - contains_over_first_not_nil
+  - contains_over_filter_count
+  - contains_over_range_nil_comparison
+  - first_where
+  - last_where
+  - unneeded_parentheses_in_closure_argument
+  # Test hygiene.
+  - balanced_xctest_lifecycle
+  - empty_xctest_method
+  - final_test_case
+  - xctfail_message
+  # Project rules (defined under custom_rules below; only_rules must name them too).
+  - no_print
+  - no_nslog
+  - no_secret_literal
+  - no_insecure_http
+  - no_hardcoded_home_path
+  - core_no_swiftui
+  - no_force_try_outside_core
+  - no_force_cast_outside_capture
+  - no_raw_sql_outside_core
+
+# `swiftlint analyze --compiler-log-path <xcodebuild log>` only.
+analyzer_rules:
+  - unused_import
+
+custom_rules:
+  no_print:
+    excluded:
+      - 'Tests/.*'
+      - '.*/Tests/.*'
+      - 'Sources/.*'
+      - '.*/Sources/.*'
+
+    name: "No print"
+    regex: '(?<![\w.])(print|debugPrint|dump)\s*\('
+    match_kinds:
+      - identifier
+    message: "不要用 print/debugPrint/dump；进度写进 captureStatus，错误用 notice，日志用 os.Logger。"
+    severity: error
+
+  no_nslog:
+    excluded:
+      - 'Tests/.*'
+      - '.*/Tests/.*'
+
+    name: "No NSLog"
+    regex: '(?<![\w.])NSLog\s*\('
+    match_kinds:
+      - identifier
+    message: "不要用 NSLog；错误走 notice，调试信息走 os.Logger。"
+    severity: error
+
+  no_secret_literal:
+    excluded:
+      - 'Tests/.*'
+      - '.*/Tests/.*'
+
+    name: "No secret literal"
+    regex: '(sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[abps]-[A-Za-z0-9-]{10,})'
+    match_kinds:
+      - string
+    message: "不要把密钥写进源码；放进 Keychain 或本地配置。"
+    severity: error
+
+  no_insecure_http:
+    excluded:
+      - 'Tests/.*'
+      - '.*/Tests/.*'
+
+    name: "No insecure HTTP"
+    regex: 'http://(?!127\.0\.0\.1|localhost)'
+    match_kinds:
+      - string
+    message: "外部请求必须用 https；本机回调才允许 http://127.0.0.1 或 http://localhost。"
+    severity: error
+
+  no_hardcoded_home_path:
+    excluded:
+      - 'Tests/.*'
+      - '.*/Tests/.*'
+
+    name: "No hardcoded home path"
+    regex: '/Users/[^"\s]+'
+    match_kinds:
+      - string
+    message: "不要写死 /Users/…；用 FileManager 的目录 API。"
+    severity: error
+
+  core_no_swiftui:
+    name: "Core must not import SwiftUI"
+    included: '.*MyClip/Core/.*'
+    regex: '(?m)^import SwiftUI$'
+    message: "Core 不能依赖 SwiftUI；展示逻辑放在 MyClip/Features，通过状态或闭包回传。"
+    severity: error
+
+  no_force_try_outside_core:
+    name: "No try! outside Core"
+    included: '.*MyClip/(App|Features)/.*'
+    regex: '\btry!'
+    message: "界面和 App 层禁止 try!；用 do/catch、try? 并显式处理失败。"
+    severity: error
+
+  no_force_cast_outside_capture:
+    name: "No as! outside Capture"
+    included: '.*MyClip/(App|Features)/(?!Capture/).*'
+    regex: '\bas!'
+    message: "禁止 as!；用条件转换（as? / guard let）或类型化 API。"
+    severity: error
+
+  no_raw_sql_outside_core:
+    name: "Raw SQL stays in Core"
+    included: '.*MyClip/(App|Features)/.*'
+    regex: '(?i)\b(SELECT\s[^"\n]{0,200}\sFROM|INSERT\sINTO|DELETE\sFROM|UPDATE\s[^"\n]{0,80}\sSET)\b'
+    match_kinds:
+      - string
+    message: "SQL 只能放在 Core/Storage 或 Core/Memory；界面和 App 通过 LibraryStore 访问。"
+    severity: error

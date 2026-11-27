@@ -7,6 +7,7 @@ suite="${1:-all}"
 if [[ $# -gt 0 ]]; then shift; fi
 case "$suite" in
     all)
+        bash Scripts/test.sh lint
         bash Scripts/test.sh core
         bash Scripts/test.sh cloud-sync
         bash Scripts/test.sh scripts
@@ -17,6 +18,13 @@ case "$suite" in
         ;;
     core) swift test "$@" ;;
     cloud-sync) bash Tests/CloudSync/run.sh "$@" ;;
+    lint)
+        if ! command -v swiftlint >/dev/null 2>&1; then
+            echo "SwiftLint is required for this check: brew install swiftlint" >&2
+            exit 2
+        fi
+        swiftlint lint --strict --config .swiftlint.yml
+        ;;
     scripts)
         node --test Tests/Adapters/test_ephemeral_codex.cjs
         node --test Tests/SubscriptionAgent/*.test.mjs
@@ -33,5 +41,5 @@ case "$suite" in
         SPARKLE_BIN="${SPARKLE_BIN:-build/app-tests/SourcePackages/artifacts/sparkle/Sparkle/bin}" \
             PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Tests/Updates -v
         ;;
-    *) echo "Usage: bash Scripts/test.sh [all|core|cloud-sync|scripts|benchmark|app [TestName...]|performance|updates]" >&2; exit 2 ;;
+    *) echo "Usage: bash Scripts/test.sh [all|lint|core|cloud-sync|scripts|benchmark|app [TestName...]|performance|updates]" >&2; exit 2 ;;
 esac

@@ -104,7 +104,13 @@ xcodegen generate
 bash Scripts/test.sh
 ```
 
-`Scripts/test.sh` 是本地与 CI 共用的入口，默认依次运行核心、脚本、benchmark 和原生应用测试。原生测试需要 macOS 图形会话。分组运行和单项筛选见 [测试说明](../Tests/README.md)。
+`Scripts/test.sh` 是本地与 CI 共用的入口，默认依次运行 lint、核心、脚本、benchmark 和原生应用测试。原生测试需要 macOS 图形会话。分组运行和单项筛选见 [测试说明](../Tests/README.md)。
+
+SwiftLint 规则在仓库根的 `.swiftlint.yml`，目前全部为零违规；新增规则时要同时清理现有违规（或单独排除），再提交。CI 的 `Lint` 工作流固定使用 SwiftLint 0.65.1。需要 `swiftlint analyze` 的类型感知规则时，传入 xcodebuild 日志：
+
+```sh
+swiftlint analyze --config .swiftlint.yml --compiler-log-path build/xcodebuild.log
+```
 
 ```sh
 xcodebuild -project MyClip.xcodeproj -scheme MyClip -configuration Debug build
