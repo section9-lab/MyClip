@@ -38,7 +38,7 @@ Memory 仅保存有来源依据的上下文：`Daily/` 记录经过，`Wiki/` �
 
 | 管道 | 触发 | 写入范围 | 代码入口 |
 |---|---|---|---|
-| 实时（batch） | 每 5 分钟，一批 ≤8 张截图 | 只写 `Daily/YYYY/MM/DD/YYYY-MM-DD-HH-主题.md`（一个事件一个文件，不建当天索引）；不改 Wiki、根文件，不调工具，不返回任务 JSON | `DayPrompt.daily`，`MemoryRules.dailyWriting` |
+| 实时（batch） | 新截图最多攒 5 分钟成一批（≤8 张），批次之间不额外等待 | 只写 `Daily/YYYY/MM/DD/YYYY-MM-DD-HH-主题.md`（一个事件一个文件，不建当天索引）；不改 Wiki、根文件，不调工具，不返回任务 JSON | `DayPrompt.daily`，`MemoryRules.dailyWriting` |
 | 定期整理（digest） | 每小时一次，且上次整理后有 Daily 页面变化 | 读水位线之后的 Daily，归纳进 `Wiki/`、`Memory.md`、`Now.md`、`Profile.md`；调用看板工具（`board_list` / `board_add` / `board_update` / `board_delete`）与日历工具（`calendar_list` / `calendar_add` / `calendar_update` / `calendar_delete`）分别维护两个独立功能 | `DayPrompt.digest`，`MemoryDigest`，`MemoryRules.reviewWriting` |
 
 - 水位线是 `vault_meta.digest_at`，取上次 digest 的开始时间，所以整理期间新写的页面下一轮会读到；每次最多 8 个 Daily 页（`MemoryDigest.scopeLimit`），积压小时数会在之后几轮补齐。

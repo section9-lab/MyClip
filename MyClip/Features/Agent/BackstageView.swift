@@ -799,7 +799,7 @@ struct BackstageView: View {
     private var rulesPopover: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("整理规则").font(.headline)
-            Text("按截图时间先后整理，自动整理之间至少间隔 5 分钟。")
+            Text("按截图时间先后整理；一批完成后立刻接下一批，失败会自动重试，不需要手动点重试。")
             Text("最多 8 张截图。")
             Text("回车、鼠标和手动截图都将原图交给 Agent；OCR 文字只用于本机搜索和原文查看。")
             Text(dreamHelp)

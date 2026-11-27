@@ -1,20 +1,25 @@
 import Foundation
 
-/// Decides whether a failed organization batch is retried on its own or waits for the user.
+/// Decides how a failed organization batch is retried. The queue never waits for the user: every failure goes back
+/// in line and tries again. Task ingestion keeps its own bounded budget.
 public enum RetryPolicy {
     public enum Verdict: Sendable, Equatable { case transient, permanent }
 
-    /// Attempts a batch gets before the queue pauses, counting the first run. With the backoff below a batch keeps
-    /// retrying for about two hours, long enough to ride out a flaky network or an overloaded provider.
+    /// Tries a task-ingestion stage gets before it waits for the user. The organization queue has no cap.
     public static let maxAttempts = 6
 
+    /// Wait before a failed batch runs again. It is short on purpose: a backlog drains linearly instead of pausing.
+    public static let queueDelay: TimeInterval = 5
+
+    /// Task ingestion's growing backoff; the organization queue never uses it.
     static let backoff: [TimeInterval] = [60, 300, 900, 1800, 3600]
 
-    /// Wait before automatically re-running a batch. The queue's own 5 minute interval still applies on top.
+    /// Wait before task ingestion tries again.
     public static func delay(afterAttempt attempt: Int) -> TimeInterval {
         backoff[min(max(attempt, 1), backoff.count) - 1]
     }
 
+    /// Task-ingestion budget only; the organization queue retries without one.
     public static func canRetry(afterAttempt attempt: Int) -> Bool { attempt < maxAttempts }
 
     public static func classify(_ error: any Error) -> Verdict {

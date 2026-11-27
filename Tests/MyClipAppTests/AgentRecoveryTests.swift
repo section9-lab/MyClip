@@ -110,9 +110,11 @@ import Combine
             _ = try await limited.claimNextJob(immediately: true, jobID: limitedID)
         }
         try await limited.finishJob(id: limitedID, state: .failed, error: "certificate verify failed")
-        check(try await !limited.recoverRetryableOrganizationFailure(agent: .opencode),
-              "Automatic recovery never resets an exhausted attempt budget")
-        check(try await limited.snapshot().queue.paused, "Exhausted retries keep a visible failure for user action")
+        check(try await !limited.snapshot().queue.paused, "A failure never parks the queue")
+        try await limited.setOrganizationPaused(true, reason: "certificate verify failed")
+        check(try await limited.recoverRetryableOrganizationFailure(agent: .opencode),
+              "Automatic recovery lifts a legacy pause regardless of the attempt budget")
+        check(try await !limited.snapshot().queue.paused, "The recovered queue runs again")
 
         try await model.store.record(image: image,
             context: CaptureContext(appName: "Fixture", bundleID: "test.recovery", windowTitle: "Recovery", windowID: 1,
@@ -144,9 +146,7 @@ import Combine
         model.handle(.disconnected(""), agent: .opencode)
         model.connect(.opencode)
         try await waitUntil { model.state(.opencode).phase == .failed }
-        check(model.agentRetryAt[.opencode] == nil, "Authentication failure requires user action")
-        await model.recoverOrganizationIfNeeded(at: now.addingTimeInterval(100_000))
-        check(model.state(.opencode).phase == .failed, "Time passing does not retry an authentication failure")
+        check(model.agentRetryAt[.opencode] != nil, "Every failure schedules its own retry, including authentication")
 
         try setScenario("prompt_certificate")
         model.connect(.opencode)
@@ -162,6 +162,7 @@ import Combine
         await model.processNext()
         check(model.library.jobs.first { $0.id == jobID }?.attempts == 1, "Normal dispatch respects the scheduled retry deadline")
         try setScenario("task_recovery_empty")
+        await model.recoverOrganizationIfNeeded(at: now.addingTimeInterval(10))
         await model.processNext(immediately: true, jobID: jobID)
         check(model.library.jobs.first { $0.id == jobID }?.state == .completed, "A later healthy connection settles the same batch")
 
@@ -169,7 +170,7 @@ import Combine
         let olderID = try await model.store.enqueue(sourceIDs: [source.id], agent: .opencode)
         for _ in 1...3 {
             _ = try await model.store.claimNextJob(immediately: true, jobID: olderID)
-            try await model.store.scheduleRetry(id: olderID, error: "Agent 响应超时，可以重试。", at: now.addingTimeInterval(-2000))
+            try await model.store.scheduleRetry(id: olderID, error: "Agent 响应超时，将自动重试。", at: now.addingTimeInterval(-2000))
         }
         let failedID = try await model.store.enqueue(sourceIDs: [source.id], agent: .opencode)
         _ = try await model.store.claimNextJob(immediately: true, jobID: failedID)
@@ -179,12 +180,12 @@ import Combine
         try database.run("UPDATE job_times SET finished_at=? WHERE id=?", [String(now.addingTimeInterval(-1000).timeIntervalSince1970), failedID.uuidString])
         try database.run("UPDATE organization_queue SET last_started_at=? WHERE id=1", [String(now.addingTimeInterval(-1000).timeIntervalSince1970)])
         await model.refresh()
-        check(model.processingPaused, "The fixture reproduces the persisted queue pause")
+        check(!model.processingPaused, "The failure itself no longer parks the queue")
         try await model.store.setOrganizationPaused(true)
         await model.refresh()
         await model.recoverOrganizationIfNeeded()
         check(model.processingPaused && model.library.jobs.first { $0.id == failedID }?.state == .failed,
-              "Automatic recovery preserves a manual pause")
+              "Automatic recovery preserves an explicit manual pause")
         try await model.store.setOrganizationPaused(true, reason: "Internal error: unknown certificate verification error")
         let restarted = try MyClipModel(root: model.store.root, preview: false, preferences: preferences)
         defer { restarted.stop() }
@@ -193,11 +194,14 @@ import Combine
         UserDefaults.standard.set(true, forKey: "myclip.coldStartIngestionAttempted")
         defer { UserDefaults.standard.set(previousColdStart, forKey: "myclip.coldStartIngestionAttempted") }
         restarted.start()
-        try await waitUntil { restarted.library.jobs.contains { $0.id == olderID && $0.state == .completed } }
-        check(!restarted.processingPaused, "The actual startup worker automatically lifts a legacy retryable pause")
+        try await waitUntil {
+            let jobs = restarted.library.jobs
+            return jobs.contains { $0.id == olderID && $0.state == .completed }
+                && !jobs.contains { $0.id == failedID && $0.state == .failed }
+        }
+        check(!restarted.processingPaused, "The actual startup worker automatically lifts a legacy pause")
         let recovered = restarted.library.jobs.first { $0.id == failedID }
-        check(recovered?.isAwaitingRetry == true && recovered?.attempts == 1,
-              "Startup preserves the certificate batch and its original retry budget")
+        check(recovered?.state != .failed, "A failed batch resumes without a user click")
         check(restarted.library.jobs.first { $0.id == olderID }?.attempts == 4,
               "The previously blocked timeout batch completes its fourth attempt automatically")
         if failures > 0 { throw LibraryError.invalidResult("\(failures) Agent recovery checks failed") }

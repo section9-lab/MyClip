@@ -32,9 +32,9 @@ extension LibraryStore {
     public func recoverInterruptedJobs(at date: Date = Date()) throws {
         try recoverInterruptedTaskIngestions(at: date)
         try recoverHistoricalTaskIngestions(at: date)
+        var failedBatches: [UUID] = []
         try database.transaction {
             let running = try database.run("SELECT id,attempts,kind FROM jobs WHERE state='running'")
-            guard !running.isEmpty else { return }
             for row in running {
                 guard let id = row["id"].flatMap(UUID.init(uuidString:)) else { continue }
                 let attempts = Int(row["attempts"] ?? "0") ?? 0
@@ -47,16 +47,20 @@ extension LibraryStore {
                         try database.run("UPDATE jobs SET state='failed',error=?,retry_at=NULL WHERE id=?", [String(localized: "上次做梦被中断，明天会再做。"), id.uuidString])
                         try database.run("UPDATE job_times SET finished_at=? WHERE id=?", [String(date.timeIntervalSince1970), id.uuidString])
                     }
-                } else if RetryPolicy.canRetry(afterAttempt: attempts) {
-                    try requeue(id: id, error: String(localized: "上次整理被中断，会自动重新整理。"), at: date.addingTimeInterval(RetryPolicy.delay(afterAttempt: attempts)))
                 } else {
-                    let reason = String(localized: "上次整理被中断，且已重试 \(attempts) 次；已保留截图和已有 Memory，请手动重试。")
-                    try database.run("UPDATE jobs SET state='failed',error=?,retry_at=NULL WHERE id=?", [reason, id.uuidString])
-                    try database.run("UPDATE job_times SET finished_at=? WHERE id=?", [String(date.timeIntervalSince1970), id.uuidString])
-                    try setOrganizationPaused(true, reason: reason)
+                    // A batch never waits for the user: whatever stopped it, it goes straight back in line.
+                    try requeue(id: id, error: String(localized: "上次整理被中断，会自动继续。"), at: date)
                 }
             }
+            for row in try database.run("SELECT id FROM jobs WHERE state='failed' AND kind!='dream'") {
+                if let id = row["id"].flatMap(UUID.init(uuidString:)) { failedBatches.append(id) }
+            }
+            // A backlog inherited from an older build still carries its old backoff; start it now.
+            try database.run("UPDATE jobs SET retry_at=? WHERE state='queued' AND attempts>0 AND retry_at>? AND kind!='dream'",
+                             [String(date.timeIntervalSince1970), String(date.timeIntervalSince1970)])
         }
+        // Failures left by older builds resume without a click; a batch whose screenshots are gone stays failed.
+        for id in failedBatches { try? retryJob(id: id) }
     }
 
     @discardableResult
@@ -79,7 +83,6 @@ extension LibraryStore {
             guard try !database.run("SELECT id FROM jobs WHERE id=? AND state IN ('running','queued')", [id.uuidString]).isEmpty else { return }
             try database.run("UPDATE jobs SET state=?,error=?,retry_at=NULL WHERE id=?", [state.rawValue, error, id.uuidString])
             try database.run("UPDATE job_times SET finished_at=? WHERE id=?", [String(Date().timeIntervalSince1970), id.uuidString])
-            if state == .failed { try setOrganizationPaused(true, reason: error ?? String(localized: "整理失败，请手动重试。")) }
         }
     }
 
@@ -134,24 +137,20 @@ extension LibraryStore {
         }
     }
 
-    /// Reclassify the failure that owns a persisted pause without resetting its retry budget. This also repairs queues
-    /// stopped by older builds that treated transport/certificate errors as permanent. Manual pauses have no reason.
+    /// Lifts a pause left by an older build and puts its failed batch straight back in line. Current failures are
+    /// requeued by the dispatcher, so this only repairs a paused queue persisted by an earlier version.
     @discardableResult
     public func recoverRetryableOrganizationFailure(agent: ClipAgent, at date: Date = Date()) throws -> Bool {
         try database.transaction {
             guard let settings = try database.run("SELECT paused,pause_reason FROM organization_queue WHERE id=1").first,
                   settings["paused"] == "1", let reason = settings["pause_reason"],
-                  RetryPolicy.classify(message: reason) == .transient,
                   let row = try database.run("""
                     SELECT j.*,t.finished_at FROM jobs j LEFT JOIN job_times t ON t.id=j.id
                     WHERE j.state='failed' AND j.error=? ORDER BY t.finished_at DESC,j.rowid DESC LIMIT 1
                     """, [reason]).first,
                   row["agent"] == agent.rawValue, row["kind"] == ClipJobKind.batch.rawValue,
                   let id = row["id"].flatMap(UUID.init(uuidString:)) else { return false }
-            let attempts = Int(row["attempts"] ?? "0") ?? 0
-            guard RetryPolicy.canRetry(afterAttempt: attempts) else { return false }
-            let finished = row["finished_at"].flatMap(Double.init).map(Date.init(timeIntervalSince1970:)) ?? date
-            try requeue(id: id, error: reason, at: finished.addingTimeInterval(RetryPolicy.delay(afterAttempt: attempts)))
+            try requeue(id: id, error: reason, at: date)
             try setOrganizationPaused(false)
             return true
         }

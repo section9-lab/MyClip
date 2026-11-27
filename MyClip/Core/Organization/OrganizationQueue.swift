@@ -59,7 +59,7 @@ extension LibraryStore {
             """) {
             if let agent = row["agent"].flatMap(ClipAgent.init(rawValue:)) { result.pendingCounts[agent] = Int(row["n"] ?? "0") ?? 0 }
         }
-        if let head = try queueHead(at: date, lastStartedAt: result.lastStartedAt) {
+        if let head = try queueHead(at: date) {
             result.nextAgent = head.agent
             result.readyAt = head.readyAt
         }
@@ -131,19 +131,15 @@ extension LibraryStore {
         let readyAt: Date
     }
 
-    /// The next batch to run and when it may start. A batch that already ran once goes first as soon as its backoff has
-    /// passed; until then fresh screenshots and hand-picked batches keep the queue busy in the order they arrived. When
-    /// both are due, the unfinished batch wins. Every start also waits out the queue's own interval since the previous start.
-    private func queueHead(at date: Date, lastStartedAt: Date? = nil) throws -> QueueHead? {
-        let lastStarted = try lastStartedAt
-            ?? database.run("SELECT last_started_at FROM organization_queue WHERE id=1").first?["last_started_at"]
-                .flatMap(Double.init).map(Date.init(timeIntervalSince1970:))
-        let floor = lastStarted?.addingTimeInterval(OrganizationQueue.interval) ?? .distantPast
+    /// The next batch to run and when it may start. A batch that already ran once goes first as soon as its retry
+    /// time has passed; fresh screenshots keep their five-minute batching window so a batch has something to read.
+    /// Nothing waits for the previous job: the dispatcher calls this again as soon as one finishes.
+    private func queueHead(at date: Date) throws -> QueueHead? {
         var unfinished: QueueHead?
         if let row = try database.run("SELECT id,agent,retry_at FROM jobs WHERE state='queued' AND attempts>0 ORDER BY retry_at,created_at,rowid LIMIT 1").first,
            let id = row["id"], let agent = row["agent"].flatMap(ClipAgent.init(rawValue:)) {
             let retryAt = row["retry_at"].flatMap(Double.init).map(Date.init(timeIntervalSince1970:)) ?? .distantPast
-            unfinished = QueueHead(item: .job(id), agent: agent, readyAt: max(retryAt, floor))
+            unfinished = QueueHead(item: .job(id), agent: agent, readyAt: retryAt)
         }
         var fresh: QueueHead?
         // A queued dream goes first: an automatic one is only queued when nothing else waits, a manual one was asked for.
@@ -154,7 +150,7 @@ extension LibraryStore {
             """).first, let id = row["id"], let agent = row["agent"].flatMap(ClipAgent.init(rawValue:)),
            let queuedAt = row["queued_at"].flatMap(Double.init) {
             let oldestDeadline = row["dream"] == "1" ? Date(timeIntervalSince1970: queuedAt) : Date(timeIntervalSince1970: queuedAt).addingTimeInterval(OrganizationQueue.interval)
-            fresh = QueueHead(item: row["kind"] == "job" ? .job(id) : .captures, agent: agent, readyAt: max(oldestDeadline, floor))
+            fresh = QueueHead(item: row["kind"] == "job" ? .job(id) : .captures, agent: agent, readyAt: oldestDeadline)
         }
         guard let unfinished else { return fresh }
         guard let fresh else { return unfinished }

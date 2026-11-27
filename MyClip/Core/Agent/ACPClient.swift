@@ -106,7 +106,7 @@ public enum ACPError: Error, LocalizedError, Sendable {
         case .disconnected(let message): String(localized: "Agent 连接已关闭。\(message)")
         case .protocolError(let message): String(localized: "Agent 通信错误：\(message)")
         case .unsupportedImages: String(localized: "此 Agent 未提供截图处理能力。")
-        case .timeout: String(localized: "Agent 响应超时，可以重试。")
+        case .timeout: String(localized: "Agent 响应超时，将自动重试。")
         case .remote(_, let message):
             if message.localizedCaseInsensitiveContains("connection refused") {
                 String(localized: "无法连接 Agent 服务或代理，请检查 Claude Code / Codex 的网络配置。\n\(message)")

@@ -287,6 +287,8 @@ final class MyClipModel: ObservableObject {
     private var workerSleep: Task<Void, Never>?
     private var workerSleepToken: UUID?
     private var workerWakePending = false
+    /// Set by a dispatch that claimed work, so the worker can start the next batch without its refresh tick.
+    var didWorkInLastRun = false
     var lastPermissionRefresh = Date.distantPast
     private var searchTask: Task<Void, Never>?
     private var refreshOperation: Task<Void, Never>?
@@ -395,9 +397,12 @@ final class MyClipModel: ObservableObject {
                 if !preview && !backgroundSuspended {
                     await cleanupIfNeeded()
                     await recoverOrganizationIfNeeded()
-                    if !processingPaused { await processNext() }
+                    let didWork: Bool
+                    if processingPaused { didWork = false } else { didWork = await processNext() }
                     await refreshIfNeeded()
                     startTextRecognition()
+                    // A finished batch does not wait for the next tick: the backlog drains back to back.
+                    if didWork { continue }
                 }
                 await waitForWorker(nextWorkerDelay())
             }

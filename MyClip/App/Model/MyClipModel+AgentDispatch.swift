@@ -546,17 +546,20 @@ extension MyClipModel {
         }
     }
 
-    func processNext(immediately: Bool = false, jobID: UUID? = nil, agent: ClipAgent? = nil) async {
-        guard canStartOrganization, organizationTask == nil, let enabled = preferences.enabledAgent else { return }
+    @discardableResult
+    func processNext(immediately: Bool = false, jobID: UUID? = nil, agent: ClipAgent? = nil) async -> Bool {
+        guard canStartOrganization, organizationTask == nil, let enabled = preferences.enabledAgent else { return false }
         // Reserve dispatch with the task handle before the first await. An empty queue check is
         // not visible work: toggling @Published dispatching here redraws Backstage on every tick.
         organizationAgent = enabled
+        didWorkInLastRun = false
         let task = Task { await runNext(immediately: immediately, jobID: jobID, agent: agent, enabled: enabled) }
         organizationTask = task
         await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
         organizationTask = nil
         organizationAgent = nil
         if dispatching { dispatching = false }
+        return didWorkInLastRun
     }
 
     private func runNext(immediately: Bool, jobID: UUID?, agent: ClipAgent?, enabled: ClipAgent) async {
@@ -572,6 +575,7 @@ extension MyClipModel {
                     return
                 }
                 dispatching = true
+                didWorkInLastRun = true
                 await repairTaskIngestion(stage, agent: enabled)
                 return
             }
@@ -599,6 +603,7 @@ extension MyClipModel {
             guard target == preferences.enabledAgent, !state(target).busy, state(target).phase != .failed,
                   let job = try await store.claimNextJob(immediately: immediately, jobID: jobID) else { return }
             dispatching = true
+            didWorkInLastRun = true
             liveActivities = []
             responseBuffer = ""
             responsePublishedAt = .distantPast
@@ -653,16 +658,11 @@ extension MyClipModel {
                     try await store.finishJob(id: job.id, state: .cancelled)
                     agents[job.agent]?.phase = .disconnected
                     agents[job.agent]?.detail = String(localized: "整理已取消")
-                } else if RetryPolicy.classify(error) == .transient, RetryPolicy.canRetry(afterAttempt: job.attempts) {
-                    // Timeouts, dropped connections and overloaded providers get another run without stopping the queue.
-                    let delay = RetryPolicy.delay(afterAttempt: job.attempts)
-                    try await store.scheduleRetry(id: job.id, error: error.localizedDescription, at: Date().addingTimeInterval(delay))
-                    agents[job.agent]?.phase = .disconnected
-                    agents[job.agent]?.detail = String(localized: "\(firstLine(error)) · 将自动重试")
                 } else {
-                    let attemptsNote = job.attempts > 1 ? String(localized: "已自动重试 \(job.attempts - 1) 次仍未成功。") : ""
-                    try await store.finishJob(id: job.id, state: .failed, error: attemptsNote + error.localizedDescription)
-                    setFailure(job.agent, error, automaticallyRetry: false)
+                    // No failure parks the queue or asks the user: the batch goes back in line and tries again.
+                    try await store.scheduleRetry(id: job.id, error: error.localizedDescription,
+                                                  at: Date().addingTimeInterval(RetryPolicy.queueDelay))
+                    setFailure(job.agent, error)
                 }
             }
             await releaseSession(job.agent)
@@ -919,9 +919,8 @@ extension MyClipModel {
 
     private func setFailure(_ agent: ClipAgent, _ error: any Error, automaticallyRetry: Bool = true) {
         agents[agent]?.phase = .failed
-        let retryable = automaticallyRetry && preferences.enabledAgent == agent && RetryPolicy.classify(error) == .transient
-        agents[agent]?.detail = retryable ? String(localized: "\(firstLine(error)) · 将自动重试") : firstLine(error)
-        agentRetryAt[agent] = retryable ? Date().addingTimeInterval(RetryPolicy.delay(afterAttempt: 1)) : nil
+        agents[agent]?.detail = automaticallyRetry ? String(localized: "\(firstLine(error)) · 将自动重试") : firstLine(error)
+        agentRetryAt[agent] = automaticallyRetry ? Date().addingTimeInterval(RetryPolicy.queueDelay) : nil
         wakeWorker()
     }
 
