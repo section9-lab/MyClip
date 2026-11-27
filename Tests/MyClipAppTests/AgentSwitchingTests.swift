@@ -63,7 +63,7 @@ import MyClipCore
                                     reason: .manual, date: .now.addingTimeInterval(-1000)),
             agent: .opencode, organize: true, extractedText: "test")
         await model.refresh()
-        let run = Task { await model.processNext(immediately: true) }
+        let run = Task { _ = await model.processNext(immediately: true) }
         try await waitUntil { model.activityText.contains("等待取消") }
         let oldJob = model.currentJob!
         model.disableAgent()
@@ -92,7 +92,7 @@ import MyClipCore
             preferences.enabledAgent = .opencode
             let id = try await model.store.enqueue(sourceIDs: oldJob.sourceIDs, agent: .opencode)
             await model.refresh()
-            let task = Task { await model.processNext(immediately: true, jobID: id, agent: .opencode) }
+            let task = Task { _ = await model.processNext(immediately: true, jobID: id, agent: .opencode) }
             try await waitUntil {
                 model.currentJob?.id == id && (scenario == "connect_hang"
                     ? model.state(.opencode).phase == .connecting : model.activityText.contains("等待取消"))
@@ -177,7 +177,7 @@ import MyClipCore
         _ = try command("opencode", scenario: "hang")
         preferences.enabledAgent = .opencode
         let stageID = try await model.store.enqueueTaskIngestion(response: "bad JSON", sourceIDs: Set(oldJob.sourceIDs), memoryIDs: [])
-        let repair = Task { await model.processNext(immediately: true) }
+        let repair = Task { _ = await model.processNext(immediately: true) }
         try await waitUntil { model.discoveringTasks && model.state(.opencode).phase == .working }
         model.enable(.workbuddy)
         try await waitUntil { !model.dispatching && !model.discoveringTasks }
