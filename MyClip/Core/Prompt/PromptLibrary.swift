@@ -3,7 +3,22 @@ import Foundation
 /// Prompt bodies live as Markdown in `Resources/Prompts`. This type only loads and renders them, so the Swift sources
 /// contain no prompt prose.
 enum PromptLibrary {
-    private static let directory = Bundle.module.resourceURL!.appendingPathComponent("Resources/Prompts", isDirectory: true)
+    /// SwiftPM lays a resource bundle out as `Contents/Resources/Resources` on macOS and as `Resources/Resources`
+    /// (or a flat `Resources`) in other build layouts, so pick the first candidate that holds a known prompt file.
+    private static let directory: URL = {
+        let root = Bundle.module.resourceURL ?? Bundle.module.bundleURL
+        let bundle = Bundle.module.bundleURL
+        let candidates = [
+            root.appendingPathComponent("Resources/Prompts", isDirectory: true),
+            root.appendingPathComponent("Prompts", isDirectory: true),
+            bundle.appendingPathComponent("Contents/Resources/Resources/Prompts", isDirectory: true),
+            bundle.appendingPathComponent("Contents/Resources/Prompts", isDirectory: true),
+            bundle.appendingPathComponent("Resources/Resources/Prompts", isDirectory: true),
+            bundle.appendingPathComponent("Resources/Prompts", isDirectory: true),
+            bundle.appendingPathComponent("Prompts", isDirectory: true)
+        ]
+        return candidates.first { FileManager.default.fileExists(atPath: $0.appendingPathComponent("shared/sandbox.md").path) } ?? candidates[0]
+    }()
 
     static func text(_ name: String) -> String {
         let url = directory.appendingPathComponent(name.hasSuffix(".md") ? name : name + ".md")
